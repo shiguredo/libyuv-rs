@@ -1,0 +1,68 @@
+# 10bit 高ビット深度変換追加
+
+## 概要
+
+10bit 高ビット深度フォーマット (I010, I210, I410, H系, U系, P系) の変換関数を追加する。
+
+## 対象関数
+
+### I010 (10bit I420)
+- I010ToARGB
+- I010ToABGR
+- I010ToAR30
+- I010ToAB30
+- I010ToI420
+- I010ToI410
+- I010ToNV12
+- I010ToP010
+- I010Rotate
+
+### I210 (10bit I422)
+- I210ToARGB
+- I210ToABGR
+- I210ToAR30
+- I210ToAB30
+- I210ToI010
+- I210ToI410
+- I210ToI420
+- I210ToI422
+- I210ToP210
+- I210Copy
+- I210Rotate
+
+### I410 (10bit I444)
+- I410ToARGB (Matrix)
+- I410ToAR30 (Matrix)
+- I410ToI010
+- I410ToI420
+- I410ToI444
+- I410Copy
+- I410Rotate
+
+### H系 (BT.709 10bit)
+- H010ToARGB, H010ToABGR, H010ToAR30, H010ToAB30
+- H210ToARGB, H210ToABGR, H210ToAR30, H210ToAB30
+- H420ToARGB, H420ToABGR, H420ToAR30, H420ToAB30, H420ToRAW, H420ToRGB24, H420ToRGB565
+- H422ToARGB, H422ToABGR
+- H444ToARGB, H444ToABGR
+
+### U系 (12bit unsigned)
+- U010ToARGB, U010ToABGR, U010ToAR30, U010ToAB30
+- U210ToARGB, U210ToABGR, U210ToAR30, U210ToAB30
+- U420ToARGB, U420ToABGR
+- U422ToARGB, U422ToABGR
+- U444ToARGB, U444ToABGR
+
+### P系 (packed 10bit)
+- P010ToI010
+- P010ToNV12
+- P010ToP410
+- P210ToP410
+
+### I420 -> 10bit
+- I420ToI010
+- I420ToAR30
+
+## 解決方法
+
+src/convert.rs に約 60 個の 10bit 高ビット深度変換関数を追加した。src/rotate.rs に i010_rotate, i210_rotate, i410_rotate の 3 つの 10bit 回転関数を追加した。16bit 画像型 (PlanarImage16, BiplanarImage16, PackedImage16) とそのバリデーション関数を src/lib.rs に追加した。

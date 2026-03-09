@@ -1,0 +1,50 @@
+[package]
+name = "fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+arbitrary = { version = "1", features = ["derive"] }
+
+[dependencies.shiguredo_libyuv]
+path = ".."
+
+[[bin]]
+name = "fuzz_convert"
+path = "fuzz_targets/fuzz_convert.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_scale"
+path = "fuzz_targets/fuzz_scale.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_rotate"
+path = "fuzz_targets/fuzz_rotate.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_planar"
+path = "fuzz_targets/fuzz_planar.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_compare"
+path = "fuzz_targets/fuzz_compare.rs"
+test = false
+doc = false
+bench = false

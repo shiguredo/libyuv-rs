@@ -1,0 +1,11 @@
+[package]
+name = "pbt"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+proptest = "1"
+
+[dev-dependencies]
+shiguredo_libyuv = { path = ".." }
