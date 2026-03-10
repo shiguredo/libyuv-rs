@@ -38,7 +38,7 @@ jobs:
   publish:
     needs: github-release
     timeout-minutes: 10
-    runs-on: ubuntu-slim
+    runs-on: ubuntu-24.04
     environment: release
     permissions:
       id-token: write
