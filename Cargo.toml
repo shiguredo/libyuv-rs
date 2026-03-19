@@ -12,6 +12,9 @@ readme = "README.md"
 build = "build.rs"
 include = ["/src/**", "/build.rs", "/patches/**", "/README.md", "/LICENSE"]
 
+[features]
+source-build = []
+
 [dependencies]
 
 [build-dependencies]
