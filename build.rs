@@ -28,15 +28,13 @@ fn main() {
     // Cargo.toml か build.rs が更新されたら、依存ライブラリを再ビルドする
     println!("cargo::rerun-if-changed=Cargo.toml");
     println!("cargo::rerun-if-changed=build.rs");
+    println!("cargo::rerun-if-env-changed=CARGO_FEATURE_SOURCE_BUILD");
+    println!("cargo::rerun-if-env-changed=LIBYUV_TARGET");
 
     // 各種変数やビルドディレクトリのセットアップ
     let out_dir = PathBuf::from(env::var_os("OUT_DIR").expect("infallible"));
-    let out_source_dir = out_dir.join("source/");
-    let src_dir = out_source_dir.join(LIB_NAME);
     let output_metadata_path = out_dir.join("metadata.rs");
     let output_bindings_path = out_dir.join("bindings.rs");
-    let _ = fs::remove_dir_all(&out_source_dir);
-    fs::create_dir(&out_source_dir).expect("failed to create source directory");
 
     // 各種メタデータを書き込む
     let (git_url, version) = get_git_url_and_version();
@@ -75,6 +73,189 @@ fn main() {
         return;
     }
 
+    let output_lib_dir = if should_use_prebuilt() {
+        download_prebuilt(&out_dir)
+    } else {
+        build_from_source(&out_dir, &output_bindings_path)
+    };
+
+    println!(
+        "cargo::rustc-link-search=native={}",
+        output_lib_dir.display()
+    );
+    println!("cargo::rustc-link-lib=static={LINK_NAME}");
+
+    // libyuv は C++ コード (convert_jpeg.cc 等) を含むため C++ 標準ライブラリのリンクが必要
+    let target = env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
+    match target.as_str() {
+        "linux" => println!("cargo::rustc-link-lib=stdc++"),
+        "macos" | "ios" => println!("cargo::rustc-link-lib=c++"),
+        _ => {}
+    }
+}
+
+// source-build feature が有効でなければ prebuilt を使う
+fn should_use_prebuilt() -> bool {
+    if env::var("CARGO_FEATURE_SOURCE_BUILD").is_ok() {
+        return false;
+    }
+    true
+}
+
+// prebuilt バイナリをダウンロードして展開する
+fn download_prebuilt(out_dir: &Path) -> PathBuf {
+    let target = get_target_platform();
+    let version = env::var("CARGO_PKG_VERSION").expect("CARGO_PKG_VERSION is not set");
+    let base_url = format!(
+        "https://github.com/shiguredo/libyuv-rs/releases/download/{}",
+        version
+    );
+    let archive_name = format!("libyuv-{}.tar.gz", target);
+    let archive_url = format!("{}/{}", base_url, archive_name);
+    let sha256_url = format!("{}/{}.sha256", base_url, archive_name);
+
+    let archive_path = out_dir.join("prebuilt.tar.gz");
+    let sha256_path = out_dir.join("prebuilt.sha256");
+    let prebuilt_dir = out_dir.join("prebuilt");
+    fs::create_dir_all(&prebuilt_dir).expect("failed to create prebuilt directory");
+
+    // curl でアーカイブをダウンロード
+    eprintln!("prebuilt ライブラリをダウンロード中: {}", archive_url);
+    let status = Command::new("curl")
+        .args(["-fsSL", "-o"])
+        .arg(&archive_path)
+        .arg(&archive_url)
+        .status()
+        .expect("failed to execute curl. Ensure curl is installed");
+    if !status.success() {
+        panic!("failed to download prebuilt library: {}", archive_url);
+    }
+
+    // curl で SHA256 チェックサムをダウンロード
+    let status = Command::new("curl")
+        .args(["-fsSL", "-o"])
+        .arg(&sha256_path)
+        .arg(&sha256_url)
+        .status()
+        .expect("failed to execute curl");
+    if !status.success() {
+        panic!("failed to download SHA256 checksum: {}", sha256_url);
+    }
+
+    // SHA256 を検証
+    verify_sha256(&archive_path, &sha256_path);
+
+    // tar で展開
+    let status = Command::new("tar")
+        .args(["xzf"])
+        .arg(&archive_path)
+        .arg("-C")
+        .arg(&prebuilt_dir)
+        .status()
+        .expect("failed to execute tar. Ensure tar is installed");
+    if !status.success() {
+        panic!("failed to extract prebuilt archive");
+    }
+
+    // ライブラリファイルを OUT_DIR/lib/ にコピー
+    //
+    // prebuilt アーカイブにはリリースビルド時にシンボル書き換え済みの libyuv.a と
+    // #[link_name] 属性付きの bindings.rs が含まれているため、そのままコピーするだけでよい。
+    let lib_dir = out_dir.join("lib");
+    fs::create_dir_all(&lib_dir).expect("failed to create lib directory");
+    fs::copy(
+        prebuilt_dir.join("lib").join("libyuv.a"),
+        lib_dir.join("libyuv.a"),
+    )
+    .expect("failed to copy libyuv.a");
+
+    // bindings.rs を OUT_DIR/ にコピー
+    fs::copy(
+        prebuilt_dir.join("bindings.rs"),
+        out_dir.join("bindings.rs"),
+    )
+    .expect("failed to copy bindings.rs");
+
+    lib_dir
+}
+
+// SHA256 チェックサムを検証する
+fn verify_sha256(file_path: &Path, sha256_path: &Path) {
+    let expected = fs::read_to_string(sha256_path)
+        .expect("failed to read SHA256 checksum file")
+        .split_whitespace()
+        .next()
+        .expect("SHA256 checksum file is empty")
+        .to_lowercase();
+
+    let actual = compute_sha256(file_path);
+    if actual != expected {
+        panic!(
+            "SHA256 checksum mismatch:\n  expected: {}\n  actual:   {}",
+            expected, actual
+        );
+    }
+    eprintln!("SHA256 checksum verified: {}", actual);
+}
+
+// ファイルの SHA256 ハッシュを計算する
+fn compute_sha256(path: &Path) -> String {
+    let output = if cfg!(target_os = "macos") {
+        // macOS: shasum を使用
+        Command::new("shasum")
+            .args(["-a", "256"])
+            .arg(path)
+            .output()
+            .expect("failed to execute shasum. Ensure shasum is installed")
+    } else if cfg!(target_os = "windows") {
+        // Windows: certutil を使用
+        Command::new("certutil")
+            .args(["-hashfile"])
+            .arg(path)
+            .arg("SHA256")
+            .output()
+            .expect("failed to execute certutil")
+    } else {
+        // Linux: sha256sum を使用
+        Command::new("sha256sum")
+            .arg(path)
+            .output()
+            .expect("failed to execute sha256sum. Ensure coreutils is installed")
+    };
+
+    if !output.status.success() {
+        panic!("failed to compute SHA256 checksum");
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    if cfg!(target_os = "windows") {
+        // certutil 出力形式:
+        // SHA256 hash of <file>:
+        // <hash>
+        // CertUtil: -hashfile command completed successfully.
+        stdout
+            .lines()
+            .nth(1)
+            .expect("unexpected certutil output format")
+            .trim()
+            .to_lowercase()
+    } else {
+        // shasum / sha256sum 出力形式: <hash>  <filename>
+        stdout
+            .split_whitespace()
+            .next()
+            .expect("unexpected shasum/sha256sum output format")
+            .to_lowercase()
+    }
+}
+
+// ソースからビルドする
+fn build_from_source(out_dir: &Path, output_bindings_path: &Path) -> PathBuf {
+    let out_source_dir = out_dir.join("source/");
+    let src_dir = out_source_dir.join(LIB_NAME);
+    let _ = fs::remove_dir_all(&out_source_dir);
+    fs::create_dir(&out_source_dir).expect("failed to create source directory");
+
     // 依存ライブラリのリポジトリを取得する
     git_clone_external_lib(&out_source_dir);
 
@@ -97,7 +278,7 @@ fn main() {
     //   4. bindgen に渡す ParseCallbacks を返す（#[link_name] で書き換え後の名前にリンクする）
     //
     // lib.rs 側の変更は不要。bindgen が生成する #[link_name] 属性で透過的に動作する。
-    let callbacks = rewrite_symbols(&dst.join("lib"), &out_dir);
+    let callbacks = rewrite_symbols(&dst.join("lib"), out_dir);
 
     // バインディングを生成する
     //
@@ -113,19 +294,46 @@ fn main() {
         .write_to_file(output_bindings_path)
         .expect("failed to write bindings");
 
-    println!(
-        "cargo::rustc-link-search=native={}",
-        dst.join("lib").display()
-    );
-    println!("cargo::rustc-link-lib=static={LINK_NAME}");
+    dst.join("lib")
+}
 
-    // libyuv は C++ コード (convert_jpeg.cc 等) を含むため C++ 標準ライブラリのリンクが必要
-    let target = env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
-    match target.as_str() {
-        "linux" => println!("cargo::rustc-link-lib=stdc++"),
-        "macos" | "ios" => println!("cargo::rustc-link-lib=c++"),
-        _ => {}
+// --- プラットフォーム検出 ---
+
+// CARGO_CFG_TARGET_OS + CARGO_CFG_TARGET_ARCH からプラットフォーム名を生成する
+fn get_target_platform() -> String {
+    if let Ok(target) = env::var("LIBYUV_TARGET") {
+        return target;
     }
+
+    let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
+    let target_arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap_or_default();
+
+    match (target_os.as_str(), target_arch.as_str()) {
+        ("linux", "x86_64") => format!("{}_x86_64", detect_linux_distro()),
+        ("linux", "aarch64") => format!("{}_armv8", detect_linux_distro()),
+        ("macos", "aarch64") => "macos_arm64".to_string(),
+        ("windows", "x86_64") => "windows_x86_64".to_string(),
+        _ => panic!("unsupported target: os={}, arch={}", target_os, target_arch),
+    }
+}
+
+// /etc/os-release から Ubuntu バージョンを検出する
+fn detect_linux_distro() -> String {
+    if let Ok(content) = fs::read_to_string("/etc/os-release") {
+        for line in content.lines() {
+            if let Some(version) = line.strip_prefix("VERSION_ID=") {
+                let version = version.trim_matches('"');
+                match version {
+                    "22.04" | "24.04" => return format!("ubuntu-{}", version),
+                    _ => {}
+                }
+            }
+        }
+    }
+    panic!(
+        "unsupported Linux distribution. \
+         set LIBYUV_TARGET environment variable to specify the target explicitly"
+    );
 }
 
 // --- シンボル書き換え ---
@@ -451,6 +659,8 @@ fn rewrite_archive_symbols(objcopy_path: &Path, lib_path: &Path, map_file: &Path
         panic!("llvm-objcopy failed");
     }
 }
+
+// --- 既存のヘルパー関数 ---
 
 // 外部ライブラリのリポジトリを git clone する
 fn git_clone_external_lib(build_dir: &Path) {
