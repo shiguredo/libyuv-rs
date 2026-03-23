@@ -159,15 +159,24 @@ fn download_prebuilt(out_dir: &Path) -> PathBuf {
 
     // ライブラリファイルを OUT_DIR/lib/ にコピー
     //
-    // prebuilt アーカイブにはリリースビルド時にシンボル書き換え済みの libyuv.a と
+    // prebuilt アーカイブにはリリースビルド時にシンボル書き換え済みの静的ライブラリと
     // #[link_name] 属性付きの bindings.rs が含まれているため、そのままコピーするだけでよい。
+    //
+    // プラットフォームごとのライブラリファイル名:
+    //   - Linux/macOS: libyuv.a (cmake のデフォルト出力)
+    //   - Windows: yuv.lib (MSVC の cmake 出力)
     let lib_dir = out_dir.join("lib");
     fs::create_dir_all(&lib_dir).expect("failed to create lib directory");
+    let lib_filename = if cfg!(target_os = "windows") {
+        "yuv.lib"
+    } else {
+        "libyuv.a"
+    };
     fs::copy(
-        prebuilt_dir.join("lib").join("libyuv.a"),
-        lib_dir.join("libyuv.a"),
+        prebuilt_dir.join("lib").join(lib_filename),
+        lib_dir.join(lib_filename),
     )
-    .expect("failed to copy libyuv.a");
+    .unwrap_or_else(|e| panic!("failed to copy {}: {}", lib_filename, e));
 
     // bindings.rs を OUT_DIR/ にコピー
     fs::copy(
