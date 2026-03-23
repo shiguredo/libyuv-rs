@@ -16,7 +16,7 @@ Please read <https://github.com/shiguredo/oss> before use.
 
 利用前に <https://github.com/shiguredo/oss> をお読みください。
 
-## shiguredo_libyuv について
+## 概要
 
 Google の [libyuv](https://chromium.googlesource.com/libyuv/libyuv/) を利用した画像変換・処理ライブラリの Rust バインディングです。
 
