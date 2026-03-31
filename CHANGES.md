@@ -59,9 +59,6 @@
   - @voluntas
 - [ADD] `RotationMode` enum を追加する
   - @voluntas
-- [ADD] 上流パッチ適用機能を追加する
-  - `patches/` ディレクトリの `.patch` ファイルをソースビルド時に自動適用する
-  - @voluntas
 - [CHANGE] prebuilt バイナリダウンロード機能を追加する
   - `source-build` feature でソースからのビルドに切り替え可能にする
   - デフォルトでは GitHub Releases から prebuilt バイナリをダウンロードする
