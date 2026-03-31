@@ -6,7 +6,8 @@ use std::ffi::c_int;
 use crate::{
     ArgbImage, ArgbImageMut, Error, FilterMode, I012Image, I012ImageMut, I212Image, I212ImageMut,
     I412Image, I412ImageMut, I420Image, I420ImageMut, I422Image, I422ImageMut, I444Image,
-    I444ImageMut, ImageSize, Nv12Image, Nv12ImageMut, Nv24Image, Nv24ImageMut, sys,
+    I444ImageMut, ImageSize, Nv12Image, Nv12ImageMut, Nv24Image, Nv24ImageMut, checked_buf_size,
+    require_c_int, sys,
 };
 
 // ---------------------------------------------------------------------------
@@ -355,14 +356,73 @@ pub fn scale_plane(
     dst_size: ImageSize,
     filtering: FilterMode,
 ) -> Result<(), Error> {
-    if src.len() < src_stride * src_size.height {
+    // c_int 範囲チェック
+    require_c_int(
+        src_size.width,
+        "ScalePlane",
+        "source width exceeds c_int range",
+    )?;
+    require_c_int(
+        src_size.height,
+        "ScalePlane",
+        "source height exceeds c_int range",
+    )?;
+    require_c_int(
+        src_stride,
+        "ScalePlane",
+        "source stride exceeds c_int range",
+    )?;
+    require_c_int(
+        dst_size.width,
+        "ScalePlane",
+        "destination width exceeds c_int range",
+    )?;
+    require_c_int(
+        dst_size.height,
+        "ScalePlane",
+        "destination height exceeds c_int range",
+    )?;
+    require_c_int(
+        dst_stride,
+        "ScalePlane",
+        "destination stride exceeds c_int range",
+    )?;
+    // stride >= width チェック
+    if src_stride < src_size.width {
+        return Err(Error::with_reason(
+            -1,
+            "ScalePlane",
+            "source stride smaller than width",
+        ));
+    }
+    if dst_stride < dst_size.width {
+        return Err(Error::with_reason(
+            -1,
+            "ScalePlane",
+            "destination stride smaller than width",
+        ));
+    }
+    // バッファサイズチェック（オーバーフロー安全）
+    let src_buf = checked_buf_size(
+        src_stride,
+        src_size.height,
+        "ScalePlane",
+        "source buffer size overflow",
+    )?;
+    if src.len() < src_buf {
         return Err(Error::with_reason(
             -1,
             "ScalePlane",
             "source buffer too small",
         ));
     }
-    if dst.len() < dst_stride * dst_size.height {
+    let dst_buf = checked_buf_size(
+        dst_stride,
+        dst_size.height,
+        "ScalePlane",
+        "destination buffer size overflow",
+    )?;
+    if dst.len() < dst_buf {
         return Err(Error::with_reason(
             -1,
             "ScalePlane",
@@ -397,14 +457,73 @@ pub fn scale_plane_12(
     dst_size: ImageSize,
     filtering: FilterMode,
 ) -> Result<(), Error> {
-    if src.len() < src_stride * src_size.height {
+    // c_int 範囲チェック
+    require_c_int(
+        src_size.width,
+        "ScalePlane_12",
+        "source width exceeds c_int range",
+    )?;
+    require_c_int(
+        src_size.height,
+        "ScalePlane_12",
+        "source height exceeds c_int range",
+    )?;
+    require_c_int(
+        src_stride,
+        "ScalePlane_12",
+        "source stride exceeds c_int range",
+    )?;
+    require_c_int(
+        dst_size.width,
+        "ScalePlane_12",
+        "destination width exceeds c_int range",
+    )?;
+    require_c_int(
+        dst_size.height,
+        "ScalePlane_12",
+        "destination height exceeds c_int range",
+    )?;
+    require_c_int(
+        dst_stride,
+        "ScalePlane_12",
+        "destination stride exceeds c_int range",
+    )?;
+    // stride >= width チェック（stride は要素数、width はピクセル数）
+    if src_stride < src_size.width {
+        return Err(Error::with_reason(
+            -1,
+            "ScalePlane_12",
+            "source stride smaller than width",
+        ));
+    }
+    if dst_stride < dst_size.width {
+        return Err(Error::with_reason(
+            -1,
+            "ScalePlane_12",
+            "destination stride smaller than width",
+        ));
+    }
+    // バッファサイズチェック（オーバーフロー安全）
+    let src_buf = checked_buf_size(
+        src_stride,
+        src_size.height,
+        "ScalePlane_12",
+        "source buffer size overflow",
+    )?;
+    if src.len() < src_buf {
         return Err(Error::with_reason(
             -1,
             "ScalePlane_12",
             "source buffer too small",
         ));
     }
-    if dst.len() < dst_stride * dst_size.height {
+    let dst_buf = checked_buf_size(
+        dst_stride,
+        dst_size.height,
+        "ScalePlane_12",
+        "destination buffer size overflow",
+    )?;
+    if dst.len() < dst_buf {
         return Err(Error::with_reason(
             -1,
             "ScalePlane_12",
@@ -439,14 +558,73 @@ pub fn scale_plane_16(
     dst_size: ImageSize,
     filtering: FilterMode,
 ) -> Result<(), Error> {
-    if src.len() < src_stride * src_size.height {
+    // c_int 範囲チェック
+    require_c_int(
+        src_size.width,
+        "ScalePlane_16",
+        "source width exceeds c_int range",
+    )?;
+    require_c_int(
+        src_size.height,
+        "ScalePlane_16",
+        "source height exceeds c_int range",
+    )?;
+    require_c_int(
+        src_stride,
+        "ScalePlane_16",
+        "source stride exceeds c_int range",
+    )?;
+    require_c_int(
+        dst_size.width,
+        "ScalePlane_16",
+        "destination width exceeds c_int range",
+    )?;
+    require_c_int(
+        dst_size.height,
+        "ScalePlane_16",
+        "destination height exceeds c_int range",
+    )?;
+    require_c_int(
+        dst_stride,
+        "ScalePlane_16",
+        "destination stride exceeds c_int range",
+    )?;
+    // stride >= width チェック（stride は要素数、width はピクセル数）
+    if src_stride < src_size.width {
+        return Err(Error::with_reason(
+            -1,
+            "ScalePlane_16",
+            "source stride smaller than width",
+        ));
+    }
+    if dst_stride < dst_size.width {
+        return Err(Error::with_reason(
+            -1,
+            "ScalePlane_16",
+            "destination stride smaller than width",
+        ));
+    }
+    // バッファサイズチェック（オーバーフロー安全）
+    let src_buf = checked_buf_size(
+        src_stride,
+        src_size.height,
+        "ScalePlane_16",
+        "source buffer size overflow",
+    )?;
+    if src.len() < src_buf {
         return Err(Error::with_reason(
             -1,
             "ScalePlane_16",
             "source buffer too small",
         ));
     }
-    if dst.len() < dst_stride * dst_size.height {
+    let dst_buf = checked_buf_size(
+        dst_stride,
+        dst_size.height,
+        "ScalePlane_16",
+        "destination buffer size overflow",
+    )?;
+    if dst.len() < dst_buf {
         return Err(Error::with_reason(
             -1,
             "ScalePlane_16",
@@ -553,10 +731,77 @@ pub fn uv_scale(
     dst_size: ImageSize,
     filtering: FilterMode,
 ) -> Result<(), Error> {
-    if src_uv.len() < src_stride_uv * src_size.height {
+    // c_int 範囲チェック
+    require_c_int(
+        src_size.width,
+        "UVScale",
+        "source width exceeds c_int range",
+    )?;
+    require_c_int(
+        src_size.height,
+        "UVScale",
+        "source height exceeds c_int range",
+    )?;
+    require_c_int(
+        src_stride_uv,
+        "UVScale",
+        "source stride exceeds c_int range",
+    )?;
+    require_c_int(
+        dst_size.width,
+        "UVScale",
+        "destination width exceeds c_int range",
+    )?;
+    require_c_int(
+        dst_size.height,
+        "UVScale",
+        "destination height exceeds c_int range",
+    )?;
+    require_c_int(
+        dst_stride_uv,
+        "UVScale",
+        "destination stride exceeds c_int range",
+    )?;
+    // stride >= width * 2 チェック（UV インターリーブなので 1 ピクセルあたり 2 バイト）
+    let src_min_stride = src_size
+        .width
+        .checked_mul(2)
+        .ok_or_else(|| Error::with_reason(-1, "UVScale", "source width * 2 overflow"))?;
+    if src_stride_uv < src_min_stride {
+        return Err(Error::with_reason(
+            -1,
+            "UVScale",
+            "source stride smaller than width * 2",
+        ));
+    }
+    let dst_min_stride = dst_size
+        .width
+        .checked_mul(2)
+        .ok_or_else(|| Error::with_reason(-1, "UVScale", "destination width * 2 overflow"))?;
+    if dst_stride_uv < dst_min_stride {
+        return Err(Error::with_reason(
+            -1,
+            "UVScale",
+            "destination stride smaller than width * 2",
+        ));
+    }
+    // バッファサイズチェック（オーバーフロー安全）
+    let src_buf = checked_buf_size(
+        src_stride_uv,
+        src_size.height,
+        "UVScale",
+        "source buffer size overflow",
+    )?;
+    if src_uv.len() < src_buf {
         return Err(Error::with_reason(-1, "UVScale", "source buffer too small"));
     }
-    if dst_uv.len() < dst_stride_uv * dst_size.height {
+    let dst_buf = checked_buf_size(
+        dst_stride_uv,
+        dst_size.height,
+        "UVScale",
+        "destination buffer size overflow",
+    )?;
+    if dst_uv.len() < dst_buf {
         return Err(Error::with_reason(
             -1,
             "UVScale",
@@ -591,14 +836,81 @@ pub fn uv_scale_16(
     dst_size: ImageSize,
     filtering: FilterMode,
 ) -> Result<(), Error> {
-    if src_uv.len() < src_stride_uv * src_size.height {
+    // c_int 範囲チェック
+    require_c_int(
+        src_size.width,
+        "UVScale_16",
+        "source width exceeds c_int range",
+    )?;
+    require_c_int(
+        src_size.height,
+        "UVScale_16",
+        "source height exceeds c_int range",
+    )?;
+    require_c_int(
+        src_stride_uv,
+        "UVScale_16",
+        "source stride exceeds c_int range",
+    )?;
+    require_c_int(
+        dst_size.width,
+        "UVScale_16",
+        "destination width exceeds c_int range",
+    )?;
+    require_c_int(
+        dst_size.height,
+        "UVScale_16",
+        "destination height exceeds c_int range",
+    )?;
+    require_c_int(
+        dst_stride_uv,
+        "UVScale_16",
+        "destination stride exceeds c_int range",
+    )?;
+    // stride >= width * 2 チェック（UV インターリーブなので 1 ピクセルあたり 2 要素）
+    let src_min_stride = src_size
+        .width
+        .checked_mul(2)
+        .ok_or_else(|| Error::with_reason(-1, "UVScale_16", "source width * 2 overflow"))?;
+    if src_stride_uv < src_min_stride {
+        return Err(Error::with_reason(
+            -1,
+            "UVScale_16",
+            "source stride smaller than width * 2",
+        ));
+    }
+    let dst_min_stride = dst_size
+        .width
+        .checked_mul(2)
+        .ok_or_else(|| Error::with_reason(-1, "UVScale_16", "destination width * 2 overflow"))?;
+    if dst_stride_uv < dst_min_stride {
+        return Err(Error::with_reason(
+            -1,
+            "UVScale_16",
+            "destination stride smaller than width * 2",
+        ));
+    }
+    // バッファサイズチェック（オーバーフロー安全）
+    let src_buf = checked_buf_size(
+        src_stride_uv,
+        src_size.height,
+        "UVScale_16",
+        "source buffer size overflow",
+    )?;
+    if src_uv.len() < src_buf {
         return Err(Error::with_reason(
             -1,
             "UVScale_16",
             "source buffer too small",
         ));
     }
-    if dst_uv.len() < dst_stride_uv * dst_size.height {
+    let dst_buf = checked_buf_size(
+        dst_stride_uv,
+        dst_size.height,
+        "UVScale_16",
+        "destination buffer size overflow",
+    )?;
+    if dst_uv.len() < dst_buf {
         return Err(Error::with_reason(
             -1,
             "UVScale_16",
@@ -669,6 +981,19 @@ pub fn argb_scale_clip(
 ) -> Result<(), Error> {
     src.validate(src_size, "ARGBScaleClip")?;
     dst.validate(dst_size, "ARGBScaleClip")?;
+    // クリップパラメータの c_int 範囲チェック
+    require_c_int(clip_x, "ARGBScaleClip", "clip_x exceeds c_int range")?;
+    require_c_int(clip_y, "ARGBScaleClip", "clip_y exceeds c_int range")?;
+    require_c_int(
+        clip_width,
+        "ARGBScaleClip",
+        "clip_width exceeds c_int range",
+    )?;
+    require_c_int(
+        clip_height,
+        "ARGBScaleClip",
+        "clip_height exceeds c_int range",
+    )?;
 
     let result = unsafe {
         sys::ARGBScaleClip(

@@ -5,7 +5,7 @@ use std::ffi::c_int;
 
 use crate::{
     ArgbImage, ArgbImageMut, Error, I400Image, I400ImageMut, I420Image, I420ImageMut, ImageSize,
-    Nv12Image, Nv12ImageMut, Rgb24Image, Rgb24ImageMut, sys,
+    Nv12Image, Nv12ImageMut, Rgb24Image, Rgb24ImageMut, checked_buf_size, require_c_int, sys,
 };
 
 // ============================================================
@@ -20,14 +20,50 @@ pub fn copy_plane(
     dst_stride: usize,
     size: ImageSize,
 ) -> Result<(), Error> {
+    // c_int 範囲チェック
+    require_c_int(size.width, "CopyPlane", "width exceeds c_int range")?;
+    require_c_int(size.height, "CopyPlane", "height exceeds c_int range")?;
+    require_c_int(src_stride, "CopyPlane", "source stride exceeds c_int range")?;
+    require_c_int(
+        dst_stride,
+        "CopyPlane",
+        "destination stride exceeds c_int range",
+    )?;
+
+    // stride >= width チェック
+    if src_stride < size.width {
+        return Err(Error::with_reason(
+            -1,
+            "CopyPlane",
+            "source stride smaller than width",
+        ));
+    }
+    if dst_stride < size.width {
+        return Err(Error::with_reason(
+            -1,
+            "CopyPlane",
+            "destination stride smaller than width",
+        ));
+    }
+
+    // バッファサイズ計算（オーバーフロー安全）
+    // CopyPlane は (height-1)*stride + width バイト必要
     let src_required_size = if size.height > 0 {
-        (size.height - 1) * src_stride + size.width
+        (size.height - 1)
+            .checked_mul(src_stride)
+            .and_then(|v| v.checked_add(size.width))
+            .ok_or_else(|| Error::with_reason(-1, "CopyPlane", "source buffer size overflow"))?
     } else {
         0
     };
 
     let dst_required_size = if size.height > 0 {
-        (size.height - 1) * dst_stride + size.width
+        (size.height - 1)
+            .checked_mul(dst_stride)
+            .and_then(|v| v.checked_add(size.width))
+            .ok_or_else(|| {
+                Error::with_reason(-1, "CopyPlane", "destination buffer size overflow")
+            })?
     } else {
         0
     };
@@ -68,7 +104,22 @@ pub fn set_plane(
     size: ImageSize,
     value: u8,
 ) -> Result<(), Error> {
-    let dst_size = dst_stride * size.height;
+    // c_int 範囲チェック
+    require_c_int(size.width, "SetPlane", "width exceeds c_int range")?;
+    require_c_int(size.height, "SetPlane", "height exceeds c_int range")?;
+    require_c_int(dst_stride, "SetPlane", "stride exceeds c_int range")?;
+
+    // stride >= width チェック
+    if dst_stride < size.width {
+        return Err(Error::with_reason(
+            -1,
+            "SetPlane",
+            "stride smaller than width",
+        ));
+    }
+
+    // バッファサイズ計算（オーバーフロー安全）
+    let dst_size = checked_buf_size(dst_stride, size.height, "SetPlane", "buffer size overflow")?;
 
     if dst.len() < dst_size {
         return Err(Error::with_reason(
@@ -128,21 +179,88 @@ pub fn split_uv_plane(
     dst_stride_v: usize,
     size: ImageSize,
 ) -> Result<(), Error> {
-    if src_uv.len() < src_stride_uv * size.height {
+    // c_int 範囲チェック
+    require_c_int(size.width, "SplitUVPlane", "width exceeds c_int range")?;
+    require_c_int(size.height, "SplitUVPlane", "height exceeds c_int range")?;
+    require_c_int(
+        src_stride_uv,
+        "SplitUVPlane",
+        "source UV stride exceeds c_int range",
+    )?;
+    require_c_int(
+        dst_stride_u,
+        "SplitUVPlane",
+        "destination U stride exceeds c_int range",
+    )?;
+    require_c_int(
+        dst_stride_v,
+        "SplitUVPlane",
+        "destination V stride exceeds c_int range",
+    )?;
+
+    // stride >= 最小幅チェック
+    // src_uv はインターリーブなので 1 行あたり width * 2 バイト必要
+    let uv_row_bytes = size
+        .width
+        .checked_mul(2)
+        .ok_or_else(|| Error::with_reason(-1, "SplitUVPlane", "width * 2 overflow"))?;
+    if src_stride_uv < uv_row_bytes {
+        return Err(Error::with_reason(
+            -1,
+            "SplitUVPlane",
+            "source UV stride smaller than width * 2",
+        ));
+    }
+    if dst_stride_u < size.width {
+        return Err(Error::with_reason(
+            -1,
+            "SplitUVPlane",
+            "destination U stride smaller than width",
+        ));
+    }
+    if dst_stride_v < size.width {
+        return Err(Error::with_reason(
+            -1,
+            "SplitUVPlane",
+            "destination V stride smaller than width",
+        ));
+    }
+
+    // バッファサイズ計算（オーバーフロー安全）
+    let src_size = checked_buf_size(
+        src_stride_uv,
+        size.height,
+        "SplitUVPlane",
+        "source UV buffer size overflow",
+    )?;
+    let dst_u_size = checked_buf_size(
+        dst_stride_u,
+        size.height,
+        "SplitUVPlane",
+        "destination U buffer size overflow",
+    )?;
+    let dst_v_size = checked_buf_size(
+        dst_stride_v,
+        size.height,
+        "SplitUVPlane",
+        "destination V buffer size overflow",
+    )?;
+
+    if src_uv.len() < src_size {
         return Err(Error::with_reason(
             -1,
             "SplitUVPlane",
             "source UV buffer too small",
         ));
     }
-    if dst_u.len() < dst_stride_u * size.height {
+    if dst_u.len() < dst_u_size {
         return Err(Error::with_reason(
             -1,
             "SplitUVPlane",
             "destination U buffer too small",
         ));
     }
-    if dst_v.len() < dst_stride_v * size.height {
+    if dst_v.len() < dst_v_size {
         return Err(Error::with_reason(
             -1,
             "SplitUVPlane",
@@ -176,21 +294,89 @@ pub fn merge_uv_plane(
     dst_stride_uv: usize,
     size: ImageSize,
 ) -> Result<(), Error> {
-    if src_u.len() < src_stride_u * size.height {
+    // c_int 範囲チェック
+    require_c_int(size.width, "MergeUVPlane", "width exceeds c_int range")?;
+    require_c_int(size.height, "MergeUVPlane", "height exceeds c_int range")?;
+    require_c_int(
+        src_stride_u,
+        "MergeUVPlane",
+        "source U stride exceeds c_int range",
+    )?;
+    require_c_int(
+        src_stride_v,
+        "MergeUVPlane",
+        "source V stride exceeds c_int range",
+    )?;
+    require_c_int(
+        dst_stride_uv,
+        "MergeUVPlane",
+        "destination UV stride exceeds c_int range",
+    )?;
+
+    // stride >= 最小幅チェック
+    // src_u/v は 1 行あたり width バイト必要
+    if src_stride_u < size.width {
+        return Err(Error::with_reason(
+            -1,
+            "MergeUVPlane",
+            "source U stride smaller than width",
+        ));
+    }
+    if src_stride_v < size.width {
+        return Err(Error::with_reason(
+            -1,
+            "MergeUVPlane",
+            "source V stride smaller than width",
+        ));
+    }
+    // dst_uv はインターリーブなので 1 行あたり width * 2 バイト必要
+    let uv_row_bytes = size
+        .width
+        .checked_mul(2)
+        .ok_or_else(|| Error::with_reason(-1, "MergeUVPlane", "width * 2 overflow"))?;
+    if dst_stride_uv < uv_row_bytes {
+        return Err(Error::with_reason(
+            -1,
+            "MergeUVPlane",
+            "destination UV stride smaller than width * 2",
+        ));
+    }
+
+    // バッファサイズ計算（オーバーフロー安全）
+    let src_u_size = checked_buf_size(
+        src_stride_u,
+        size.height,
+        "MergeUVPlane",
+        "source U buffer size overflow",
+    )?;
+    let src_v_size = checked_buf_size(
+        src_stride_v,
+        size.height,
+        "MergeUVPlane",
+        "source V buffer size overflow",
+    )?;
+    let dst_size = checked_buf_size(
+        dst_stride_uv,
+        size.height,
+        "MergeUVPlane",
+        "destination UV buffer size overflow",
+    )?;
+
+    if src_u.len() < src_u_size {
         return Err(Error::with_reason(
             -1,
             "MergeUVPlane",
             "source U buffer too small",
         ));
     }
-    if src_v.len() < src_stride_v * size.height {
+    if src_v.len() < src_v_size {
         return Err(Error::with_reason(
             -1,
             "MergeUVPlane",
             "source V buffer too small",
         ));
     }
-    if dst_uv.len() < dst_stride_uv * size.height {
+    if dst_uv.len() < dst_size {
         return Err(Error::with_reason(
             -1,
             "MergeUVPlane",
@@ -222,14 +408,63 @@ pub fn swap_uv_plane(
     dst_stride_vu: usize,
     size: ImageSize,
 ) -> Result<(), Error> {
-    if src_uv.len() < src_stride_uv * size.height {
+    // c_int 範囲チェック
+    require_c_int(size.width, "SwapUVPlane", "width exceeds c_int range")?;
+    require_c_int(size.height, "SwapUVPlane", "height exceeds c_int range")?;
+    require_c_int(
+        src_stride_uv,
+        "SwapUVPlane",
+        "source UV stride exceeds c_int range",
+    )?;
+    require_c_int(
+        dst_stride_vu,
+        "SwapUVPlane",
+        "destination VU stride exceeds c_int range",
+    )?;
+
+    // stride >= 最小幅チェック
+    // src/dst は UV インターリーブなので 1 行あたり width * 2 バイト必要
+    let uv_row_bytes = size
+        .width
+        .checked_mul(2)
+        .ok_or_else(|| Error::with_reason(-1, "SwapUVPlane", "width * 2 overflow"))?;
+    if src_stride_uv < uv_row_bytes {
+        return Err(Error::with_reason(
+            -1,
+            "SwapUVPlane",
+            "source UV stride smaller than width * 2",
+        ));
+    }
+    if dst_stride_vu < uv_row_bytes {
+        return Err(Error::with_reason(
+            -1,
+            "SwapUVPlane",
+            "destination VU stride smaller than width * 2",
+        ));
+    }
+
+    // バッファサイズ計算（オーバーフロー安全）
+    let src_size = checked_buf_size(
+        src_stride_uv,
+        size.height,
+        "SwapUVPlane",
+        "source UV buffer size overflow",
+    )?;
+    let dst_size = checked_buf_size(
+        dst_stride_vu,
+        size.height,
+        "SwapUVPlane",
+        "destination VU buffer size overflow",
+    )?;
+
+    if src_uv.len() < src_size {
         return Err(Error::with_reason(
             -1,
             "SwapUVPlane",
             "source UV buffer too small",
         ));
     }
-    if dst_vu.len() < dst_stride_vu * size.height {
+    if dst_vu.len() < dst_size {
         return Err(Error::with_reason(
             -1,
             "SwapUVPlane",
@@ -277,22 +512,84 @@ pub fn split_rgb_plane(
             "width must be a multiple of 32",
         ));
     }
+
+    // c_int 範囲チェック（width/height は src.validate 内でもチェックされるが、dst 用 stride はここで確認）
+    require_c_int(
+        dst_stride_r,
+        "SplitRGBPlane",
+        "destination R stride exceeds c_int range",
+    )?;
+    require_c_int(
+        dst_stride_g,
+        "SplitRGBPlane",
+        "destination G stride exceeds c_int range",
+    )?;
+    require_c_int(
+        dst_stride_b,
+        "SplitRGBPlane",
+        "destination B stride exceeds c_int range",
+    )?;
+
     src.validate(size, "SplitRGBPlane")?;
-    if dst_r.len() < dst_stride_r * size.height {
+
+    // stride >= width チェック
+    if dst_stride_r < size.width {
+        return Err(Error::with_reason(
+            -1,
+            "SplitRGBPlane",
+            "destination R stride smaller than width",
+        ));
+    }
+    if dst_stride_g < size.width {
+        return Err(Error::with_reason(
+            -1,
+            "SplitRGBPlane",
+            "destination G stride smaller than width",
+        ));
+    }
+    if dst_stride_b < size.width {
+        return Err(Error::with_reason(
+            -1,
+            "SplitRGBPlane",
+            "destination B stride smaller than width",
+        ));
+    }
+
+    // バッファサイズ計算（オーバーフロー安全）
+    let dst_r_size = checked_buf_size(
+        dst_stride_r,
+        size.height,
+        "SplitRGBPlane",
+        "destination R buffer size overflow",
+    )?;
+    let dst_g_size = checked_buf_size(
+        dst_stride_g,
+        size.height,
+        "SplitRGBPlane",
+        "destination G buffer size overflow",
+    )?;
+    let dst_b_size = checked_buf_size(
+        dst_stride_b,
+        size.height,
+        "SplitRGBPlane",
+        "destination B buffer size overflow",
+    )?;
+
+    if dst_r.len() < dst_r_size {
         return Err(Error::with_reason(
             -1,
             "SplitRGBPlane",
             "destination R buffer too small",
         ));
     }
-    if dst_g.len() < dst_stride_g * size.height {
+    if dst_g.len() < dst_g_size {
         return Err(Error::with_reason(
             -1,
             "SplitRGBPlane",
             "destination G buffer too small",
         ));
     }
-    if dst_b.len() < dst_stride_b * size.height {
+    if dst_b.len() < dst_b_size {
         return Err(Error::with_reason(
             -1,
             "SplitRGBPlane",
@@ -329,21 +626,81 @@ pub fn merge_rgb_plane(
     dst: &mut Rgb24ImageMut<'_>,
     size: ImageSize,
 ) -> Result<(), Error> {
-    if src_r.len() < src_stride_r * size.height {
+    // c_int 範囲チェック（width/height は dst.validate 内でもチェックされるが、src 用 stride はここで確認）
+    require_c_int(
+        src_stride_r,
+        "MergeRGBPlane",
+        "source R stride exceeds c_int range",
+    )?;
+    require_c_int(
+        src_stride_g,
+        "MergeRGBPlane",
+        "source G stride exceeds c_int range",
+    )?;
+    require_c_int(
+        src_stride_b,
+        "MergeRGBPlane",
+        "source B stride exceeds c_int range",
+    )?;
+
+    // stride >= width チェック
+    if src_stride_r < size.width {
+        return Err(Error::with_reason(
+            -1,
+            "MergeRGBPlane",
+            "source R stride smaller than width",
+        ));
+    }
+    if src_stride_g < size.width {
+        return Err(Error::with_reason(
+            -1,
+            "MergeRGBPlane",
+            "source G stride smaller than width",
+        ));
+    }
+    if src_stride_b < size.width {
+        return Err(Error::with_reason(
+            -1,
+            "MergeRGBPlane",
+            "source B stride smaller than width",
+        ));
+    }
+
+    // バッファサイズ計算（オーバーフロー安全）
+    let src_r_size = checked_buf_size(
+        src_stride_r,
+        size.height,
+        "MergeRGBPlane",
+        "source R buffer size overflow",
+    )?;
+    let src_g_size = checked_buf_size(
+        src_stride_g,
+        size.height,
+        "MergeRGBPlane",
+        "source G buffer size overflow",
+    )?;
+    let src_b_size = checked_buf_size(
+        src_stride_b,
+        size.height,
+        "MergeRGBPlane",
+        "source B buffer size overflow",
+    )?;
+
+    if src_r.len() < src_r_size {
         return Err(Error::with_reason(
             -1,
             "MergeRGBPlane",
             "source R buffer too small",
         ));
     }
-    if src_g.len() < src_stride_g * size.height {
+    if src_g.len() < src_g_size {
         return Err(Error::with_reason(
             -1,
             "MergeRGBPlane",
             "source G buffer too small",
         ));
     }
-    if src_b.len() < src_stride_b * size.height {
+    if src_b.len() < src_b_size {
         return Err(Error::with_reason(
             -1,
             "MergeRGBPlane",
@@ -540,7 +897,31 @@ pub fn i420_blend(
     src1.validate(size, "I420Blend")?;
     dst.validate(size, "I420Blend")?;
 
-    if alpha.len() < alpha_stride * size.height {
+    // alpha バッファの c_int 範囲チェック
+    require_c_int(
+        alpha_stride,
+        "I420Blend",
+        "alpha stride exceeds c_int range",
+    )?;
+
+    // stride >= width チェック
+    if alpha_stride < size.width {
+        return Err(Error::with_reason(
+            -1,
+            "I420Blend",
+            "alpha stride smaller than width",
+        ));
+    }
+
+    // バッファサイズ計算（オーバーフロー安全）
+    let alpha_size = checked_buf_size(
+        alpha_stride,
+        size.height,
+        "I420Blend",
+        "alpha buffer size overflow",
+    )?;
+
+    if alpha.len() < alpha_size {
         return Err(Error::with_reason(
             -1,
             "I420Blend",
@@ -621,29 +1002,108 @@ pub fn blend_plane(
     dst_stride: usize,
     size: ImageSize,
 ) -> Result<(), Error> {
-    let required = |stride: usize| stride * size.height;
-    if src0.len() < required(src0_stride) {
+    // c_int 範囲チェック
+    require_c_int(size.width, "BlendPlane", "width exceeds c_int range")?;
+    require_c_int(size.height, "BlendPlane", "height exceeds c_int range")?;
+    require_c_int(
+        src0_stride,
+        "BlendPlane",
+        "source 0 stride exceeds c_int range",
+    )?;
+    require_c_int(
+        src1_stride,
+        "BlendPlane",
+        "source 1 stride exceeds c_int range",
+    )?;
+    require_c_int(
+        alpha_stride,
+        "BlendPlane",
+        "alpha stride exceeds c_int range",
+    )?;
+    require_c_int(
+        dst_stride,
+        "BlendPlane",
+        "destination stride exceeds c_int range",
+    )?;
+
+    // stride >= width チェック
+    if src0_stride < size.width {
+        return Err(Error::with_reason(
+            -1,
+            "BlendPlane",
+            "source 0 stride smaller than width",
+        ));
+    }
+    if src1_stride < size.width {
+        return Err(Error::with_reason(
+            -1,
+            "BlendPlane",
+            "source 1 stride smaller than width",
+        ));
+    }
+    if alpha_stride < size.width {
+        return Err(Error::with_reason(
+            -1,
+            "BlendPlane",
+            "alpha stride smaller than width",
+        ));
+    }
+    if dst_stride < size.width {
+        return Err(Error::with_reason(
+            -1,
+            "BlendPlane",
+            "destination stride smaller than width",
+        ));
+    }
+
+    // バッファサイズ計算（オーバーフロー安全）
+    let src0_size = checked_buf_size(
+        src0_stride,
+        size.height,
+        "BlendPlane",
+        "source 0 buffer size overflow",
+    )?;
+    let src1_size = checked_buf_size(
+        src1_stride,
+        size.height,
+        "BlendPlane",
+        "source 1 buffer size overflow",
+    )?;
+    let alpha_size = checked_buf_size(
+        alpha_stride,
+        size.height,
+        "BlendPlane",
+        "alpha buffer size overflow",
+    )?;
+    let dst_size = checked_buf_size(
+        dst_stride,
+        size.height,
+        "BlendPlane",
+        "destination buffer size overflow",
+    )?;
+
+    if src0.len() < src0_size {
         return Err(Error::with_reason(
             -1,
             "BlendPlane",
             "source 0 buffer too small",
         ));
     }
-    if src1.len() < required(src1_stride) {
+    if src1.len() < src1_size {
         return Err(Error::with_reason(
             -1,
             "BlendPlane",
             "source 1 buffer too small",
         ));
     }
-    if alpha.len() < required(alpha_stride) {
+    if alpha.len() < alpha_size {
         return Err(Error::with_reason(
             -1,
             "BlendPlane",
             "alpha buffer too small",
         ));
     }
-    if dst.len() < required(dst_stride) {
+    if dst.len() < dst_size {
         return Err(Error::with_reason(
             -1,
             "BlendPlane",
@@ -686,22 +1146,87 @@ pub fn interpolate_plane(
     size: ImageSize,
     interpolation: u8,
 ) -> Result<(), Error> {
-    let required = |stride: usize| stride * size.height;
-    if src0.len() < required(src0_stride) {
+    // c_int 範囲チェック
+    require_c_int(size.width, "InterpolatePlane", "width exceeds c_int range")?;
+    require_c_int(
+        size.height,
+        "InterpolatePlane",
+        "height exceeds c_int range",
+    )?;
+    require_c_int(
+        src0_stride,
+        "InterpolatePlane",
+        "source 0 stride exceeds c_int range",
+    )?;
+    require_c_int(
+        src1_stride,
+        "InterpolatePlane",
+        "source 1 stride exceeds c_int range",
+    )?;
+    require_c_int(
+        dst_stride,
+        "InterpolatePlane",
+        "destination stride exceeds c_int range",
+    )?;
+
+    // stride >= width チェック
+    if src0_stride < size.width {
+        return Err(Error::with_reason(
+            -1,
+            "InterpolatePlane",
+            "source 0 stride smaller than width",
+        ));
+    }
+    if src1_stride < size.width {
+        return Err(Error::with_reason(
+            -1,
+            "InterpolatePlane",
+            "source 1 stride smaller than width",
+        ));
+    }
+    if dst_stride < size.width {
+        return Err(Error::with_reason(
+            -1,
+            "InterpolatePlane",
+            "destination stride smaller than width",
+        ));
+    }
+
+    // バッファサイズ計算（オーバーフロー安全）
+    let src0_size = checked_buf_size(
+        src0_stride,
+        size.height,
+        "InterpolatePlane",
+        "source 0 buffer size overflow",
+    )?;
+    let src1_size = checked_buf_size(
+        src1_stride,
+        size.height,
+        "InterpolatePlane",
+        "source 1 buffer size overflow",
+    )?;
+    let dst_size = checked_buf_size(
+        dst_stride,
+        size.height,
+        "InterpolatePlane",
+        "destination buffer size overflow",
+    )?;
+
+    if src0.len() < src0_size {
         return Err(Error::with_reason(
             -1,
             "InterpolatePlane",
             "source 0 buffer too small",
         ));
     }
-    if src1.len() < required(src1_stride) {
+    if src1.len() < src1_size {
         return Err(Error::with_reason(
             -1,
             "InterpolatePlane",
             "source 1 buffer too small",
         ));
     }
-    if dst.len() < required(dst_stride) {
+    if dst.len() < dst_size {
         return Err(Error::with_reason(
             -1,
             "InterpolatePlane",

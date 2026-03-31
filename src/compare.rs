@@ -2,7 +2,7 @@
 
 use std::ffi::c_int;
 
-use crate::{Error, I420Image, ImageSize, sys};
+use crate::{Error, I420Image, ImageSize, checked_buf_size, require_c_int, sys};
 
 /// I420 画像間の PSNR（ピーク信号対雑音比）を計算する
 ///
@@ -81,14 +81,57 @@ pub fn calc_frame_psnr(
     src_b_stride: usize,
     size: ImageSize,
 ) -> Result<f64, Error> {
-    if src_a.len() < src_a_stride * size.height {
+    // c_int 範囲チェック
+    require_c_int(size.width, "CalcFramePsnr", "width exceeds c_int range")?;
+    require_c_int(size.height, "CalcFramePsnr", "height exceeds c_int range")?;
+    require_c_int(
+        src_a_stride,
+        "CalcFramePsnr",
+        "stride A exceeds c_int range",
+    )?;
+    require_c_int(
+        src_b_stride,
+        "CalcFramePsnr",
+        "stride B exceeds c_int range",
+    )?;
+
+    // stride が width より小さい場合、libyuv が範囲外アクセスする
+    if src_a_stride < size.width {
+        return Err(Error::with_reason(
+            -1,
+            "CalcFramePsnr",
+            "stride A smaller than width",
+        ));
+    }
+    if src_b_stride < size.width {
+        return Err(Error::with_reason(
+            -1,
+            "CalcFramePsnr",
+            "stride B smaller than width",
+        ));
+    }
+
+    // オーバーフロー防止のため checked_mul を使用
+    let a_size = checked_buf_size(
+        src_a_stride,
+        size.height,
+        "CalcFramePsnr",
+        "buffer A size overflow",
+    )?;
+    if src_a.len() < a_size {
         return Err(Error::with_reason(
             -1,
             "CalcFramePsnr",
             "source A buffer too small",
         ));
     }
-    if src_b.len() < src_b_stride * size.height {
+    let b_size = checked_buf_size(
+        src_b_stride,
+        size.height,
+        "CalcFramePsnr",
+        "buffer B size overflow",
+    )?;
+    if src_b.len() < b_size {
         return Err(Error::with_reason(
             -1,
             "CalcFramePsnr",
@@ -121,14 +164,57 @@ pub fn calc_frame_ssim(
     src_b_stride: usize,
     size: ImageSize,
 ) -> Result<f64, Error> {
-    if src_a.len() < src_a_stride * size.height {
+    // c_int 範囲チェック
+    require_c_int(size.width, "CalcFrameSsim", "width exceeds c_int range")?;
+    require_c_int(size.height, "CalcFrameSsim", "height exceeds c_int range")?;
+    require_c_int(
+        src_a_stride,
+        "CalcFrameSsim",
+        "stride A exceeds c_int range",
+    )?;
+    require_c_int(
+        src_b_stride,
+        "CalcFrameSsim",
+        "stride B exceeds c_int range",
+    )?;
+
+    // stride が width より小さい場合、libyuv が範囲外アクセスする
+    if src_a_stride < size.width {
+        return Err(Error::with_reason(
+            -1,
+            "CalcFrameSsim",
+            "stride A smaller than width",
+        ));
+    }
+    if src_b_stride < size.width {
+        return Err(Error::with_reason(
+            -1,
+            "CalcFrameSsim",
+            "stride B smaller than width",
+        ));
+    }
+
+    // オーバーフロー防止のため checked_mul を使用
+    let a_size = checked_buf_size(
+        src_a_stride,
+        size.height,
+        "CalcFrameSsim",
+        "buffer A size overflow",
+    )?;
+    if src_a.len() < a_size {
         return Err(Error::with_reason(
             -1,
             "CalcFrameSsim",
             "source A buffer too small",
         ));
     }
-    if src_b.len() < src_b_stride * size.height {
+    let b_size = checked_buf_size(
+        src_b_stride,
+        size.height,
+        "CalcFrameSsim",
+        "buffer B size overflow",
+    )?;
+    if src_b.len() < b_size {
         return Err(Error::with_reason(
             -1,
             "CalcFrameSsim",
@@ -155,6 +241,9 @@ pub fn calc_frame_ssim(
 /// stride を考慮せず、連続したバッファ同士を比較する。
 /// count バイト分のデータを比較する。
 pub fn compute_sum_square_error(src_a: &[u8], src_b: &[u8], count: usize) -> Result<u64, Error> {
+    // c_int 範囲チェック
+    require_c_int(count, "ComputeSumSquareError", "count exceeds c_int range")?;
+
     if src_a.len() < count {
         return Err(Error::with_reason(
             -1,
@@ -184,14 +273,65 @@ pub fn compute_sum_square_error_plane(
     src_b_stride: usize,
     size: ImageSize,
 ) -> Result<u64, Error> {
-    if src_a.len() < src_a_stride * size.height {
+    // c_int 範囲チェック
+    require_c_int(
+        size.width,
+        "ComputeSumSquareErrorPlane",
+        "width exceeds c_int range",
+    )?;
+    require_c_int(
+        size.height,
+        "ComputeSumSquareErrorPlane",
+        "height exceeds c_int range",
+    )?;
+    require_c_int(
+        src_a_stride,
+        "ComputeSumSquareErrorPlane",
+        "stride A exceeds c_int range",
+    )?;
+    require_c_int(
+        src_b_stride,
+        "ComputeSumSquareErrorPlane",
+        "stride B exceeds c_int range",
+    )?;
+
+    // stride が width より小さい場合、libyuv が範囲外アクセスする
+    if src_a_stride < size.width {
+        return Err(Error::with_reason(
+            -1,
+            "ComputeSumSquareErrorPlane",
+            "stride A smaller than width",
+        ));
+    }
+    if src_b_stride < size.width {
+        return Err(Error::with_reason(
+            -1,
+            "ComputeSumSquareErrorPlane",
+            "stride B smaller than width",
+        ));
+    }
+
+    // オーバーフロー防止のため checked_mul を使用
+    let a_size = checked_buf_size(
+        src_a_stride,
+        size.height,
+        "ComputeSumSquareErrorPlane",
+        "buffer A size overflow",
+    )?;
+    if src_a.len() < a_size {
         return Err(Error::with_reason(
             -1,
             "ComputeSumSquareErrorPlane",
             "source A buffer too small",
         ));
     }
-    if src_b.len() < src_b_stride * size.height {
+    let b_size = checked_buf_size(
+        src_b_stride,
+        size.height,
+        "ComputeSumSquareErrorPlane",
+        "buffer B size overflow",
+    )?;
+    if src_b.len() < b_size {
         return Err(Error::with_reason(
             -1,
             "ComputeSumSquareErrorPlane",

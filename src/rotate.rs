@@ -6,7 +6,8 @@ use std::ffi::c_int;
 use crate::{
     Android420Image, ArgbImage, ArgbImageMut, Error, I010Image, I010ImageMut, I210Image,
     I210ImageMut, I410Image, I410ImageMut, I420Image, I420ImageMut, I422Image, I422ImageMut,
-    I444Image, I444ImageMut, ImageSize, Nv12Image, RotationMode, sys,
+    I444Image, I444ImageMut, ImageSize, Nv12Image, RotationMode, checked_buf_size, require_c_int,
+    sys,
 };
 
 /// I420 画像の回転
@@ -87,14 +88,57 @@ pub fn rotate_plane(
     dst_size: ImageSize,
     mode: RotationMode,
 ) -> Result<(), Error> {
-    if src.len() < src_stride * src_size.height {
+    // c_int 範囲チェック
+    require_c_int(src_size.width, "RotatePlane", "width exceeds c_int range")?;
+    require_c_int(src_size.height, "RotatePlane", "height exceeds c_int range")?;
+    require_c_int(
+        src_stride,
+        "RotatePlane",
+        "source stride exceeds c_int range",
+    )?;
+    require_c_int(
+        dst_stride,
+        "RotatePlane",
+        "destination stride exceeds c_int range",
+    )?;
+
+    // stride >= width チェック
+    if src_stride < src_size.width {
+        return Err(Error::with_reason(
+            -1,
+            "RotatePlane",
+            "source stride smaller than width",
+        ));
+    }
+    if dst_stride < dst_size.width {
+        return Err(Error::with_reason(
+            -1,
+            "RotatePlane",
+            "destination stride smaller than width",
+        ));
+    }
+
+    // バッファサイズチェック（オーバーフロー安全）
+    let src_buf = checked_buf_size(
+        src_stride,
+        src_size.height,
+        "RotatePlane",
+        "source buffer size overflow",
+    )?;
+    if src.len() < src_buf {
         return Err(Error::with_reason(
             -1,
             "RotatePlane",
             "source buffer too small",
         ));
     }
-    if dst.len() < dst_stride * dst_size.height {
+    let dst_buf = checked_buf_size(
+        dst_stride,
+        dst_size.height,
+        "RotatePlane",
+        "destination buffer size overflow",
+    )?;
+    if dst.len() < dst_buf {
         return Err(Error::with_reason(
             -1,
             "RotatePlane",
@@ -251,6 +295,13 @@ pub fn android420_to_i420_rotate(
     src.validate(src_size, "Android420ToI420Rotate")?;
     dst.validate(dst_size, "Android420ToI420Rotate")?;
 
+    // pixel_stride_uv の c_int 範囲チェック
+    require_c_int(
+        pixel_stride_uv,
+        "Android420ToI420Rotate",
+        "pixel_stride_uv exceeds c_int range",
+    )?;
+
     let result = unsafe {
         sys::Android420ToI420Rotate(
             src.y.as_ptr(),
@@ -403,14 +454,65 @@ pub fn rotate_plane_16(
     dst_size: ImageSize,
     mode: RotationMode,
 ) -> Result<(), Error> {
-    if src.len() < src_stride * src_size.height {
+    // c_int 範囲チェック
+    require_c_int(
+        src_size.width,
+        "RotatePlane_16",
+        "width exceeds c_int range",
+    )?;
+    require_c_int(
+        src_size.height,
+        "RotatePlane_16",
+        "height exceeds c_int range",
+    )?;
+    require_c_int(
+        src_stride,
+        "RotatePlane_16",
+        "source stride exceeds c_int range",
+    )?;
+    require_c_int(
+        dst_stride,
+        "RotatePlane_16",
+        "destination stride exceeds c_int range",
+    )?;
+
+    // stride >= width チェック（u16 スライスなので stride は要素数）
+    if src_stride < src_size.width {
+        return Err(Error::with_reason(
+            -1,
+            "RotatePlane_16",
+            "source stride smaller than width",
+        ));
+    }
+    if dst_stride < dst_size.width {
+        return Err(Error::with_reason(
+            -1,
+            "RotatePlane_16",
+            "destination stride smaller than width",
+        ));
+    }
+
+    // バッファサイズチェック（オーバーフロー安全）
+    let src_buf = checked_buf_size(
+        src_stride,
+        src_size.height,
+        "RotatePlane_16",
+        "source buffer size overflow",
+    )?;
+    if src.len() < src_buf {
         return Err(Error::with_reason(
             -1,
             "RotatePlane_16",
             "source buffer too small",
         ));
     }
-    if dst.len() < dst_stride * dst_size.height {
+    let dst_buf = checked_buf_size(
+        dst_stride,
+        dst_size.height,
+        "RotatePlane_16",
+        "destination buffer size overflow",
+    )?;
+    if dst.len() < dst_buf {
         return Err(Error::with_reason(
             -1,
             "RotatePlane_16",
@@ -447,15 +549,63 @@ pub fn rotate_plane_90(
     dst: &mut [u8],
     dst_stride: usize,
 ) -> Result<(), Error> {
-    if src.len() < src_stride * src_size.height {
+    // c_int 範囲チェック
+    require_c_int(src_size.width, "RotatePlane90", "width exceeds c_int range")?;
+    require_c_int(
+        src_size.height,
+        "RotatePlane90",
+        "height exceeds c_int range",
+    )?;
+    require_c_int(
+        src_stride,
+        "RotatePlane90",
+        "source stride exceeds c_int range",
+    )?;
+    require_c_int(
+        dst_stride,
+        "RotatePlane90",
+        "destination stride exceeds c_int range",
+    )?;
+
+    // stride >= width チェック
+    if src_stride < src_size.width {
+        return Err(Error::with_reason(
+            -1,
+            "RotatePlane90",
+            "source stride smaller than width",
+        ));
+    }
+    // 90 度回転: 出力は幅と高さが入れ替わるので dst_stride >= src_size.height
+    if dst_stride < src_size.height {
+        return Err(Error::with_reason(
+            -1,
+            "RotatePlane90",
+            "destination stride smaller than height",
+        ));
+    }
+
+    // バッファサイズチェック（オーバーフロー安全）
+    let src_buf = checked_buf_size(
+        src_stride,
+        src_size.height,
+        "RotatePlane90",
+        "source buffer size overflow",
+    )?;
+    if src.len() < src_buf {
         return Err(Error::with_reason(
             -1,
             "RotatePlane90",
             "source buffer too small",
         ));
     }
-    // 90 度回転: 出力は幅と高さが入れ替わる
-    if dst.len() < dst_stride * src_size.width {
+    // 90 度回転: 出力の高さは src_size.width
+    let dst_buf = checked_buf_size(
+        dst_stride,
+        src_size.width,
+        "RotatePlane90",
+        "destination buffer size overflow",
+    )?;
+    if dst.len() < dst_buf {
         return Err(Error::with_reason(
             -1,
             "RotatePlane90",
@@ -485,7 +635,52 @@ pub fn rotate_plane_180(
     dst: &mut [u8],
     dst_stride: usize,
 ) -> Result<(), Error> {
-    if src.len() < src_stride * src_size.height {
+    // c_int 範囲チェック
+    require_c_int(
+        src_size.width,
+        "RotatePlane180",
+        "width exceeds c_int range",
+    )?;
+    require_c_int(
+        src_size.height,
+        "RotatePlane180",
+        "height exceeds c_int range",
+    )?;
+    require_c_int(
+        src_stride,
+        "RotatePlane180",
+        "source stride exceeds c_int range",
+    )?;
+    require_c_int(
+        dst_stride,
+        "RotatePlane180",
+        "destination stride exceeds c_int range",
+    )?;
+
+    // stride >= width チェック
+    if src_stride < src_size.width {
+        return Err(Error::with_reason(
+            -1,
+            "RotatePlane180",
+            "source stride smaller than width",
+        ));
+    }
+    if dst_stride < src_size.width {
+        return Err(Error::with_reason(
+            -1,
+            "RotatePlane180",
+            "destination stride smaller than width",
+        ));
+    }
+
+    // バッファサイズチェック（オーバーフロー安全）
+    let src_buf = checked_buf_size(
+        src_stride,
+        src_size.height,
+        "RotatePlane180",
+        "source buffer size overflow",
+    )?;
+    if src.len() < src_buf {
         return Err(Error::with_reason(
             -1,
             "RotatePlane180",
@@ -493,7 +688,13 @@ pub fn rotate_plane_180(
         ));
     }
     // 180 度回転: 出力は入力と同じサイズ
-    if dst.len() < dst_stride * src_size.height {
+    let dst_buf = checked_buf_size(
+        dst_stride,
+        src_size.height,
+        "RotatePlane180",
+        "destination buffer size overflow",
+    )?;
+    if dst.len() < dst_buf {
         return Err(Error::with_reason(
             -1,
             "RotatePlane180",
@@ -525,15 +726,67 @@ pub fn rotate_plane_270(
     dst: &mut [u8],
     dst_stride: usize,
 ) -> Result<(), Error> {
-    if src.len() < src_stride * src_size.height {
+    // c_int 範囲チェック
+    require_c_int(
+        src_size.width,
+        "RotatePlane270",
+        "width exceeds c_int range",
+    )?;
+    require_c_int(
+        src_size.height,
+        "RotatePlane270",
+        "height exceeds c_int range",
+    )?;
+    require_c_int(
+        src_stride,
+        "RotatePlane270",
+        "source stride exceeds c_int range",
+    )?;
+    require_c_int(
+        dst_stride,
+        "RotatePlane270",
+        "destination stride exceeds c_int range",
+    )?;
+
+    // stride >= width チェック
+    if src_stride < src_size.width {
+        return Err(Error::with_reason(
+            -1,
+            "RotatePlane270",
+            "source stride smaller than width",
+        ));
+    }
+    // 270 度回転: 出力は幅と高さが入れ替わるので dst_stride >= src_size.height
+    if dst_stride < src_size.height {
+        return Err(Error::with_reason(
+            -1,
+            "RotatePlane270",
+            "destination stride smaller than height",
+        ));
+    }
+
+    // バッファサイズチェック（オーバーフロー安全）
+    let src_buf = checked_buf_size(
+        src_stride,
+        src_size.height,
+        "RotatePlane270",
+        "source buffer size overflow",
+    )?;
+    if src.len() < src_buf {
         return Err(Error::with_reason(
             -1,
             "RotatePlane270",
             "source buffer too small",
         ));
     }
-    // 270 度回転: 出力は幅と高さが入れ替わる
-    if dst.len() < dst_stride * src_size.width {
+    // 270 度回転: 出力の高さは src_size.width
+    let dst_buf = checked_buf_size(
+        dst_stride,
+        src_size.width,
+        "RotatePlane270",
+        "destination buffer size overflow",
+    )?;
+    if dst.len() < dst_buf {
         return Err(Error::with_reason(
             -1,
             "RotatePlane270",
@@ -573,21 +826,91 @@ pub fn split_rotate_uv(
     dst_size: ImageSize,
     mode: RotationMode,
 ) -> Result<(), Error> {
-    if src_uv.len() < src_stride_uv * src_size.height {
+    // c_int 範囲チェック
+    require_c_int(src_size.width, "SplitRotateUV", "width exceeds c_int range")?;
+    require_c_int(
+        src_size.height,
+        "SplitRotateUV",
+        "height exceeds c_int range",
+    )?;
+    require_c_int(
+        src_stride_uv,
+        "SplitRotateUV",
+        "source stride exceeds c_int range",
+    )?;
+    require_c_int(
+        dst_stride_u,
+        "SplitRotateUV",
+        "destination U stride exceeds c_int range",
+    )?;
+    require_c_int(
+        dst_stride_v,
+        "SplitRotateUV",
+        "destination V stride exceeds c_int range",
+    )?;
+
+    // src は UV インターリーブなので stride >= width * 2
+    let src_min_width = src_size
+        .width
+        .checked_mul(2)
+        .ok_or_else(|| Error::with_reason(-1, "SplitRotateUV", "width * 2 overflow"))?;
+    if src_stride_uv < src_min_width {
+        return Err(Error::with_reason(
+            -1,
+            "SplitRotateUV",
+            "source stride smaller than width * 2",
+        ));
+    }
+    // dst_u/v は stride >= width
+    if dst_stride_u < dst_size.width {
+        return Err(Error::with_reason(
+            -1,
+            "SplitRotateUV",
+            "destination U stride smaller than width",
+        ));
+    }
+    if dst_stride_v < dst_size.width {
+        return Err(Error::with_reason(
+            -1,
+            "SplitRotateUV",
+            "destination V stride smaller than width",
+        ));
+    }
+
+    // バッファサイズチェック（オーバーフロー安全）
+    let src_buf = checked_buf_size(
+        src_stride_uv,
+        src_size.height,
+        "SplitRotateUV",
+        "source buffer size overflow",
+    )?;
+    if src_uv.len() < src_buf {
         return Err(Error::with_reason(
             -1,
             "SplitRotateUV",
             "source buffer too small",
         ));
     }
-    if dst_u.len() < dst_stride_u * dst_size.height {
+    let dst_u_buf = checked_buf_size(
+        dst_stride_u,
+        dst_size.height,
+        "SplitRotateUV",
+        "destination U buffer size overflow",
+    )?;
+    if dst_u.len() < dst_u_buf {
         return Err(Error::with_reason(
             -1,
             "SplitRotateUV",
             "destination U buffer too small",
         ));
     }
-    if dst_v.len() < dst_stride_v * dst_size.height {
+    let dst_v_buf = checked_buf_size(
+        dst_stride_v,
+        dst_size.height,
+        "SplitRotateUV",
+        "destination V buffer size overflow",
+    )?;
+    if dst_v.len() < dst_v_buf {
         return Err(Error::with_reason(
             -1,
             "SplitRotateUV",
@@ -624,22 +947,96 @@ pub fn split_rotate_uv_90(
     dst_b: &mut [u8],
     dst_stride_b: usize,
 ) -> Result<(), Error> {
-    if src.len() < src_stride * src_size.height {
+    // c_int 範囲チェック
+    require_c_int(
+        src_size.width,
+        "SplitRotateUV90",
+        "width exceeds c_int range",
+    )?;
+    require_c_int(
+        src_size.height,
+        "SplitRotateUV90",
+        "height exceeds c_int range",
+    )?;
+    require_c_int(
+        src_stride,
+        "SplitRotateUV90",
+        "source stride exceeds c_int range",
+    )?;
+    require_c_int(
+        dst_stride_a,
+        "SplitRotateUV90",
+        "destination A stride exceeds c_int range",
+    )?;
+    require_c_int(
+        dst_stride_b,
+        "SplitRotateUV90",
+        "destination B stride exceeds c_int range",
+    )?;
+
+    // src は UV インターリーブなので stride >= width * 2
+    let src_min_width = src_size
+        .width
+        .checked_mul(2)
+        .ok_or_else(|| Error::with_reason(-1, "SplitRotateUV90", "width * 2 overflow"))?;
+    if src_stride < src_min_width {
+        return Err(Error::with_reason(
+            -1,
+            "SplitRotateUV90",
+            "source stride smaller than width * 2",
+        ));
+    }
+    // 90 度回転: 出力は幅と高さが入れ替わるので dst_stride >= src_size.height
+    if dst_stride_a < src_size.height {
+        return Err(Error::with_reason(
+            -1,
+            "SplitRotateUV90",
+            "destination A stride smaller than height",
+        ));
+    }
+    if dst_stride_b < src_size.height {
+        return Err(Error::with_reason(
+            -1,
+            "SplitRotateUV90",
+            "destination B stride smaller than height",
+        ));
+    }
+
+    // バッファサイズチェック（オーバーフロー安全）
+    let src_buf = checked_buf_size(
+        src_stride,
+        src_size.height,
+        "SplitRotateUV90",
+        "source buffer size overflow",
+    )?;
+    if src.len() < src_buf {
         return Err(Error::with_reason(
             -1,
             "SplitRotateUV90",
             "source buffer too small",
         ));
     }
-    // 90 度回転: 出力は幅と高さが入れ替わる
-    if dst_a.len() < dst_stride_a * src_size.width {
+    // 90 度回転: 出力の高さは src_size.width
+    let dst_a_buf = checked_buf_size(
+        dst_stride_a,
+        src_size.width,
+        "SplitRotateUV90",
+        "destination A buffer size overflow",
+    )?;
+    if dst_a.len() < dst_a_buf {
         return Err(Error::with_reason(
             -1,
             "SplitRotateUV90",
             "destination A buffer too small",
         ));
     }
-    if dst_b.len() < dst_stride_b * src_size.width {
+    let dst_b_buf = checked_buf_size(
+        dst_stride_b,
+        src_size.width,
+        "SplitRotateUV90",
+        "destination B buffer size overflow",
+    )?;
+    if dst_b.len() < dst_b_buf {
         return Err(Error::with_reason(
             -1,
             "SplitRotateUV90",
@@ -673,7 +1070,69 @@ pub fn split_rotate_uv_180(
     dst_b: &mut [u8],
     dst_stride_b: usize,
 ) -> Result<(), Error> {
-    if src.len() < src_stride * src_size.height {
+    // c_int 範囲チェック
+    require_c_int(
+        src_size.width,
+        "SplitRotateUV180",
+        "width exceeds c_int range",
+    )?;
+    require_c_int(
+        src_size.height,
+        "SplitRotateUV180",
+        "height exceeds c_int range",
+    )?;
+    require_c_int(
+        src_stride,
+        "SplitRotateUV180",
+        "source stride exceeds c_int range",
+    )?;
+    require_c_int(
+        dst_stride_a,
+        "SplitRotateUV180",
+        "destination A stride exceeds c_int range",
+    )?;
+    require_c_int(
+        dst_stride_b,
+        "SplitRotateUV180",
+        "destination B stride exceeds c_int range",
+    )?;
+
+    // src は UV インターリーブなので stride >= width * 2
+    let src_min_width = src_size
+        .width
+        .checked_mul(2)
+        .ok_or_else(|| Error::with_reason(-1, "SplitRotateUV180", "width * 2 overflow"))?;
+    if src_stride < src_min_width {
+        return Err(Error::with_reason(
+            -1,
+            "SplitRotateUV180",
+            "source stride smaller than width * 2",
+        ));
+    }
+    // dst_a/b は stride >= width
+    if dst_stride_a < src_size.width {
+        return Err(Error::with_reason(
+            -1,
+            "SplitRotateUV180",
+            "destination A stride smaller than width",
+        ));
+    }
+    if dst_stride_b < src_size.width {
+        return Err(Error::with_reason(
+            -1,
+            "SplitRotateUV180",
+            "destination B stride smaller than width",
+        ));
+    }
+
+    // バッファサイズチェック（オーバーフロー安全）
+    let src_buf = checked_buf_size(
+        src_stride,
+        src_size.height,
+        "SplitRotateUV180",
+        "source buffer size overflow",
+    )?;
+    if src.len() < src_buf {
         return Err(Error::with_reason(
             -1,
             "SplitRotateUV180",
@@ -681,14 +1140,26 @@ pub fn split_rotate_uv_180(
         ));
     }
     // 180 度回転: 出力は入力と同じサイズ
-    if dst_a.len() < dst_stride_a * src_size.height {
+    let dst_a_buf = checked_buf_size(
+        dst_stride_a,
+        src_size.height,
+        "SplitRotateUV180",
+        "destination A buffer size overflow",
+    )?;
+    if dst_a.len() < dst_a_buf {
         return Err(Error::with_reason(
             -1,
             "SplitRotateUV180",
             "destination A buffer too small",
         ));
     }
-    if dst_b.len() < dst_stride_b * src_size.height {
+    let dst_b_buf = checked_buf_size(
+        dst_stride_b,
+        src_size.height,
+        "SplitRotateUV180",
+        "destination B buffer size overflow",
+    )?;
+    if dst_b.len() < dst_b_buf {
         return Err(Error::with_reason(
             -1,
             "SplitRotateUV180",
@@ -724,22 +1195,96 @@ pub fn split_rotate_uv_270(
     dst_b: &mut [u8],
     dst_stride_b: usize,
 ) -> Result<(), Error> {
-    if src.len() < src_stride * src_size.height {
+    // c_int 範囲チェック
+    require_c_int(
+        src_size.width,
+        "SplitRotateUV270",
+        "width exceeds c_int range",
+    )?;
+    require_c_int(
+        src_size.height,
+        "SplitRotateUV270",
+        "height exceeds c_int range",
+    )?;
+    require_c_int(
+        src_stride,
+        "SplitRotateUV270",
+        "source stride exceeds c_int range",
+    )?;
+    require_c_int(
+        dst_stride_a,
+        "SplitRotateUV270",
+        "destination A stride exceeds c_int range",
+    )?;
+    require_c_int(
+        dst_stride_b,
+        "SplitRotateUV270",
+        "destination B stride exceeds c_int range",
+    )?;
+
+    // src は UV インターリーブなので stride >= width * 2
+    let src_min_width = src_size
+        .width
+        .checked_mul(2)
+        .ok_or_else(|| Error::with_reason(-1, "SplitRotateUV270", "width * 2 overflow"))?;
+    if src_stride < src_min_width {
+        return Err(Error::with_reason(
+            -1,
+            "SplitRotateUV270",
+            "source stride smaller than width * 2",
+        ));
+    }
+    // 270 度回転: 出力は幅と高さが入れ替わるので dst_stride >= src_size.height
+    if dst_stride_a < src_size.height {
+        return Err(Error::with_reason(
+            -1,
+            "SplitRotateUV270",
+            "destination A stride smaller than height",
+        ));
+    }
+    if dst_stride_b < src_size.height {
+        return Err(Error::with_reason(
+            -1,
+            "SplitRotateUV270",
+            "destination B stride smaller than height",
+        ));
+    }
+
+    // バッファサイズチェック（オーバーフロー安全）
+    let src_buf = checked_buf_size(
+        src_stride,
+        src_size.height,
+        "SplitRotateUV270",
+        "source buffer size overflow",
+    )?;
+    if src.len() < src_buf {
         return Err(Error::with_reason(
             -1,
             "SplitRotateUV270",
             "source buffer too small",
         ));
     }
-    // 270 度回転: 出力は幅と高さが入れ替わる
-    if dst_a.len() < dst_stride_a * src_size.width {
+    // 270 度回転: 出力の高さは src_size.width
+    let dst_a_buf = checked_buf_size(
+        dst_stride_a,
+        src_size.width,
+        "SplitRotateUV270",
+        "destination A buffer size overflow",
+    )?;
+    if dst_a.len() < dst_a_buf {
         return Err(Error::with_reason(
             -1,
             "SplitRotateUV270",
             "destination A buffer too small",
         ));
     }
-    if dst_b.len() < dst_stride_b * src_size.width {
+    let dst_b_buf = checked_buf_size(
+        dst_stride_b,
+        src_size.width,
+        "SplitRotateUV270",
+        "destination B buffer size overflow",
+    )?;
+    if dst_b.len() < dst_b_buf {
         return Err(Error::with_reason(
             -1,
             "SplitRotateUV270",
@@ -779,22 +1324,96 @@ pub fn split_transpose_uv(
     dst_b: &mut [u8],
     dst_stride_b: usize,
 ) -> Result<(), Error> {
-    if src.len() < src_stride * src_size.height {
+    // c_int 範囲チェック
+    require_c_int(
+        src_size.width,
+        "SplitTransposeUV",
+        "width exceeds c_int range",
+    )?;
+    require_c_int(
+        src_size.height,
+        "SplitTransposeUV",
+        "height exceeds c_int range",
+    )?;
+    require_c_int(
+        src_stride,
+        "SplitTransposeUV",
+        "source stride exceeds c_int range",
+    )?;
+    require_c_int(
+        dst_stride_a,
+        "SplitTransposeUV",
+        "destination A stride exceeds c_int range",
+    )?;
+    require_c_int(
+        dst_stride_b,
+        "SplitTransposeUV",
+        "destination B stride exceeds c_int range",
+    )?;
+
+    // src は UV インターリーブなので stride >= width * 2
+    let src_min_width = src_size
+        .width
+        .checked_mul(2)
+        .ok_or_else(|| Error::with_reason(-1, "SplitTransposeUV", "width * 2 overflow"))?;
+    if src_stride < src_min_width {
+        return Err(Error::with_reason(
+            -1,
+            "SplitTransposeUV",
+            "source stride smaller than width * 2",
+        ));
+    }
+    // 転置: 出力は幅と高さが入れ替わるので dst_stride >= src_size.height
+    if dst_stride_a < src_size.height {
+        return Err(Error::with_reason(
+            -1,
+            "SplitTransposeUV",
+            "destination A stride smaller than height",
+        ));
+    }
+    if dst_stride_b < src_size.height {
+        return Err(Error::with_reason(
+            -1,
+            "SplitTransposeUV",
+            "destination B stride smaller than height",
+        ));
+    }
+
+    // バッファサイズチェック（オーバーフロー安全）
+    let src_buf = checked_buf_size(
+        src_stride,
+        src_size.height,
+        "SplitTransposeUV",
+        "source buffer size overflow",
+    )?;
+    if src.len() < src_buf {
         return Err(Error::with_reason(
             -1,
             "SplitTransposeUV",
             "source buffer too small",
         ));
     }
-    // 転置: 出力は幅と高さが入れ替わる
-    if dst_a.len() < dst_stride_a * src_size.width {
+    // 転置: 出力の高さは src_size.width
+    let dst_a_buf = checked_buf_size(
+        dst_stride_a,
+        src_size.width,
+        "SplitTransposeUV",
+        "destination A buffer size overflow",
+    )?;
+    if dst_a.len() < dst_a_buf {
         return Err(Error::with_reason(
             -1,
             "SplitTransposeUV",
             "destination A buffer too small",
         ));
     }
-    if dst_b.len() < dst_stride_b * src_size.width {
+    let dst_b_buf = checked_buf_size(
+        dst_stride_b,
+        src_size.width,
+        "SplitTransposeUV",
+        "destination B buffer size overflow",
+    )?;
+    if dst_b.len() < dst_b_buf {
         return Err(Error::with_reason(
             -1,
             "SplitTransposeUV",
@@ -828,15 +1447,67 @@ pub fn transpose_plane(
     dst: &mut [u8],
     dst_stride: usize,
 ) -> Result<(), Error> {
-    if src.len() < src_stride * src_size.height {
+    // c_int 範囲チェック
+    require_c_int(
+        src_size.width,
+        "TransposePlane",
+        "width exceeds c_int range",
+    )?;
+    require_c_int(
+        src_size.height,
+        "TransposePlane",
+        "height exceeds c_int range",
+    )?;
+    require_c_int(
+        src_stride,
+        "TransposePlane",
+        "source stride exceeds c_int range",
+    )?;
+    require_c_int(
+        dst_stride,
+        "TransposePlane",
+        "destination stride exceeds c_int range",
+    )?;
+
+    // stride >= width チェック
+    if src_stride < src_size.width {
+        return Err(Error::with_reason(
+            -1,
+            "TransposePlane",
+            "source stride smaller than width",
+        ));
+    }
+    // 転置: 出力は幅と高さが入れ替わるので dst_stride >= src_size.height
+    if dst_stride < src_size.height {
+        return Err(Error::with_reason(
+            -1,
+            "TransposePlane",
+            "destination stride smaller than height",
+        ));
+    }
+
+    // バッファサイズチェック（オーバーフロー安全）
+    let src_buf = checked_buf_size(
+        src_stride,
+        src_size.height,
+        "TransposePlane",
+        "source buffer size overflow",
+    )?;
+    if src.len() < src_buf {
         return Err(Error::with_reason(
             -1,
             "TransposePlane",
             "source buffer too small",
         ));
     }
-    // 転置: 出力は幅と高さが入れ替わる
-    if dst.len() < dst_stride * src_size.width {
+    // 転置: 出力の高さは src_size.width
+    let dst_buf = checked_buf_size(
+        dst_stride,
+        src_size.width,
+        "TransposePlane",
+        "destination buffer size overflow",
+    )?;
+    if dst.len() < dst_buf {
         return Err(Error::with_reason(
             -1,
             "TransposePlane",
