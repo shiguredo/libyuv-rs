@@ -1596,7 +1596,25 @@ pub fn argb_sobel_to_plane(
     size: ImageSize,
 ) -> Result<(), Error> {
     src.validate(size, "ARGBSobelToPlane")?;
-    if dst.len() < dst_stride * size.height {
+    require_c_int(
+        dst_stride,
+        "ARGBSobelToPlane",
+        "destination stride exceeds c_int range",
+    )?;
+    if dst_stride < size.width {
+        return Err(Error::with_reason(
+            -1,
+            "ARGBSobelToPlane",
+            "destination stride smaller than width",
+        ));
+    }
+    let dst_size = checked_buf_size(
+        dst_stride,
+        size.height,
+        "ARGBSobelToPlane",
+        "buffer size overflow",
+    )?;
+    if dst.len() < dst_size {
         return Err(Error::with_reason(
             -1,
             "ARGBSobelToPlane",
@@ -1834,7 +1852,30 @@ pub fn argb_blur(
 ) -> Result<(), Error> {
     src.validate(size, "ARGBBlur")?;
     dst.validate(size, "ARGBBlur")?;
-    if cumsum.len() < stride32_cumsum * size.height {
+    require_c_int(
+        stride32_cumsum,
+        "ARGBBlur",
+        "cumsum stride exceeds c_int range",
+    )?;
+    // cumsum は i32 要素で 1 行あたり width * 4 要素必要 (ARGB の各チャンネル分)
+    let min_cumsum_stride = size
+        .width
+        .checked_mul(4)
+        .ok_or_else(|| Error::with_reason(-1, "ARGBBlur", "width * 4 overflow"))?;
+    if stride32_cumsum < min_cumsum_stride {
+        return Err(Error::with_reason(
+            -1,
+            "ARGBBlur",
+            "cumsum stride smaller than width * 4",
+        ));
+    }
+    let cumsum_size = checked_buf_size(
+        stride32_cumsum,
+        size.height,
+        "ARGBBlur",
+        "cumsum buffer size overflow",
+    )?;
+    if cumsum.len() < cumsum_size {
         return Err(Error::with_reason(
             -1,
             "ARGBBlur",
@@ -1867,7 +1908,30 @@ pub fn argb_compute_cumulative_sum(
     size: ImageSize,
 ) -> Result<(), Error> {
     src.validate(size, "ARGBComputeCumulativeSum")?;
-    if dst_cumsum.len() < dst_stride32_cumsum * size.height {
+    require_c_int(
+        dst_stride32_cumsum,
+        "ARGBComputeCumulativeSum",
+        "cumsum stride exceeds c_int range",
+    )?;
+    // cumsum は i32 要素で 1 行あたり width * 4 要素必要
+    let min_cumsum_stride = size
+        .width
+        .checked_mul(4)
+        .ok_or_else(|| Error::with_reason(-1, "ARGBComputeCumulativeSum", "width * 4 overflow"))?;
+    if dst_stride32_cumsum < min_cumsum_stride {
+        return Err(Error::with_reason(
+            -1,
+            "ARGBComputeCumulativeSum",
+            "cumsum stride smaller than width * 4",
+        ));
+    }
+    let cumsum_size = checked_buf_size(
+        dst_stride32_cumsum,
+        size.height,
+        "ARGBComputeCumulativeSum",
+        "cumsum buffer size overflow",
+    )?;
+    if dst_cumsum.len() < cumsum_size {
         return Err(Error::with_reason(
             -1,
             "ARGBComputeCumulativeSum",
@@ -2069,7 +2133,25 @@ pub fn argb_extract_alpha(
     size: ImageSize,
 ) -> Result<(), Error> {
     src.validate(size, "ARGBExtractAlpha")?;
-    if dst.len() < dst_stride * size.height {
+    require_c_int(
+        dst_stride,
+        "ARGBExtractAlpha",
+        "destination stride exceeds c_int range",
+    )?;
+    if dst_stride < size.width {
+        return Err(Error::with_reason(
+            -1,
+            "ARGBExtractAlpha",
+            "destination stride smaller than width",
+        ));
+    }
+    let dst_size = checked_buf_size(
+        dst_stride,
+        size.height,
+        "ARGBExtractAlpha",
+        "buffer size overflow",
+    )?;
+    if dst.len() < dst_size {
         return Err(Error::with_reason(
             -1,
             "ARGBExtractAlpha",
@@ -2121,7 +2203,31 @@ pub fn argb_copy_y_to_alpha(
     dst: &mut ArgbImageMut<'_>,
     size: ImageSize,
 ) -> Result<(), Error> {
-    if src_y.len() < src_stride_y * size.height {
+    require_c_int(size.width, "ARGBCopyYToAlpha", "width exceeds c_int range")?;
+    require_c_int(
+        size.height,
+        "ARGBCopyYToAlpha",
+        "height exceeds c_int range",
+    )?;
+    require_c_int(
+        src_stride_y,
+        "ARGBCopyYToAlpha",
+        "source stride exceeds c_int range",
+    )?;
+    if src_stride_y < size.width {
+        return Err(Error::with_reason(
+            -1,
+            "ARGBCopyYToAlpha",
+            "source stride smaller than width",
+        ));
+    }
+    let src_size = checked_buf_size(
+        src_stride_y,
+        size.height,
+        "ARGBCopyYToAlpha",
+        "buffer size overflow",
+    )?;
+    if src_y.len() < src_size {
         return Err(Error::with_reason(
             -1,
             "ARGBCopyYToAlpha",
