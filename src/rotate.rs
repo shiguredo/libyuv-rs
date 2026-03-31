@@ -295,12 +295,14 @@ pub fn android420_to_i420_rotate(
     src.validate(src_size, "Android420ToI420Rotate")?;
     dst.validate(dst_size, "Android420ToI420Rotate")?;
 
-    // pixel_stride_uv の c_int 範囲チェック
-    require_c_int(
-        pixel_stride_uv,
-        "Android420ToI420Rotate",
-        "pixel_stride_uv exceeds c_int range",
-    )?;
+    // pixel_stride_uv は 1 (planar) または 2 (interleaved) のみ有効
+    if pixel_stride_uv != 1 && pixel_stride_uv != 2 {
+        return Err(Error::with_reason(
+            -1,
+            "Android420ToI420Rotate",
+            "pixel_stride_uv must be 1 or 2",
+        ));
+    }
 
     let result = unsafe {
         sys::Android420ToI420Rotate(
