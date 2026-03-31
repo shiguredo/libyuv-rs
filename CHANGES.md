@@ -70,11 +70,11 @@
 
 ### misc
 
-- PBT テストを追加する (proptest)
+- [ADD] PBT テストを追加する (proptest)
   - @voluntas
-- Fuzzing ターゲットを追加する (cargo-fuzz)
+- [ADD] Fuzzing ターゲットを追加する (cargo-fuzz)
   - @voluntas
-- Docs.rs ビルド対応を追加する
+- [ADD] Docs.rs ビルド対応を追加する
   - @voluntas
 
 
