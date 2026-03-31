@@ -1,6 +1,6 @@
 [package]
 name = "shiguredo_libyuv"
-version = "2026.1.0-canary.4"
+version = "2026.1.0"
 edition = "2024"
 rust-version = "1.88"
 authors = ["Shiguredo Inc."]
@@ -10,7 +10,7 @@ homepage = "https://github.com/shiguredo/libyuv-rs"
 repository = "https://github.com/shiguredo/libyuv-rs"
 readme = "README.md"
 build = "build.rs"
-include = ["/src/**", "/build.rs", "/patches/**", "/README.md", "/LICENSE"]
+include = ["/src/**", "/build.rs", "/README.md", "/LICENSE"]
 
 [features]
 source-build = []
@@ -27,7 +27,7 @@ shiguredo_toml = "2026.1"
 #
 # なお libyuv にはタグが存在しないので、コミットハッシュで参照している
 [package.metadata.external-dependencies]
-libyuv = { git = "https://chromium.googlesource.com/libyuv/libyuv", version = "30809ff64a9ca5e45f86439c0d474c2d3eef3d05" }
+libyuv = { git = "https://chromium.googlesource.com/libyuv/libyuv", version = "1170363ce55fec2a256ce383479d8a6a3edadffe" }
 
 [workspace]
 members = ["pbt"]

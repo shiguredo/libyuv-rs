@@ -268,9 +268,6 @@ fn build_from_source(out_dir: &Path, output_bindings_path: &Path) -> PathBuf {
     // 依存ライブラリのリポジトリを取得する
     git_clone_external_lib(&out_source_dir);
 
-    // 上流のバグを修正するパッチを適用する
-    apply_patches(&src_dir);
-
     // 依存ライブラリをビルドする
     shiguredo_cmake::set_cmake_env();
     let dst = Config::new(&src_dir)
@@ -696,43 +693,6 @@ fn git_clone_external_lib(build_dir: &Path) {
         .is_ok_and(|status| status.success());
     if !success {
         panic!("failed to checkout commit {version} in {LIB_NAME} repository");
-    }
-}
-
-// 上流のバグを修正するパッチを適用する
-fn apply_patches(repo_dir: &Path) {
-    let patches_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("patches");
-    if !patches_dir.exists() {
-        return;
-    }
-
-    let mut patches: Vec<_> = fs::read_dir(&patches_dir)
-        .expect("failed to read patches directory")
-        .filter_map(|entry| {
-            let entry = entry.ok()?;
-            let path = entry.path();
-            if path.extension().is_some_and(|ext| ext == "patch") {
-                Some(path)
-            } else {
-                None
-            }
-        })
-        .collect();
-    patches.sort();
-
-    for patch in &patches {
-        let success = Command::new("git")
-            .arg("apply")
-            .arg(patch)
-            .current_dir(repo_dir)
-            .status()
-            .is_ok_and(|status| status.success());
-        if !success {
-            panic!(
-                "failed to apply patch: {}",
-                patch.file_name().unwrap().to_string_lossy()
-            );
-        }
     }
 }
 

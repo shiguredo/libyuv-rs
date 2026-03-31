@@ -11,6 +11,14 @@
 
 ## develop
 
+
+### misc
+
+
+## 2026.1.0
+
+**リリース日**: 2026-03-31
+
 - [ADD] シンボル書き換え機能を追加する
   - 静的ライブラリ内の全シンボルに `shiguredo_yuv_` プレフィックスを付与し、他ライブラリとの衝突を回避する
   - llvm-nm でシンボル収集、llvm-objcopy で書き換え、bindgen の `#[link_name]` で透過的にリンクする
@@ -51,9 +59,6 @@
   - @voluntas
 - [ADD] `RotationMode` enum を追加する
   - @voluntas
-- [ADD] 上流パッチ適用機能を追加する
-  - `patches/` ディレクトリの `.patch` ファイルをソースビルド時に自動適用する
-  - @voluntas
 - [CHANGE] prebuilt バイナリダウンロード機能を追加する
   - `source-build` feature でソースからのビルドに切り替え可能にする
   - デフォルトでは GitHub Releases から prebuilt バイナリをダウンロードする
@@ -76,7 +81,6 @@
   - @voluntas
 - [ADD] Docs.rs ビルド対応を追加する
   - @voluntas
-
 
 ## 2025.2.0
 

@@ -66,3 +66,11 @@ https://github.com/shiguredo/libyuv-rs/actions/runs/22860116385/job/66311383646
 - `vout` を 3 つの個別バッファ `vr`, `vg`, `vb` に分離し、出力プレーンの重複書き込みを防止
 
 libyuv 上流は最新 HEAD (30809ff6) でも未修正のため、パッチは当面維持する必要がある。
+
+Completed: 2026-03-31
+
+## パッチ仕組みの削除
+
+パッチファイル自体が既に削除されておりパッチの仕組みが空稼働していたため、
+`patches/` ディレクトリ、`build.rs` の `apply_patches` 関数、`Cargo.toml` の include 設定をまとめて削除した。
+上流で修正された場合、または再度パッチが必要になった場合は git history から復元可能。
