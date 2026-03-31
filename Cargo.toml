@@ -18,9 +18,9 @@ source-build = []
 [dependencies]
 
 [build-dependencies]
-bindgen = "0.72.0"
-shiguredo_cmake = "4.2.3"
-shiguredo_toml = "2026.1.0"
+bindgen = "0.72"
+shiguredo_cmake = "4.3"
+shiguredo_toml = "2026.1"
 
 # 以降は外部ライブラリビルド用のメタデータ
 # (この内容は build.rs の中からのみ参照される)
