@@ -22,6 +22,14 @@ pub fn i420_rotate(
     mode: RotationMode,
 ) -> Result<(), Error> {
     src.validate(src_size, "I420Rotate")?;
+    let expected = mode.output_size(src_size);
+    if dst_size.width != expected.width || dst_size.height != expected.height {
+        return Err(Error::with_reason(
+            -1,
+            "I420Rotate",
+            "dst_size does not match rotated dimensions",
+        ));
+    }
     dst.validate(dst_size, "I420Rotate")?;
 
     let result = unsafe {
@@ -59,6 +67,14 @@ pub fn argb_rotate(
     mode: RotationMode,
 ) -> Result<(), Error> {
     src.validate(src_size, "ARGBRotate")?;
+    let expected = mode.output_size(src_size);
+    if dst_size.width != expected.width || dst_size.height != expected.height {
+        return Err(Error::with_reason(
+            -1,
+            "ARGBRotate",
+            "dst_size does not match rotated dimensions",
+        ));
+    }
     dst.validate(dst_size, "ARGBRotate")?;
 
     let result = unsafe {
@@ -88,6 +104,16 @@ pub fn rotate_plane(
     dst_size: ImageSize,
     mode: RotationMode,
 ) -> Result<(), Error> {
+    // 出力サイズと回転モードの整合性チェック
+    let expected = mode.output_size(src_size);
+    if dst_size.width != expected.width || dst_size.height != expected.height {
+        return Err(Error::with_reason(
+            -1,
+            "RotatePlane",
+            "dst_size does not match rotated dimensions",
+        ));
+    }
+
     // c_int 範囲チェック
     require_c_int(src_size.width, "RotatePlane", "width exceeds c_int range")?;
     require_c_int(src_size.height, "RotatePlane", "height exceeds c_int range")?;
@@ -177,6 +203,14 @@ pub fn i010_rotate(
     mode: RotationMode,
 ) -> Result<(), Error> {
     src.validate(src_size, "I010Rotate")?;
+    let expected = mode.output_size(src_size);
+    if dst_size.width != expected.width || dst_size.height != expected.height {
+        return Err(Error::with_reason(
+            -1,
+            "I010Rotate",
+            "dst_size does not match rotated dimensions",
+        ));
+    }
     dst.validate(dst_size, "I010Rotate")?;
 
     let result = unsafe {
@@ -214,6 +248,14 @@ pub fn i210_rotate(
     mode: RotationMode,
 ) -> Result<(), Error> {
     src.validate(src_size, "I210Rotate")?;
+    let expected = mode.output_size(src_size);
+    if dst_size.width != expected.width || dst_size.height != expected.height {
+        return Err(Error::with_reason(
+            -1,
+            "I210Rotate",
+            "dst_size does not match rotated dimensions",
+        ));
+    }
     dst.validate(dst_size, "I210Rotate")?;
 
     let result = unsafe {
@@ -251,6 +293,14 @@ pub fn i410_rotate(
     mode: RotationMode,
 ) -> Result<(), Error> {
     src.validate(src_size, "I410Rotate")?;
+    let expected = mode.output_size(src_size);
+    if dst_size.width != expected.width || dst_size.height != expected.height {
+        return Err(Error::with_reason(
+            -1,
+            "I410Rotate",
+            "dst_size does not match rotated dimensions",
+        ));
+    }
     dst.validate(dst_size, "I410Rotate")?;
 
     let result = unsafe {
@@ -293,6 +343,14 @@ pub fn android420_to_i420_rotate(
     mode: RotationMode,
 ) -> Result<(), Error> {
     src.validate(src_size, "Android420ToI420Rotate")?;
+    let expected = mode.output_size(src_size);
+    if dst_size.width != expected.width || dst_size.height != expected.height {
+        return Err(Error::with_reason(
+            -1,
+            "Android420ToI420Rotate",
+            "dst_size does not match rotated dimensions",
+        ));
+    }
     dst.validate(dst_size, "Android420ToI420Rotate")?;
 
     // pixel_stride_uv は 1 (planar) または 2 (interleaved) のみ有効
@@ -339,6 +397,14 @@ pub fn nv12_to_i420_rotate(
     mode: RotationMode,
 ) -> Result<(), Error> {
     src.validate(src_size, "NV12ToI420Rotate")?;
+    let expected = mode.output_size(src_size);
+    if dst_size.width != expected.width || dst_size.height != expected.height {
+        return Err(Error::with_reason(
+            -1,
+            "NV12ToI420Rotate",
+            "dst_size does not match rotated dimensions",
+        ));
+    }
     dst.validate(dst_size, "NV12ToI420Rotate")?;
 
     let result = unsafe {
@@ -378,6 +444,14 @@ pub fn i422_rotate(
     mode: RotationMode,
 ) -> Result<(), Error> {
     src.validate(src_size, "I422Rotate")?;
+    let expected = mode.output_size(src_size);
+    if dst_size.width != expected.width || dst_size.height != expected.height {
+        return Err(Error::with_reason(
+            -1,
+            "I422Rotate",
+            "dst_size does not match rotated dimensions",
+        ));
+    }
     dst.validate(dst_size, "I422Rotate")?;
 
     let result = unsafe {
@@ -415,6 +489,14 @@ pub fn i444_rotate(
     mode: RotationMode,
 ) -> Result<(), Error> {
     src.validate(src_size, "I444Rotate")?;
+    let expected = mode.output_size(src_size);
+    if dst_size.width != expected.width || dst_size.height != expected.height {
+        return Err(Error::with_reason(
+            -1,
+            "I444Rotate",
+            "dst_size does not match rotated dimensions",
+        ));
+    }
     dst.validate(dst_size, "I444Rotate")?;
 
     let result = unsafe {
@@ -456,6 +538,16 @@ pub fn rotate_plane_16(
     dst_size: ImageSize,
     mode: RotationMode,
 ) -> Result<(), Error> {
+    // 出力サイズと回転モードの整合性チェック
+    let expected = mode.output_size(src_size);
+    if dst_size.width != expected.width || dst_size.height != expected.height {
+        return Err(Error::with_reason(
+            -1,
+            "RotatePlane_16",
+            "dst_size does not match rotated dimensions",
+        ));
+    }
+
     // c_int 範囲チェック
     require_c_int(
         src_size.width,
@@ -828,6 +920,16 @@ pub fn split_rotate_uv(
     dst_size: ImageSize,
     mode: RotationMode,
 ) -> Result<(), Error> {
+    // 出力サイズと回転モードの整合性チェック
+    let expected = mode.output_size(src_size);
+    if dst_size.width != expected.width || dst_size.height != expected.height {
+        return Err(Error::with_reason(
+            -1,
+            "SplitRotateUV",
+            "dst_size does not match rotated dimensions",
+        ));
+    }
+
     // c_int 範囲チェック
     require_c_int(src_size.width, "SplitRotateUV", "width exceeds c_int range")?;
     require_c_int(

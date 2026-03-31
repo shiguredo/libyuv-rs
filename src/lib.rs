@@ -116,6 +116,16 @@ impl RotationMode {
             RotationMode::Rotate270 => sys::RotationMode_kRotate270,
         }
     }
+
+    /// 回転後の出力サイズを返す
+    pub(crate) fn output_size(self, src: ImageSize) -> ImageSize {
+        match self {
+            RotationMode::None | RotationMode::Rotate180 => src,
+            RotationMode::Rotate90 | RotationMode::Rotate270 => {
+                ImageSize::new(src.height, src.width)
+            }
+        }
+    }
 }
 
 /// 画像の幅と高さ
