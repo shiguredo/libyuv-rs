@@ -10,7 +10,7 @@ homepage = "https://github.com/shiguredo/libyuv-rs"
 repository = "https://github.com/shiguredo/libyuv-rs"
 readme = "README.md"
 build = "build.rs"
-include = ["/src/**", "/build.rs", "/patches/**", "/README.md", "/LICENSE"]
+include = ["/src/**", "/build.rs", "/README.md", "/LICENSE"]
 
 [features]
 source-build = []
