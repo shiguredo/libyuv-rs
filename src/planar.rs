@@ -1381,6 +1381,30 @@ pub fn i420_rect(
     value_v: u8,
 ) -> Result<(), Error> {
     dst.validate(size, "I420Rect")?;
+    // 矩形パラメータの c_int 範囲チェック
+    require_c_int(x, "I420Rect", "x exceeds c_int range")?;
+    require_c_int(y, "I420Rect", "y exceeds c_int range")?;
+    require_c_int(rect_width, "I420Rect", "rect_width exceeds c_int range")?;
+    require_c_int(rect_height, "I420Rect", "rect_height exceeds c_int range")?;
+    // 矩形が画像境界内に収まることを検証する
+    if x.checked_add(rect_width)
+        .is_none_or(|right| right > size.width)
+    {
+        return Err(Error::with_reason(
+            -1,
+            "I420Rect",
+            "rectangle exceeds image width",
+        ));
+    }
+    if y.checked_add(rect_height)
+        .is_none_or(|bottom| bottom > size.height)
+    {
+        return Err(Error::with_reason(
+            -1,
+            "I420Rect",
+            "rectangle exceeds image height",
+        ));
+    }
 
     let result = unsafe {
         sys::I420Rect(
@@ -1414,6 +1438,30 @@ pub fn argb_rect(
     argb_color: u32,
 ) -> Result<(), Error> {
     dst.validate(size, "ARGBRect")?;
+    // 矩形パラメータの c_int 範囲チェック
+    require_c_int(x, "ARGBRect", "x exceeds c_int range")?;
+    require_c_int(y, "ARGBRect", "y exceeds c_int range")?;
+    require_c_int(rect_width, "ARGBRect", "rect_width exceeds c_int range")?;
+    require_c_int(rect_height, "ARGBRect", "rect_height exceeds c_int range")?;
+    // 矩形が画像境界内に収まることを検証する
+    if x.checked_add(rect_width)
+        .is_none_or(|right| right > size.width)
+    {
+        return Err(Error::with_reason(
+            -1,
+            "ARGBRect",
+            "rectangle exceeds image width",
+        ));
+    }
+    if y.checked_add(rect_height)
+        .is_none_or(|bottom| bottom > size.height)
+    {
+        return Err(Error::with_reason(
+            -1,
+            "ARGBRect",
+            "rectangle exceeds image height",
+        ));
+    }
 
     let result = unsafe {
         sys::ARGBRect(

@@ -994,6 +994,27 @@ pub fn argb_scale_clip(
         "ARGBScaleClip",
         "clip_height exceeds c_int range",
     )?;
+    // クリップ矩形が出力画像の境界内に収まることを検証する
+    if clip_x
+        .checked_add(clip_width)
+        .is_none_or(|right| right > dst_size.width)
+    {
+        return Err(Error::with_reason(
+            -1,
+            "ARGBScaleClip",
+            "clip rectangle exceeds destination width",
+        ));
+    }
+    if clip_y
+        .checked_add(clip_height)
+        .is_none_or(|bottom| bottom > dst_size.height)
+    {
+        return Err(Error::with_reason(
+            -1,
+            "ARGBScaleClip",
+            "clip rectangle exceeds destination height",
+        ));
+    }
 
     let result = unsafe {
         sys::ARGBScaleClip(
