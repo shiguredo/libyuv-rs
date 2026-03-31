@@ -359,9 +359,12 @@ pub fn sum_square_error_to_psnr(sse: u64, count: u64) -> f64 {
 }
 
 /// ハミング距離を計算する
-pub fn compute_hamming_distance(src_a: &[u8], src_b: &[u8]) -> u64 {
+pub fn compute_hamming_distance(src_a: &[u8], src_b: &[u8]) -> Result<u64, Error> {
     let count = src_a.len().min(src_b.len());
-    unsafe { sys::ComputeHammingDistance(src_a.as_ptr(), src_b.as_ptr(), count as c_int) }
+    require_c_int(count, "ComputeHammingDistance", "count exceeds c_int range")?;
+    let result =
+        unsafe { sys::ComputeHammingDistance(src_a.as_ptr(), src_b.as_ptr(), count as c_int) };
+    Ok(result)
 }
 
 /// DJB2 ハッシュを計算する
