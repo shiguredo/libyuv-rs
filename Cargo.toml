@@ -27,7 +27,7 @@ shiguredo_toml = "2026.1"
 #
 # なお libyuv にはタグが存在しないので、コミットハッシュで参照している
 [package.metadata.external-dependencies]
-libyuv = { git = "https://chromium.googlesource.com/libyuv/libyuv", version = "30809ff64a9ca5e45f86439c0d474c2d3eef3d05" }
+libyuv = { git = "https://chromium.googlesource.com/libyuv/libyuv", version = "1170363ce55fec2a256ce383479d8a6a3edadffe" }
 
 [workspace]
 members = ["pbt"]
