@@ -551,7 +551,7 @@ dependencies = [
 
 [[package]]
 name = "shiguredo_libyuv"
-version = "2026.1.0-canary.3"
+version = "2026.1.0-canary.4"
 dependencies = [
  "bindgen",
  "shiguredo_cmake",
