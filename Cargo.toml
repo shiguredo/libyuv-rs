@@ -1,0 +1,34 @@
+[package]
+name = "shiguredo_libyuv"
+version = "2026.1.0"
+edition = "2024"
+rust-version = "1.88"
+authors = ["Shiguredo Inc."]
+license = "Apache-2.0"
+description = "Rust bindings for Google's libyuv image conversion and processing library"
+homepage = "https://github.com/shiguredo/libyuv-rs"
+repository = "https://github.com/shiguredo/libyuv-rs"
+readme = "README.md"
+build = "build.rs"
+include = ["/src/**", "/build.rs", "/README.md", "/LICENSE"]
+
+[features]
+source-build = []
+
+[dependencies]
+
+[build-dependencies]
+bindgen = "0.72"
+shiguredo_cmake = "4.3"
+shiguredo_toml = "2026.1"
+
+# 以降は外部ライブラリビルド用のメタデータ
+# (この内容は build.rs の中からのみ参照される)
+#
+# なお libyuv にはタグが存在しないので、コミットハッシュで参照している
+[package.metadata.external-dependencies]
+libyuv = { git = "https://chromium.googlesource.com/libyuv/libyuv", version = "1170363ce55fec2a256ce383479d8a6a3edadffe" }
+
+[workspace]
+members = ["pbt"]
+exclude = ["fuzz"]
