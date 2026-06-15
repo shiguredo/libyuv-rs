@@ -55,21 +55,22 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # 空 glob 時に find が「No such file or directory」で非ゼロ終了するので、
-          # `|| true` で受けてから候補が空 / 複数の両方を明示的に弾く。
-          # `echo "" | wc -l` は 1 を返すため、空文字列判定を wc に先行させる。
+          # 空 glob 時に find が「No such file or directory」で非ゼロ終了するので
+          # `|| true` で受け、候補が空のときは明示的にエラーにする。
+          # cargo clippy と cargo test は profile が異なり metadata hash も変わるため、
+          # `shiguredo_libyuv-<hash>/out` が複数できる場合がある。最新更新の 1 つを選ぶ。
           candidates=$(find target/debug/build/shiguredo_libyuv-*/out -maxdepth 0 -type d 2>/dev/null || true)
           if [ -z "$candidates" ]; then
             echo "ERROR: no OUT_DIR matched target/debug/build/shiguredo_libyuv-*/out"
             exit 1
           fi
-          count=$(echo "$candidates" | wc -l)
-          if [ "$count" != "1" ]; then
-            echo "ERROR: expected 1 OUT_DIR but got $count:"
+          OUT_DIR=$(printf '%s\n' $candidates | xargs ls -td 2>/dev/null | head -1)
+          if [ -z "$OUT_DIR" ] || [ ! -d "$OUT_DIR" ]; then
+            echo "ERROR: failed to pick OUT_DIR from candidates:"
             echo "$candidates"
             exit 1
           fi
-          OUT_DIR=$(echo "$candidates" | head -1)
+          echo "selected OUT_DIR=$OUT_DIR"
           bash scripts/verify_symbol_rewrite.sh "$OUT_DIR"
           bash scripts/verify_libyuv_source.sh "$OUT_DIR"
 
