@@ -393,6 +393,12 @@ fn build_from_source(out_dir: &Path, output_bindings_path: &Path) -> PathBuf {
     let libyuv_src_dir = out_source_dir.join(LIBYUV.name);
     git_clone_external_lib(&out_source_dir, &LIBYUV);
 
+    // libyuv の util ツール (cpuid / yuvconvert / yuvconstants) はビルド対象から外す。
+    // `util/cpuid.c` には Intel APX 命令 (`vdpphps`) が含まれており、
+    // GitHub Actions の binutils ではアセンブルできないため。
+    // Rust バインディングからこれらツールは参照しないので静的ライブラリの機能には影響しない。
+    patch_libyuv_skip_util_tools(&libyuv_src_dir);
+
     let mut libyuv_cfg = Config::new(&libyuv_src_dir);
     libyuv_cfg
         .define("BUILD_SHARED_LIBS", "OFF")
@@ -968,6 +974,51 @@ fn git_clone_external_lib(build_dir: &Path, lib: &LibraryConfig) {
             version, lib.name
         );
     }
+}
+
+// ============================================================
+// libyuv CMakeLists.txt パッチ
+// ============================================================
+
+/// libyuv の `CMakeLists.txt` から util ツール (cpuid / yuvconvert / yuvconstants) のビルドを除外する。
+///
+/// 必要性:
+///   libyuv commit `d23308a2a7442be8e559b1b471862fd7588d6a57` 以降の `util/cpuid.c` には
+///   Intel APX 命令 (`vdpphps`) が含まれており、GitHub Actions の binutils ではアセンブルできない。
+///   Rust バインディングからは util ツールは参照しないので、静的ライブラリ (`libyuv.a`) には
+///   影響せずビルドをスキップできる。
+fn patch_libyuv_skip_util_tools(src_dir: &Path) {
+    let cmake_path = src_dir.join("CMakeLists.txt");
+    let content = fs::read_to_string(&cmake_path)
+        .unwrap_or_else(|e| panic!("failed to read {}: {}", cmake_path.display(), e));
+    let patched = strip_libyuv_util_tools(&content);
+    if patched == content {
+        panic!(
+            "libyuv CMakeLists.txt patch did not match any line. \
+             Upstream may have changed; please review the util-tool removal logic."
+        );
+    }
+    fs::write(&cmake_path, patched)
+        .unwrap_or_else(|e| panic!("failed to write {}: {}", cmake_path.display(), e));
+}
+
+/// `CMakeLists.txt` の本文から util ツール関連の行 (add_executable / target_link_libraries /
+/// install) を取り除く。
+fn strip_libyuv_util_tools(content: &str) -> String {
+    const TOOL_NAMES: &[&str] = &["cpuid", "yuvconvert", "yuvconstants"];
+    let mut lines: Vec<&str> = Vec::new();
+    for line in content.lines() {
+        let trimmed = line.trim_start();
+        let mentions_tool = TOOL_NAMES.iter().any(|name| line.contains(name));
+        let is_tool_line = mentions_tool
+            && (trimmed.starts_with("add_executable")
+                || trimmed.starts_with("target_link_libraries")
+                || trimmed.starts_with("install"));
+        if !is_tool_line {
+            lines.push(line);
+        }
+    }
+    lines.join("\n")
 }
 
 // Cargo.toml から依存ライブラリの Git URL とバージョンタグを取得する

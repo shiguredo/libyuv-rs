@@ -23,7 +23,7 @@ include = [
 # なお libyuv にはタグが存在しないので、コミットハッシュで参照している
 [package.metadata.external-dependencies.libyuv]
 git = "https://chromium.googlesource.com/libyuv/libyuv"
-version = "1170363ce55fec2a256ce383479d8a6a3edadffe"
+version = "d23308a2a7442be8e559b1b471862fd7588d6a57"
 
 # libjpeg-turbo はタグが存在するが、再現性のためコミットハッシュで固定する
 # 3.1.90 = e1dbfa7be7b7e54922020051dc77781e92739700

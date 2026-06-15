@@ -28,8 +28,8 @@
   - `mjpeg_size` / `mjpeg_to_i420` / `mjpeg_to_nv12` / `mjpeg_to_nv21` / `mjpeg_to_argb`
   - スケーリング非対応 (`src_size == dst_size` を強制)
   - @voluntas
-- [UPDATE] `libyuv` のハッシュを `1170363ce55fec2a256ce383479d8a6a3edadffe` に更新する
-  - <https://chromium.googlesource.com/libyuv/libyuv/+/1170363ce55fec2a256ce383479d8a6a3edadffe>
+- [UPDATE] `libyuv` のハッシュを `d23308a2a7442be8e559b1b471862fd7588d6a57` に更新する
+  - <https://chromium.googlesource.com/libyuv/libyuv/+/d23308a2a7442be8e559b1b471862fd7588d6a57>
   - @voluntas
 
 ### misc
@@ -37,6 +37,10 @@
 - [ADD] MJPEG fuzz ターゲットを追加する
   - @voluntas
 - [UPDATE] CI / release ワークフローに NASM のインストールを追加する
+  - @voluntas
+- [FIX] libyuv の util ツール (cpuid / yuvconvert / yuvconstants) をビルド対象から外す
+  - `util/cpuid.c` に Intel APX 命令 (`vdpphps`) が含まれ GitHub Actions の binutils ではアセンブルできないため、build.rs で libyuv の `CMakeLists.txt` をパッチして util ツールビルドを除外する
+  - 静的ライブラリ (`libyuv.a`) の機能には影響しない
   - @voluntas
 
 ## 2026.1.0
