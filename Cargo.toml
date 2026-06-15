@@ -9,7 +9,13 @@ homepage = "https://github.com/shiguredo/libyuv-rs"
 repository = "https://github.com/shiguredo/libyuv-rs"
 license = "Apache-2.0"
 build = "build.rs"
-include = ["/LICENSE", "/README.md", "/build.rs", "/src/**"]
+include = [
+    "/LICENSE",
+    "/README.md",
+    "/THIRD_PARTY_LICENSES",
+    "/build.rs",
+    "/src/**",
+]
 
 # 以降は外部ライブラリビルド用のメタデータ
 # (この内容は build.rs の中からのみ参照される)
@@ -18,6 +24,12 @@ include = ["/LICENSE", "/README.md", "/build.rs", "/src/**"]
 [package.metadata.external-dependencies.libyuv]
 git = "https://chromium.googlesource.com/libyuv/libyuv"
 version = "1170363ce55fec2a256ce383479d8a6a3edadffe"
+
+# libjpeg-turbo はタグが存在するが、再現性のためコミットハッシュで固定する
+# 3.1.90 = e1dbfa7be7b7e54922020051dc77781e92739700
+[package.metadata.external-dependencies.libjpeg-turbo]
+git = "https://github.com/libjpeg-turbo/libjpeg-turbo"
+version = "e1dbfa7be7b7e54922020051dc77781e92739700"
 
 [workspace]
 members = ["pbt"]

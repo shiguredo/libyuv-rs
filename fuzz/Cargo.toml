@@ -48,3 +48,10 @@ path = "fuzz_targets/fuzz_compare.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "fuzz_mjpeg"
+path = "fuzz_targets/fuzz_mjpeg.rs"
+test = false
+doc = false
+bench = false

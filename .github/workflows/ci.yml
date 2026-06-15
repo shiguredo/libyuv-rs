@@ -29,13 +29,50 @@ jobs:
           - macos-15
           - windows-2025
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - run: rustup update stable
+      - name: Install NASM
+        shell: bash
+        run: |
+          case "${{ runner.os }}" in
+            Linux)
+              if [ "${{ runner.arch }}" = "X64" ]; then
+                sudo apt-get update && sudo apt-get install -y nasm
+              fi
+              ;;
+            macOS)   brew install nasm ;;
+            Windows) choco install nasm -y && echo "C:\\Program Files\\NASM" >> $GITHUB_PATH ;;
+          esac
+      - name: Verify license hash
+        shell: bash
+        run: bash scripts/verify_license_hash.sh
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --features source-build -- -D warnings
       - run: cargo test --workspace --features source-build
+      - name: Verify symbol rewrite
+        shell: bash
+        run: |
+          set -euo pipefail
+          # 空 glob 時に find が「No such file or directory」で非ゼロ終了するので
+          # `|| true` で受け、候補が空のときは明示的にエラーにする。
+          # cargo clippy と cargo test は profile が異なり metadata hash も変わるため、
+          # `shiguredo_libyuv-<hash>/out` が複数できる場合がある。最新更新の 1 つを選ぶ。
+          candidates=$(find target/debug/build/shiguredo_libyuv-*/out -maxdepth 0 -type d 2>/dev/null || true)
+          if [ -z "$candidates" ]; then
+            echo "ERROR: no OUT_DIR matched target/debug/build/shiguredo_libyuv-*/out"
+            exit 1
+          fi
+          OUT_DIR=$(printf '%s\n' $candidates | xargs ls -td 2>/dev/null | head -1)
+          if [ -z "$OUT_DIR" ] || [ ! -d "$OUT_DIR" ]; then
+            echo "ERROR: failed to pick OUT_DIR from candidates:"
+            echo "$candidates"
+            exit 1
+          fi
+          echo "selected OUT_DIR=$OUT_DIR"
+          bash scripts/verify_symbol_rewrite.sh "$OUT_DIR"
+          bash scripts/verify_libyuv_source.sh "$OUT_DIR"
 
   # docs.rs 向けビルド確認
   docs-rs:
