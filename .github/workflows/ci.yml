@@ -29,13 +29,49 @@ jobs:
           - macos-15
           - windows-2025
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - run: rustup update stable
+      - name: Install NASM
+        shell: bash
+        run: |
+          case "${{ runner.os }}" in
+            Linux)
+              if [ "${{ runner.arch }}" = "X64" ]; then
+                sudo apt-get update && sudo apt-get install -y nasm
+              fi
+              ;;
+            macOS)   brew install nasm ;;
+            Windows) choco install nasm -y && echo "C:\\Program Files\\NASM" >> $GITHUB_PATH ;;
+          esac
+      - name: Verify license hash
+        shell: bash
+        run: bash scripts/verify_license_hash.sh
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --features source-build -- -D warnings
       - run: cargo test --workspace --features source-build
+      - name: Verify symbol rewrite
+        shell: bash
+        run: |
+          set -euo pipefail
+          # 空 glob 時に find が「No such file or directory」で非ゼロ終了するので、
+          # `|| true` で受けてから候補が空 / 複数の両方を明示的に弾く。
+          # `echo "" | wc -l` は 1 を返すため、空文字列判定を wc に先行させる。
+          candidates=$(find target/debug/build/shiguredo_libyuv-*/out -maxdepth 0 -type d 2>/dev/null || true)
+          if [ -z "$candidates" ]; then
+            echo "ERROR: no OUT_DIR matched target/debug/build/shiguredo_libyuv-*/out"
+            exit 1
+          fi
+          count=$(echo "$candidates" | wc -l)
+          if [ "$count" != "1" ]; then
+            echo "ERROR: expected 1 OUT_DIR but got $count:"
+            echo "$candidates"
+            exit 1
+          fi
+          OUT_DIR=$(echo "$candidates" | head -1)
+          bash scripts/verify_symbol_rewrite.sh "$OUT_DIR"
+          bash scripts/verify_libyuv_source.sh "$OUT_DIR"
 
   # docs.rs 向けビルド確認
   docs-rs:

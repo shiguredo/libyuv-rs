@@ -2,7 +2,7 @@
 
 - Priority: High
 - Created: 2026-06-12
-- Completed:
+- Completed: 2026-06-15
 - Model: Opus 4.7
 - Branch: feature/add-libjpeg-turbo-mjpeg-support
 - Polished: 2026-06-15
@@ -39,14 +39,14 @@ libyuv の MJPEG デコード関数 (`MJPGToI420`, `MJPGToNV12`, `MJPGToNV21`, `
 
 ### libjpeg-turbo のバージョンと取得元
 
-libjpeg-turbo 3.1.1 を採用する。実装着手時に `git ls-remote --tags https://github.com/libjpeg-turbo/libjpeg-turbo` でタグ名と該当 commit hash を確認し、**commit hash で固定** する。
+libjpeg-turbo 3.1.90 を採用する。`git ls-remote --tags https://github.com/libjpeg-turbo/libjpeg-turbo` で確認した commit hash は `e1dbfa7be7b7e54922020051dc77781e92739700` で、**この commit hash で固定** する。
 
 `Cargo.toml` への追加:
 
 ```toml
 [package.metadata.external-dependencies.libjpeg-turbo]
 git = "https://github.com/libjpeg-turbo/libjpeg-turbo"
-version = "<確認した commit hash>"
+version = "e1dbfa7be7b7e54922020051dc77781e92739700"
 ```
 
 ### build.rs の汎用化リファクタ (事前リファクタ)
@@ -332,9 +332,9 @@ magick -size 64x48 gradient:red-blue -sampling-factor 1x1 -quality 80 mjpeg_64x4
 
 サイズ選定理由は MCU 境界 (8x8 / 8x16 / 16x16 の境界) を網羅するため。生成後に `jpegtran -copy none` でメタデータを削除する。
 
-### 単体テスト (`tests/mjpeg.rs`)
+### 単体テスト (`tests/test_mjpeg.rs`)
 
-新規に `tests/mjpeg.rs` を追加 (`tests/` ディレクトリ自体も新設)。`include` 配列は `tests/` を含まない方針を維持する (integration テストはリポジトリ内のみで使用、crates.io 配布物には不要)。
+新規に `tests/test_mjpeg.rs` を追加 (`tests/` ディレクトリ自体も新設)。`include` 配列は `tests/` を含まない方針を維持する (integration テストはリポジトリ内のみで使用、crates.io 配布物には不要)。
 
 - 正常系
   - 各サブサンプリングで `mjpeg_size()` が正しい幅・高さを返す
@@ -384,7 +384,7 @@ fuzz ターゲット戦略:
   - 旧バージョン prebuilt との互換性は無い (Cargo.toml の version を bump)
   - @voluntas
 - [ADD] libjpeg-turbo をビルド依存として組み込む
-  - libjpeg-turbo 3.1.1 (commit <hash>) を build.rs から自動ビルドする
+  - libjpeg-turbo 3.1.90 (commit e1dbfa7be7b7e54922020051dc77781e92739700) を build.rs から自動ビルドする
   - 静的ライブラリのシンボルに shiguredo_jpeg_ プレフィックスを付与する
   - @voluntas
 - [ADD] MJPEG 変換関数を追加する
@@ -408,7 +408,7 @@ fuzz ターゲット戦略:
 
 - `source-build` feature の有無にかかわらず MJPEG 関数が利用可能 (source-build は自動ビルド、prebuilt はダウンロード)
 - `mjpeg_size`, `mjpeg_to_i420`, `mjpeg_to_nv12`, `mjpeg_to_nv21`, `mjpeg_to_argb` が Rust API として公開される
-- `tests/mjpeg.rs` の正常系・異常系テストがすべて通る
+- `tests/test_mjpeg.rs` の正常系・異常系テストがすべて通る
 - `fuzz/fuzz_targets/fuzz_mjpeg.rs` が `cargo fuzz run fuzz_mjpeg` で起動できる (実行時間は問わない)
 - CI の `test` ジョブで `cargo fmt --all --check` / `cargo clippy --workspace --features source-build -- -D warnings` / `cargo test --workspace --features source-build` がパスする
 - CI の `docs-rs` ジョブで `cargo doc --no-deps` (`DOCS_RS=1`) がパスする
@@ -418,3 +418,26 @@ fuzz ターゲット戦略:
 - `THIRD_PARTY_LICENSES` がリポジトリに存在し、crates.io 公開物と prebuilt アーカイブに同梱される
 - (リリース後手順、PR レビュー範囲外): 本 issue マージ → リリースタグ作成 → `release.yml` の prebuilt 生成完了後、ローカルで `cargo test --workspace` (source-build 無し) を実行し prebuilt 経路の MJPEG 関数動作を手動確認する
 - `CHANGES.md` の `## develop` セクションに上記エントリが追記されている (種別並び厳守)
+
+## 解決方法
+
+`build.rs` を `LibraryConfig` 構造体ベースの汎用化リファクタに切り替えたうえで、libjpeg-turbo 3.1.90 (commit `e1dbfa7be7b7e54922020051dc77781e92739700`) を `build.rs` から自動ビルドし、シンボル書き換えと bindgen 連携を 2 ライブラリ対応にした。MJPEG 系 5 関数 (`mjpeg_size`, `mjpeg_to_i420`, `mjpeg_to_nv12`, `mjpeg_to_nv21`, `mjpeg_to_argb`) を `src/convert.rs` に追加し、`tests/test_convert.rs` の命名規則に従って `tests/test_mjpeg.rs` で 15 件の単体テスト (正常系 5 + 異常系 10) を追加した。
+
+主な変更ファイル:
+
+- `Cargo.toml`: libjpeg-turbo の external-dependencies と `include` に `THIRD_PARTY_LICENSES` を追加
+- `THIRD_PARTY_LICENSES`: libjpeg-turbo の LICENSE.md 全文を `# libjpeg-turbo (commit ...)` ヘッダ付きで同梱
+- `build.rs`: `LIB_NAME`/`LINK_NAME`/`SYMBOL_PREFIX` 定数を削除し `LibraryConfig` 構造体に置き換え。`rewrite_symbols` を `rename_defined_symbols` (戻り値 `RenameResult` に `map_file_path` 同梱) と `rewrite_archive_symbols` の組み合わせに分割。`build_libjpeg_turbo` を新設し、libyuv 側で `CMAKE_PREFIX_PATH` を渡して `find_package(JPEG)` を成功させる。DOCS_RS 分岐に MJPG\* 関数のダミー FFI シグネチャを追加
+- `src/convert.rs`: MJPEG API 5 関数と共通入力検証 `validate_mjpeg_input` を追加 (スケーリングは `let w = size.width as c_int; let h = size.height as c_int;` で受けて `(w, h, w, h)` で渡し、無効化していることをコード上で明示)
+- `src/test_data/`: ImageMagick で生成した 4:2:0 / 4:2:2 / 4:4:4 の固定 JPEG 3 枚と再生成手順の README.md を追加 (CI から再生成しない)
+- `tests/test_mjpeg.rs`: 単体テスト 15 件。正常系では Y プレーン非ゼロ・ARGB アルファチャンネル 0xFF を検証。異常系では空入力 / SOI 破壊 / EOI 欠落 / サイズ不一致 / バッファ不足 / 幅・高さの `c_int` オーバーフローを検査
+- `fuzz/fuzz_targets/fuzz_mjpeg.rs`: `mjpeg_size` の結果でサイズを動的算出し、4 MiB ピクセル上限で OOM を防ぎつつ 4 関数すべてを呼ぶ
+- `scripts/verify_license_hash.sh`: `Cargo.toml` の libjpeg-turbo 版と `THIRD_PARTY_LICENSES` 冒頭の commit hash 一致を確認
+- `scripts/verify_symbol_rewrite.sh`: `libshiguredo_{yuv,jpeg}.a` の未解決 `jpeg_*`/`jsimd_*` シンボル不在と `shiguredo_yuv_MJPG*` 定義を確認 (オブジェクトファイル名行を誤検出しないよう末尾を `[A-Za-z0-9_]+$` で受ける)
+- `scripts/verify_libyuv_source.sh`: libyuv ソースの `jpeg_*` 識別子が `convert_jpeg.cc` / `mjpeg_decoder.cc` / `mjpeg_validate.cc` のみに出現することを確認
+- `.github/workflows/ci.yml` / `release.yml`: NASM のインストール、検証スクリプトの実行、`Find OUT_DIR` の空 glob ガード強化 (`wc -l` 誤判定を避けるための空文字列チェック)、prebuilt アーカイブ構造変更 (`libshiguredo_{yuv,jpeg}.a` + `THIRD_PARTY_LICENSES`) を反映
+- `CHANGES.md`: `## develop` に CHANGE (build.rs 汎用化, prebuilt 構造変更), ADD (libjpeg-turbo 組込, MJPEG API) と `### misc` (MJPEG fuzz, NASM CI) のエントリを追加
+
+libjpeg-turbo のバージョンは `git ls-remote` で確認した上で **3.1.90** (commit hash 固定) に決定した (issue の初期記述 3.1.1 から実装時に上方修正)。
+
+prebuilt アーカイブの構造を変更したため旧バージョン prebuilt との互換は無く、リリース時に `Cargo.toml` の `version` を bump する必要があるが、bump は本 PR ではなく別 PR で実施する方針。

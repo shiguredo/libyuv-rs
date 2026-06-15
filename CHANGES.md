@@ -11,11 +11,33 @@
 
 ## develop
 
+- [CHANGE] build.rs を複数の外部ライブラリに対応できるよう汎用化する
+  - `LIB_NAME` / `LINK_NAME` / `SYMBOL_PREFIX` 定数を `LibraryConfig` 構造体に置き換える
+  - `git_clone_external_lib` / `get_git_url_and_version` / `rewrite_symbols` / `find_static_library` を汎用化する
+  - @voluntas
+- [CHANGE] prebuilt アーカイブの構造を変更する
+  - `lib/` 配下のファイル名を `libshiguredo_yuv.a` (Windows: `shiguredo_yuv.lib`) / `libshiguredo_jpeg.a` (Windows: `shiguredo_jpeg.lib`) に変更する
+  - `THIRD_PARTY_LICENSES` をアーカイブに同梱する
+  - 旧バージョン prebuilt との互換性は無いため、リリース時に `Cargo.toml` の version を bump する
+  - @voluntas
+- [ADD] libjpeg-turbo をビルド依存として組み込む
+  - libjpeg-turbo 3.1.90 (commit `e1dbfa7be7b7e54922020051dc77781e92739700`) を build.rs から自動ビルドする
+  - 静的ライブラリのシンボルに `shiguredo_jpeg_` プレフィックスを付与する
+  - @voluntas
+- [ADD] MJPEG 変換関数を追加する
+  - `mjpeg_size` / `mjpeg_to_i420` / `mjpeg_to_nv12` / `mjpeg_to_nv21` / `mjpeg_to_argb`
+  - スケーリング非対応 (`src_size == dst_size` を強制)
+  - @voluntas
 - [UPDATE] `libyuv` のハッシュを `1170363ce55fec2a256ce383479d8a6a3edadffe` に更新する
   - <https://chromium.googlesource.com/libyuv/libyuv/+/1170363ce55fec2a256ce383479d8a6a3edadffe>
   - @voluntas
 
 ### misc
+
+- [ADD] MJPEG fuzz ターゲットを追加する
+  - @voluntas
+- [UPDATE] CI / release ワークフローに NASM のインストールを追加する
+  - @voluntas
 
 ## 2026.1.0
 

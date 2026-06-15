@@ -49,27 +49,46 @@ jobs:
         include:
           - target: ubuntu-24.04_x86_64
             os: ubuntu-24.04
-            lib_name: libyuv.a
+            lib_name: libshiguredo_yuv.a
+            jpeg_lib_name: libshiguredo_jpeg.a
           - target: ubuntu-24.04_arm64
             os: ubuntu-24.04-arm
-            lib_name: libyuv.a
+            lib_name: libshiguredo_yuv.a
+            jpeg_lib_name: libshiguredo_jpeg.a
           - target: ubuntu-22.04_x86_64
             os: ubuntu-22.04
-            lib_name: libyuv.a
+            lib_name: libshiguredo_yuv.a
+            jpeg_lib_name: libshiguredo_jpeg.a
           - target: ubuntu-22.04_arm64
             os: ubuntu-22.04-arm
-            lib_name: libyuv.a
+            lib_name: libshiguredo_yuv.a
+            jpeg_lib_name: libshiguredo_jpeg.a
           - target: macos_arm64
             os: macos-15
-            lib_name: libyuv.a
+            lib_name: libshiguredo_yuv.a
+            jpeg_lib_name: libshiguredo_jpeg.a
           - target: windows_x86_64
             os: windows-2025
-            lib_name: yuv.lib
+            lib_name: shiguredo_yuv.lib
+            jpeg_lib_name: shiguredo_jpeg.lib
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - name: Checkout sources
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install NASM
+        shell: bash
+        run: |
+          case "${{ runner.os }}" in
+            Linux)
+              if [ "${{ runner.arch }}" = "X64" ]; then
+                sudo apt-get update && sudo apt-get install -y nasm
+              fi
+              ;;
+            macOS)   brew install nasm ;;
+            Windows) choco install nasm -y && echo "C:\\Program Files\\NASM" >> $GITHUB_PATH ;;
+          esac
 
       - name: Build with source-build
         run: cargo build --release --features source-build
@@ -78,16 +97,46 @@ jobs:
         id: find_out_dir
         shell: bash
         run: |
-          OUT_DIR=$(find target/release/build/shiguredo_libyuv-*/out -maxdepth 0 -type d 2>/dev/null | head -1)
+          set -euo pipefail
+          # ci.yml の Verify symbol rewrite と同じ空 glob ガードを適用する
+          candidates=$(find target/release/build/shiguredo_libyuv-*/out -maxdepth 0 -type d 2>/dev/null || true)
+          if [ -z "$candidates" ]; then
+            echo "ERROR: no OUT_DIR matched target/release/build/shiguredo_libyuv-*/out"
+            exit 1
+          fi
+          count=$(echo "$candidates" | wc -l)
+          if [ "$count" != "1" ]; then
+            echo "ERROR: expected 1 OUT_DIR but got $count:"
+            echo "$candidates"
+            exit 1
+          fi
+          OUT_DIR=$(echo "$candidates" | head -1)
           echo "OUT_DIR=${OUT_DIR}" >> $GITHUB_OUTPUT
+
+      - name: Verify symbol rewrite
+        shell: bash
+        run: bash scripts/verify_symbol_rewrite.sh "${{ steps.find_out_dir.outputs.OUT_DIR }}"
 
       - name: Create prebuilt archive
         shell: bash
         run: |
+          set -euo pipefail
           mkdir -p staging/lib
           cp "${{ steps.find_out_dir.outputs.OUT_DIR }}/lib/${{ matrix.lib_name }}" staging/lib/
+          cp "${{ steps.find_out_dir.outputs.OUT_DIR }}/lib/${{ matrix.jpeg_lib_name }}" staging/lib/
           cp "${{ steps.find_out_dir.outputs.OUT_DIR }}/bindings.rs" staging/
+          cp LICENSE staging/
+          cp THIRD_PARTY_LICENSES staging/
           tar czf libyuv-${{ matrix.target }}.tar.gz -C staging .
+
+      - name: Verify archive contents
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! tar tzf libyuv-${{ matrix.target }}.tar.gz | grep -q "^./THIRD_PARTY_LICENSES$"; then
+            echo "ERROR: THIRD_PARTY_LICENSES missing from libyuv-${{ matrix.target }}.tar.gz"
+            exit 1
+          fi
 
       - name: Generate SHA256 checksum
         shell: bash
