@@ -17,7 +17,7 @@ include = ["/LICENSE", "/README.md", "/build.rs", "/src/**"]
 # なお libyuv にはタグが存在しないので、コミットハッシュで参照している
 [package.metadata.external-dependencies.libyuv]
 git = "https://chromium.googlesource.com/libyuv/libyuv"
-version = "d23308a2a7442be8e559b1b471862fd7588d6a57"
+version = "1170363ce55fec2a256ce383479d8a6a3edadffe"
 
 [workspace]
 members = ["pbt"]
