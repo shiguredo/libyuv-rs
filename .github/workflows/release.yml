@@ -104,8 +104,9 @@ jobs:
             echo "ERROR: no OUT_DIR matched target/release/build/shiguredo_libyuv-*/out"
             exit 1
           fi
+          # BSD wc -l は先頭に空白を付ける ($'       1' 等) ため数値比較で評価する
           count=$(echo "$candidates" | wc -l)
-          if [ "$count" != "1" ]; then
+          if [ "$count" -ne 1 ]; then
             echo "ERROR: expected 1 OUT_DIR but got $count:"
             echo "$candidates"
             exit 1
@@ -133,7 +134,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if ! tar tzf libyuv-${{ matrix.target }}.tar.gz | grep -q "^./THIRD_PARTY_LICENSES$"; then
+          # grep -q が早期終了すると tar が SIGPIPE を受けて pipefail で失敗扱いになるため
+          # 一旦変数に格納してから検査する
+          contents=$(tar tzf libyuv-${{ matrix.target }}.tar.gz)
+          if ! echo "$contents" | grep -q "^\./THIRD_PARTY_LICENSES$"; then
             echo "ERROR: THIRD_PARTY_LICENSES missing from libyuv-${{ matrix.target }}.tar.gz"
             exit 1
           fi
