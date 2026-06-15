@@ -11,8 +11,8 @@
 
 ## develop
 
-- [UPDATE] `libyuv` のハッシュを `d23308a2a7442be8e559b1b471862fd7588d6a57` に更新する
-  - <https://chromium.googlesource.com/libyuv/libyuv/+/d23308a2a7442be8e559b1b471862fd7588d6a57>
+- [UPDATE] `libyuv` のハッシュを `3bdb3b94caaf12487af7c5f91f830ef0064be250` に更新する
+  - <https://chromium.googlesource.com/libyuv/libyuv/+/3bdb3b94caaf12487af7c5f91f830ef0064be250>
   - @voluntas
 
 ### misc
