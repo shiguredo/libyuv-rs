@@ -21,7 +21,7 @@
   - 旧バージョン prebuilt との互換性は無いため、リリース時に `Cargo.toml` の version を bump する
   - @voluntas
 - [ADD] libjpeg-turbo をビルド依存として組み込む
-  - libjpeg-turbo 3.1.90 (commit `e1dbfa7be7b7e54922020051dc77781e92739700`) を build.rs から自動ビルドする
+  - libjpeg-turbo 3.1.90 (tag `3.1.90`, commit `e1dbfa7be7b7e54922020051dc77781e92739700`) を build.rs から自動ビルドする
   - 静的ライブラリのシンボルに `shiguredo_jpeg_` プレフィックスを付与する
   - @voluntas
 - [ADD] MJPEG 変換関数を追加する
