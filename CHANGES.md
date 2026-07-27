@@ -11,6 +11,8 @@
 
 ## develop
 
+- [CHANGE] MSRV (rust-version) を 1.93 に上げる
+  - @voluntas
 - [CHANGE] build.rs を複数の外部ライブラリに対応できるよう汎用化する
   - `LIB_NAME` / `LINK_NAME` / `SYMBOL_PREFIX` 定数を `LibraryConfig` 構造体に置き換える
   - `git_clone_external_lib` / `get_git_url_and_version` / `rewrite_symbols` / `find_static_library` を汎用化する
