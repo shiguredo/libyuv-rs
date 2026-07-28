@@ -6,7 +6,7 @@ use crate::{Error, I420Image, ImageSize, checked_buf_size, require_c_int, sys};
 
 /// I420 画像間の PSNR（ピーク信号対雑音比）を計算する
 ///
-/// 返り値は dB 単位の PSNR 値。同一画像の場合は `f64::INFINITY` を返す。
+/// 返り値は dB 単位の PSNR 値。同一画像の場合は `kMaxPsnr` (128.0) を返す。
 pub fn i420_psnr(
     src_a: &I420Image<'_>,
     src_b: &I420Image<'_>,
@@ -14,6 +14,15 @@ pub fn i420_psnr(
 ) -> Result<f64, Error> {
     src_a.validate(size, "I420Psnr")?;
     src_b.validate(size, "I420Psnr")?;
+
+    // ゼロサイズ入力は意味のない値（kMaxPsnr）が正常値として返るためエラーにする
+    if size.width == 0 || size.height == 0 {
+        return Err(Error::with_reason(
+            -1,
+            "I420Psnr",
+            "width and height must be greater than 0",
+        ));
+    }
 
     let result = unsafe {
         sys::I420Psnr(
@@ -73,7 +82,7 @@ pub fn i420_ssim(
 /// 単一プレーンの PSNR（ピーク信号対雑音比）を計算する
 ///
 /// ARGB 等のパックドフォーマットやグレースケール画像の品質比較に使用する。
-/// 返り値は dB 単位の PSNR 値。同一画像の場合は `f64::INFINITY` を返す。
+/// 返り値は dB 単位の PSNR 値。同一画像の場合は `kMaxPsnr` (128.0) を返す。
 pub fn calc_frame_psnr(
     src_a: &[u8],
     src_a_stride: usize,
@@ -84,6 +93,16 @@ pub fn calc_frame_psnr(
     // c_int 範囲チェック
     require_c_int(size.width, "CalcFramePsnr", "width exceeds c_int range")?;
     require_c_int(size.height, "CalcFramePsnr", "height exceeds c_int range")?;
+
+    // ゼロサイズ入力は意味のない値（kMaxPsnr）が正常値として返るためエラーにする
+    if size.width == 0 || size.height == 0 {
+        return Err(Error::with_reason(
+            -1,
+            "CalcFramePsnr",
+            "width and height must be greater than 0",
+        ));
+    }
+
     require_c_int(
         src_a_stride,
         "CalcFramePsnr",
@@ -354,8 +373,18 @@ pub fn compute_sum_square_error_plane(
 }
 
 /// 二乗誤差の合計から PSNR 値を計算する
-pub fn sum_square_error_to_psnr(sse: u64, count: u64) -> f64 {
-    unsafe { sys::SumSquareErrorToPsnr(sse, count) }
+///
+/// `count` が 0 の場合はエラーを返す。
+/// `sse` が 0 かつ `count` が 0 より大きい場合は `kMaxPsnr` (128.0) を返す（C の挙動の踏襲）。
+pub fn sum_square_error_to_psnr(sse: u64, count: u64) -> Result<f64, Error> {
+    if count == 0 {
+        return Err(Error::with_reason(
+            -1,
+            "SumSquareErrorToPsnr",
+            "count must be greater than 0",
+        ));
+    }
+    Ok(unsafe { sys::SumSquareErrorToPsnr(sse, count) })
 }
 
 /// ハミング距離を計算する
@@ -368,6 +397,8 @@ pub fn compute_hamming_distance(src_a: &[u8], src_b: &[u8]) -> Result<u64, Error
 }
 
 /// DJB2 ハッシュを計算する
-pub fn hash_djb2(src: &[u8], seed: u32) -> u32 {
-    unsafe { sys::HashDjb2(src.as_ptr(), src.len() as u64, seed) }
+///
+/// 空スライスの場合は `seed` をそのまま返す（C の挙動の踏襲）。
+pub fn hash_djb2(src: &[u8], seed: u32) -> Result<u32, Error> {
+    Ok(unsafe { sys::HashDjb2(src.as_ptr(), src.len() as u64, seed) })
 }

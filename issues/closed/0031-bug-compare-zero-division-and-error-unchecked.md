@@ -2,7 +2,7 @@
 
 - Priority: High
 - Created: 2026-07-08
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-07-29
 - Model: DeepSeek V4 Pro
 - Branch: feature/fix-compare-zero-division-error-check
 - Polished: 2026-07-29
@@ -88,12 +88,21 @@ pub fn hash_djb2(src: &[u8], seed: u32) -> u32 {
 
 ## 解決方法
 
-1. `sum_square_error_to_psnr` のシグネチャを `pub fn sum_square_error_to_psnr(sse: u64, count: u64) -> Result<f64, Error>` に変更し、`if count == 0 { return Err(Error::with_reason(-1, "SumSquareErrorToPsnr", "count must be greater than 0")) }` を追加する
-2. `calc_frame_psnr` の検証ブロック（stride チェックの前）に `if size.width == 0 || size.height == 0 { return Err(Error::with_reason(-1, "CalcFramePsnr", "width and height must be greater than 0")) }` を追加する
-3. `i420_psnr` の `.validate()` 呼び出しの直後に同様のゼロサイズチェックを追加する
-4. `hash_djb2` のシグネチャを `pub fn hash_djb2(src: &[u8], seed: u32) -> Result<u32, Error>` に変更する。空スライスは `Ok(seed)` を返す（C の挙動の踏襲）
-5. `tests/test_compare.rs` を新規作成し、エラーパス・境界値のテストを追加する（既存の `tests/test_mjpeg.rs` の import 規約に準拠する）
-6. `CHANGES.md` に `[CHANGE]` と `[FIX]` エントリを追加する
+`src/compare.rs` の 4 関数を以下のように修正した:
+
+1. `sum_square_error_to_psnr`: 戻り値型を `Result<f64, Error>` に変更し、`count == 0` で `Err` を返す検証を追加
+2. `calc_frame_psnr`: `size.width == 0 || size.height == 0` で `Err` を返す検証を追加（stride チェックの前）
+3. `i420_psnr`: `.validate()` の直後に同様のゼロサイズチェックを追加
+4. `hash_djb2`: 戻り値型を `Result<u32, Error>` に変更（API 一貫性のため。空スライスは `Ok(seed)` を返す）
+
+doc コメントの `f64::INFINITY` 記述を実挙動 (`kMaxPsnr` = 128.0) に修正した。
+
+`tests/test_compare.rs` を新規作成し、テスト 9 件を追加した:
+
+- 異常系: count == 0、width == 0、height == 0（calc_frame_psnr / i420_psnr 各々）
+- 正常系: sse == 0 で Ok(128.0)、同一バッファで Ok(128.0)、空スライスで Ok(seed)、非空データで Ok
+
+`CHANGES.md` の `## develop` に `[CHANGE]` 2 件と `[FIX]` 1 件を追加した。
 
 ## 注記
 

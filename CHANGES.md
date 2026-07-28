@@ -24,6 +24,10 @@
   - @voluntas
 - [CHANGE] detile_split_uv_plane の戻り値型を Result<(), Error> に変更し入力検証を追加する
   - @voluntas
+- [CHANGE] sum_square_error_to_psnr の戻り値型を Result<f64, Error> に変更し count == 0 の検証を追加する
+  - @voluntas
+- [CHANGE] hash_djb2 の戻り値型を Result<u32, Error> に変更する
+  - @voluntas
 - [ADD] libjpeg-turbo をビルド依存として組み込む
   - libjpeg-turbo 3.1.90 (tag `3.1.90`, commit `e1dbfa7be7b7e54922020051dc77781e92739700`) を build.rs から自動ビルドする
   - 静的ライブラリのシンボルに `shiguredo_jpeg_` プレフィックスを付与する
@@ -34,6 +38,8 @@
   - @voluntas
 - [UPDATE] `libyuv` のハッシュを `d23308a2a7442be8e559b1b471862fd7588d6a57` に更新する
   - <https://chromium.googlesource.com/libyuv/libyuv/+/d23308a2a7442be8e559b1b471862fd7588d6a57>
+  - @voluntas
+- [FIX] calc_frame_psnr と i420_psnr がゼロサイズ入力で意味のない値を返す問題を修正する
   - @voluntas
 
 ### misc
