@@ -50,12 +50,12 @@ fuzz_target!(|input: FuzzCompare| {
         let yb = take(&mut pool, y_len);
         let ub = take(&mut pool, uv_len);
         let vb = take(&mut pool, uv_len);
-        let src_a = PlanarImage {
+        let src_a = I420Image {
             y: &ya, y_stride: width,
             u: &ua, u_stride: width / 2,
             v: &va, v_stride: width / 2,
         };
-        let src_b = PlanarImage {
+        let src_b = I420Image {
             y: &yb, y_stride: width,
             u: &ub, u_stride: width / 2,
             v: &vb, v_stride: width / 2,

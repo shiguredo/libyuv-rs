@@ -65,7 +65,7 @@ fuzz_target!(|input: FuzzRotate| {
         let y = take(&mut pool, width * height);
         let u = take(&mut pool, (width / 2) * (height / 2));
         let v = take(&mut pool, (width / 2) * (height / 2));
-        let src = PlanarImage {
+        let src = I420Image {
             y: &y, y_stride: width,
             u: &u, u_stride: width / 2,
             v: &v, v_stride: width / 2,
@@ -73,7 +73,7 @@ fuzz_target!(|input: FuzzRotate| {
         let mut dst_y = vec![0u8; dw * dh];
         let mut dst_u = vec![0u8; (dw / 2) * (dh / 2)];
         let mut dst_v = vec![0u8; (dw / 2) * (dh / 2)];
-        let mut dst = PlanarImageMut {
+        let mut dst = I420ImageMut {
             y: &mut dst_y, y_stride: dw,
             u: &mut dst_u, u_stride: dw / 2,
             v: &mut dst_v, v_stride: dw / 2,
@@ -84,9 +84,9 @@ fuzz_target!(|input: FuzzRotate| {
     // ARGB 回転
     {
         let argb = take(&mut pool, width * height * 4);
-        let src = PackedImage { data: &argb, stride: width * 4 };
+        let src = ArgbImage { data: &argb, stride: width * 4 };
         let mut dst_argb = vec![0u8; dw * dh * 4];
-        let mut dst = PackedImageMut { data: &mut dst_argb, stride: dw * 4 };
+        let mut dst = ArgbImageMut { data: &mut dst_argb, stride: dw * 4 };
         let _ = argb_rotate(&src, src_size, &mut dst, dst_size, mode);
     }
 

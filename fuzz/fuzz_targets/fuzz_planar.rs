@@ -86,14 +86,14 @@ fuzz_target!(|input: FuzzPlanar| {
     // split_rgb_plane / merge_rgb_plane
     {
         let rgb = take(&mut pool, rgb_len);
-        let src = PackedImage { data: &rgb, stride: width * 3 };
+        let src = Rgb24Image { data: &rgb, stride: width * 3 };
         let mut r = vec![0u8; y_len];
         let mut g = vec![0u8; y_len];
         let mut b = vec![0u8; y_len];
         let _ = split_rgb_plane(&src, &mut r, width, &mut g, width, &mut b, width, size);
 
         let mut rgb2 = vec![0u8; rgb_len];
-        let mut dst = PackedImageMut { data: &mut rgb2, stride: width * 3 };
+        let mut dst = Rgb24ImageMut { data: &mut rgb2, stride: width * 3 };
         let _ = merge_rgb_plane(&r, width, &g, width, &b, width, &mut dst, size);
     }
 
@@ -102,7 +102,7 @@ fuzz_target!(|input: FuzzPlanar| {
         let y = take(&mut pool, y_len);
         let u = take(&mut pool, uv_len);
         let v = take(&mut pool, uv_len);
-        let src = PlanarImage {
+        let src = I420Image {
             y: &y, y_stride: width,
             u: &u, u_stride: width / 2,
             v: &v, v_stride: width / 2,
@@ -110,7 +110,7 @@ fuzz_target!(|input: FuzzPlanar| {
         let mut dst_y = vec![0u8; y_len];
         let mut dst_u = vec![0u8; uv_len];
         let mut dst_v = vec![0u8; uv_len];
-        let mut dst = PlanarImageMut {
+        let mut dst = I420ImageMut {
             y: &mut dst_y, y_stride: width,
             u: &mut dst_u, u_stride: width / 2,
             v: &mut dst_v, v_stride: width / 2,
@@ -122,12 +122,12 @@ fuzz_target!(|input: FuzzPlanar| {
     {
         let y = take(&mut pool, y_len);
         let chroma = take(&mut pool, chroma_len);
-        let src = BiplanarImage { y: &y, y_stride: width, chroma: &chroma, chroma_stride: width };
+        let src = Nv12Image { y: &y, y_stride: width, uv: &chroma, uv_stride: width };
         let mut dst_y = vec![0u8; y_len];
         let mut dst_chroma = vec![0u8; chroma_len];
-        let mut dst = BiplanarImageMut {
+        let mut dst = Nv12ImageMut {
             y: &mut dst_y, y_stride: width,
-            chroma: &mut dst_chroma, chroma_stride: width,
+            uv: &mut dst_chroma, uv_stride: width,
         };
         let _ = nv12_mirror(&src, &mut dst, size);
     }
@@ -135,18 +135,18 @@ fuzz_target!(|input: FuzzPlanar| {
     // ARGB ミラー
     {
         let argb = take(&mut pool, argb_len);
-        let src = PackedImage { data: &argb, stride: width * 4 };
+        let src = ArgbImage { data: &argb, stride: width * 4 };
         let mut dst_argb = vec![0u8; argb_len];
-        let mut dst = PackedImageMut { data: &mut dst_argb, stride: width * 4 };
+        let mut dst = ArgbImageMut { data: &mut dst_argb, stride: width * 4 };
         let _ = argb_mirror(&src, &mut dst, size);
     }
 
     // RGB24 ミラー
     {
         let rgb = take(&mut pool, rgb_len);
-        let src = PackedImage { data: &rgb, stride: width * 3 };
+        let src = Rgb24Image { data: &rgb, stride: width * 3 };
         let mut dst_rgb = vec![0u8; rgb_len];
-        let mut dst = PackedImageMut { data: &mut dst_rgb, stride: width * 3 };
+        let mut dst = Rgb24ImageMut { data: &mut dst_rgb, stride: width * 3 };
         let _ = rgb24_mirror(&src, &mut dst, size);
     }
 
@@ -166,12 +166,12 @@ fuzz_target!(|input: FuzzPlanar| {
         let u1 = take(&mut pool, uv_len);
         let v1 = take(&mut pool, uv_len);
         let alpha = take(&mut pool, y_len);
-        let src0 = PlanarImage {
+        let src0 = I420Image {
             y: &y0, y_stride: width,
             u: &u0, u_stride: width / 2,
             v: &v0, v_stride: width / 2,
         };
-        let src1 = PlanarImage {
+        let src1 = I420Image {
             y: &y1, y_stride: width,
             u: &u1, u_stride: width / 2,
             v: &v1, v_stride: width / 2,
@@ -179,7 +179,7 @@ fuzz_target!(|input: FuzzPlanar| {
         let mut dst_y = vec![0u8; y_len];
         let mut dst_u = vec![0u8; uv_len];
         let mut dst_v = vec![0u8; uv_len];
-        let mut dst = PlanarImageMut {
+        let mut dst = I420ImageMut {
             y: &mut dst_y, y_stride: width,
             u: &mut dst_u, u_stride: width / 2,
             v: &mut dst_v, v_stride: width / 2,
@@ -191,10 +191,10 @@ fuzz_target!(|input: FuzzPlanar| {
     {
         let argb0 = take(&mut pool, argb_len);
         let argb1 = take(&mut pool, argb_len);
-        let src0 = PackedImage { data: &argb0, stride: width * 4 };
-        let src1 = PackedImage { data: &argb1, stride: width * 4 };
+        let src0 = ArgbImage { data: &argb0, stride: width * 4 };
+        let src1 = ArgbImage { data: &argb1, stride: width * 4 };
         let mut dst_argb = vec![0u8; argb_len];
-        let mut dst = PackedImageMut { data: &mut dst_argb, stride: width * 4 };
+        let mut dst = ArgbImageMut { data: &mut dst_argb, stride: width * 4 };
         let _ = argb_blend(&src0, &src1, &mut dst, size);
     }
 
@@ -222,26 +222,26 @@ fuzz_target!(|input: FuzzPlanar| {
     // ARGB attenuate / unattenuate / shade / gray / sepia
     {
         let argb = take(&mut pool, argb_len);
-        let src = PackedImage { data: &argb, stride: width * 4 };
+        let src = ArgbImage { data: &argb, stride: width * 4 };
 
         let mut dst1 = vec![0u8; argb_len];
-        let mut d = PackedImageMut { data: &mut dst1, stride: width * 4 };
+        let mut d = ArgbImageMut { data: &mut dst1, stride: width * 4 };
         let _ = argb_attenuate(&src, &mut d, size);
 
         let mut dst2 = vec![0u8; argb_len];
-        let mut d = PackedImageMut { data: &mut dst2, stride: width * 4 };
+        let mut d = ArgbImageMut { data: &mut dst2, stride: width * 4 };
         let _ = argb_unattenuate(&src, &mut d, size);
 
         let mut dst3 = vec![0u8; argb_len];
-        let mut d = PackedImageMut { data: &mut dst3, stride: width * 4 };
+        let mut d = ArgbImageMut { data: &mut dst3, stride: width * 4 };
         let _ = argb_shade(&src, &mut d, size, input.shade);
 
         let mut buf = argb.clone();
-        let mut d = PackedImageMut { data: &mut buf, stride: width * 4 };
+        let mut d = ArgbImageMut { data: &mut buf, stride: width * 4 };
         let _ = argb_gray(&mut d, size);
 
         let mut buf2 = argb.clone();
-        let mut d = PackedImageMut { data: &mut buf2, stride: width * 4 };
+        let mut d = ArgbImageMut { data: &mut buf2, stride: width * 4 };
         let _ = argb_sepia(&mut d, size);
     }
 
@@ -250,7 +250,7 @@ fuzz_target!(|input: FuzzPlanar| {
         let mut dst_y = vec![0u8; y_len];
         let mut dst_u = vec![0u8; uv_len];
         let mut dst_v = vec![0u8; uv_len];
-        let mut dst = PlanarImageMut {
+        let mut dst = I420ImageMut {
             y: &mut dst_y, y_stride: width,
             u: &mut dst_u, u_stride: width / 2,
             v: &mut dst_v, v_stride: width / 2,
@@ -272,7 +272,7 @@ fuzz_target!(|input: FuzzPlanar| {
     // ARGB rect（画像範囲内に収める）
     {
         let mut dst_argb = vec![0u8; argb_len];
-        let mut dst = PackedImageMut { data: &mut dst_argb, stride: width * 4 };
+        let mut dst = ArgbImageMut { data: &mut dst_argb, stride: width * 4 };
         let rx = input.rect_x as usize % width;
         let ry = input.rect_y as usize % height;
         let max_rw = width - rx;
