@@ -5,7 +5,7 @@
 - Completed: {YYYY-MM-DD}
 - Model: DeepSeek V4 Pro
 - Branch: feature/fix-test-mjpeg-japanese-messages
-- Polished: 2026-07-08
+- Polished: 2026-07-29
 - Reporter:
 
 ## 目的
@@ -33,7 +33,9 @@ Medium。規約違反であり機械的置換で対応可能。動作への影�
 ## 完了条件
 
 - `tests/test_mjpeg.rs` 内の全 `.expect()` メッセージが日本語であること
-- `cargo test --test test_mjpeg` が成功すること
+- `cargo fmt --all --check` が成功すること
+- `cargo clippy --all-targets --all-features -- -D warnings` が成功すること
+- `cargo test --workspace` が成功すること
 
 ## 解決方法
 
