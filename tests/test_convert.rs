@@ -2,7 +2,7 @@
 //!
 //! `detile_split_uv_plane` の正常系・異常系・境界値を検証する。
 
-use shiguredo_libyuv::{ImageSize, detile_split_uv_plane};
+use shiguredo_libyuv::{ImageSize, detile_plane, detile_plane_16, detile_split_uv_plane};
 
 // テスト用の基本パラメータ
 // width=32, height=16, tile_height=16
@@ -372,4 +372,106 @@ fn detile_split_uv_plane_width_exceeds_c_int() {
         TILE_HEIGHT,
     );
     assert!(result.is_err());
+}
+
+// ============================================================
+// detile_plane
+// ============================================================
+
+// 正常系: 適切なサイズのバッファで Ok(()) が返ること
+#[test]
+fn detile_plane_ok() {
+    let width: usize = 32;
+    let height: usize = 16;
+    let tile_height: usize = 16;
+    let src = vec![0u8; width * height];
+    let mut dst = vec![0u8; width * height];
+    let size = ImageSize::new(width, height);
+
+    let result = detile_plane(&src, width, &mut dst, width, size, tile_height);
+    assert!(result.is_ok());
+}
+
+// 異常系: tile_height が非 2 累乗のケースで Err が返ること
+#[test]
+fn detile_plane_tile_height_not_power_of_two() {
+    let src = vec![0u8; 512];
+    let mut dst = vec![0u8; 512];
+    let size = ImageSize::new(32, 16);
+
+    let result = detile_plane(&src, 32, &mut dst, 32, size, 3);
+    assert!(result.is_err());
+}
+
+// 異常系: src_stride が width 未満のケースで Err が返ること
+#[test]
+fn detile_plane_src_stride_too_small() {
+    let src = vec![0u8; 512];
+    let mut dst = vec![0u8; 512];
+    let size = ImageSize::new(32, 16);
+
+    let result = detile_plane(&src, 31, &mut dst, 32, size, 16);
+    assert!(result.is_err());
+}
+
+// 境界値: width=0 のケースで Ok(()) が返ること
+#[test]
+fn detile_plane_width_zero() {
+    let src = vec![0u8; 16];
+    let mut dst = vec![0u8; 16];
+    let size = ImageSize::new(0, 16);
+
+    let result = detile_plane(&src, 16, &mut dst, 16, size, 16);
+    assert!(result.is_ok());
+}
+
+// ============================================================
+// detile_plane_16
+// ============================================================
+
+// 正常系: 適切なサイズのバッファで Ok(()) が返ること
+#[test]
+fn detile_plane_16_ok() {
+    let width: usize = 32;
+    let height: usize = 16;
+    let tile_height: usize = 16;
+    let src = vec![0u16; width * height];
+    let mut dst = vec![0u16; width * height];
+    let size = ImageSize::new(width, height);
+
+    let result = detile_plane_16(&src, width, &mut dst, width, size, tile_height);
+    assert!(result.is_ok());
+}
+
+// 異常系: tile_height が非 2 累乗のケースで Err が返ること
+#[test]
+fn detile_plane_16_tile_height_not_power_of_two() {
+    let src = vec![0u16; 512];
+    let mut dst = vec![0u16; 512];
+    let size = ImageSize::new(32, 16);
+
+    let result = detile_plane_16(&src, 32, &mut dst, 32, size, 3);
+    assert!(result.is_err());
+}
+
+// 異常系: dst_stride が width 未満のケースで Err が返ること
+#[test]
+fn detile_plane_16_dst_stride_too_small() {
+    let src = vec![0u16; 512];
+    let mut dst = vec![0u16; 512];
+    let size = ImageSize::new(32, 16);
+
+    let result = detile_plane_16(&src, 32, &mut dst, 31, size, 16);
+    assert!(result.is_err());
+}
+
+// 境界値: height=0 のケースで Ok(()) が返ること
+#[test]
+fn detile_plane_16_height_zero() {
+    let src = vec![0u16; 16];
+    let mut dst = vec![0u16; 16];
+    let size = ImageSize::new(32, 0);
+
+    let result = detile_plane_16(&src, 32, &mut dst, 32, size, 16);
+    assert!(result.is_ok());
 }
