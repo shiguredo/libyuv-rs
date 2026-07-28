@@ -1,11 +1,11 @@
-# scale.rs の _12 / _16 関数の命名とドキュメントを改善する
+# scale.rs の _12 / _16 関数のドキュメントを改善する
 
 - Priority: Medium
 - Created: 2026-07-08
 - Completed: {YYYY-MM-DD}
 - Model: DeepSeek V4 Pro
 - Branch: feature/refactor-scale-12-16-naming
-- Polished: 2026-07-08
+- Polished: 2026-07-29
 - Reporter: @voluntas
 
 ## 目的
