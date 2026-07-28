@@ -2,7 +2,7 @@
 
 - Priority: Medium
 - Created: 2026-07-08
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-07-29
 - Model: DeepSeek V4 Pro
 - Branch: feature/fix-detile-split-uv-plane-return
 - Polished: 2026-07-29
@@ -74,26 +74,24 @@ libyuv の C 実装 (`planar_functions.cc`) と単体テスト (`planar_test.cc`
 
 ## 解決方法
 
-1. `detile_split_uv_plane` のシグネチャを `pub fn detile_split_uv_plane(...) -> Result<(), Error>` に変更する
-2. `src/convert.rs` の import に `checked_buf_size` を追加する（`require_c_int` は既に import 済み）
-3. `require_c_int` で以下を c_int 範囲チェックする:
-   - `size.width`, `size.height`
-   - `src_stride_uv`, `dst_stride_u`, `dst_stride_v`
-   - `tile_height`
-   - function 名文字列は `"DetileSplitUVPlane"` を使用する
-4. `size.width == 0 || size.height == 0` の場合は `Ok(())` を早期 return する（FFI を呼ばない。C 実装の `if (width <= 0 || height == 0) return;` と同一セマンティクス。これにより `src_stride_uv == 0` で C の assert が発火する経路を塞ぐ）
-5. `tile_height` のチェック: `!tile_height.is_power_of_two()` で `Err` を返す（`usize::is_power_of_two()` は 0 で false を返すため別途 0 チェック不要。`Error::with_reason(-1, "DetileSplitUVPlane", "tile_height must be a power of two")`）
-6. stride チェック:
-   - `src_stride_uv < size.width.div_ceil(16) * 16` で `Err`（タイル配置は 16 バイト単位処理。libyuv テストの `(width + 15) & ~15` と同等）
-   - `dst_stride_u < (size.width + 1) / 2` で `Err`
-   - `dst_stride_v < (size.width + 1) / 2` で `Err`
-7. バッファサイズ検証:
-   - src_uv（タイル配置）: タイルグループ数 `size.height.div_ceil(tile_height)` を計算し、`src_stride_uv * tile_groups * tile_height` をオーバーフロー安全に計算して `src_uv.len()` と比較する（`checked_mul` を使用）
-   - dst_u（リニア出力）: `checked_buf_size(dst_stride_u, size.height, ...)`
-   - dst_v（リニア出力）: `checked_buf_size(dst_stride_v, size.height, ...)`
+`src/convert.rs` の `detile_split_uv_plane` を以下のように修正した:
+
+1. シグネチャを `pub fn detile_split_uv_plane(...) -> Result<(), Error>` に変更
+2. import に `checked_buf_size` を追加
+3. `require_c_int` で width, height, src_stride_uv, dst_stride_u, dst_stride_v, tile_height を c_int 範囲チェック
+4. `size.width == 0 || size.height == 0` で `Ok(())` を早期 return（C 実装の早期 return と同一セマンティクス）
+5. `tile_height.is_power_of_two()` で 2 の累乗をチェック（0 も false を返すため別途チェック不要）
+6. stride チェック: `src_stride_uv >= div_ceil(width, 16) * 16`、`dst_stride_u/v >= div_ceil(width, 2)`
+7. バッファサイズ検証: src_uv はタイル配置 (`checked_mul` でオーバーフロー安全に計算)、dst_u/dst_v はリニア出力 (`checked_buf_size`)
 8. FFI は void を返すため、検証通過後に `Ok(())` を返す
-9. `tests/test_convert.rs` を新規作成し、正常系・異常系のテストを追加する（既存の `tests/test_mjpeg.rs` の import 規約 `use shiguredo_libyuv::{...}` に準拠する）
-10. `CHANGES.md` に `[CHANGE]` エントリを追加する
+
+`tests/test_convert.rs` を新規作成し、テスト 15 件を追加した:
+
+- 正常系: 適切なバッファで `Ok(())` + 出力内容検証、height 非倍数、奇数 width、tile_height > height
+- 異常系: src_uv / dst_u / dst_v バッファ不足、各 stride 最小幅未満、tile_height 0 / 非 2 累乗、c_int 範囲超過
+- 境界値: width=0 / height=0
+
+`CHANGES.md` の `## develop` に `[CHANGE]` エントリを追加した。
 
 ## 注記
 
