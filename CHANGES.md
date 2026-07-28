@@ -41,6 +41,8 @@
   - @voluntas
 - [FIX] calc_frame_psnr と i420_psnr がゼロサイズ入力で意味のない値を返す問題を修正する
   - @voluntas
+- [FIX] detile_plane と detile_plane_16 の入力検証をプロジェクト標準パターンに統一する
+  - @voluntas
 
 ### misc
 

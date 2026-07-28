@@ -2,7 +2,7 @@
 
 - Priority: Medium
 - Created: 2026-07-29
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-07-29
 - Model: qwen3.8-max-preview
 - Branch: feature/fix-detile-plane-validation
 - Polished: 2026-07-29
@@ -48,3 +48,17 @@ Medium。`src_stride * size.height` の乗算がオーバーフローチェッ�
 - `tests/test_convert.rs` にテストが追加されていること
 - `cargo fmt --all --check` / `cargo clippy --all-targets --all-features -- -D warnings` / `cargo test --workspace` が成功すること
 - `CHANGES.md` の `## develop` セクションに `[FIX]` エントリを追記すること（@voluntas 署名付き）
+
+## 解決方法
+
+`src/convert.rs` の `detile_plane` と `detile_plane_16` に以下の検証を追加した:
+
+1. `require_c_int` による width, height, src_stride, dst_stride, tile_height の c_int 範囲チェック
+2. `size.width == 0 || size.height == 0` で `Ok(())` を早期 return
+3. `tile_height.is_power_of_two()` による 2 の累乗チェック
+4. `src_stride >= size.width`、`dst_stride >= size.width` の stride チェック
+5. `checked_buf_size` によるオーバーフロー安全なバッファサイズ検証
+
+`tests/test_convert.rs` にテスト 8 件を追加した（正常系 2 件、異常系 4 件、境界値 2 件）。
+
+`CHANGES.md` の `## develop` に `[FIX]` エントリを追加した。

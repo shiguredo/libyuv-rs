@@ -3995,14 +3995,76 @@ pub fn detile_plane(
     size: ImageSize,
     tile_height: usize,
 ) -> Result<(), Error> {
-    if src.len() < src_stride * size.height {
+    // c_int 範囲チェック
+    require_c_int(size.width, "DetilePlane", "width exceeds c_int range")?;
+    require_c_int(size.height, "DetilePlane", "height exceeds c_int range")?;
+    require_c_int(
+        src_stride,
+        "DetilePlane",
+        "source stride exceeds c_int range",
+    )?;
+    require_c_int(
+        dst_stride,
+        "DetilePlane",
+        "destination stride exceeds c_int range",
+    )?;
+    require_c_int(
+        tile_height,
+        "DetilePlane",
+        "tile_height exceeds c_int range",
+    )?;
+
+    // width == 0 || height == 0 は C 実装の早期 return と同一セマンティクスで no-op
+    if size.width == 0 || size.height == 0 {
+        return Ok(());
+    }
+
+    // tile_height は 2 の累乗でなければならない（libyuv 内部でビットマスクを使用するため）
+    if !tile_height.is_power_of_two() {
+        return Err(Error::with_reason(
+            -1,
+            "DetilePlane",
+            "tile_height must be a power of two",
+        ));
+    }
+
+    // stride >= width チェック
+    if src_stride < size.width {
+        return Err(Error::with_reason(
+            -1,
+            "DetilePlane",
+            "source stride smaller than width",
+        ));
+    }
+    if dst_stride < size.width {
+        return Err(Error::with_reason(
+            -1,
+            "DetilePlane",
+            "destination stride smaller than width",
+        ));
+    }
+
+    // バッファサイズ検証（オーバーフロー安全）
+    let src_size = checked_buf_size(
+        src_stride,
+        size.height,
+        "DetilePlane",
+        "source buffer size overflow",
+    )?;
+    if src.len() < src_size {
         return Err(Error::with_reason(
             -1,
             "DetilePlane",
             "source buffer too small",
         ));
     }
-    if dst.len() < dst_stride * size.height {
+    let dst_size = checked_buf_size(
+        dst_stride,
+        size.height,
+        "DetilePlane",
+        "destination buffer size overflow",
+    )?;
+    if dst.len() < dst_size {
         return Err(Error::with_reason(
             -1,
             "DetilePlane",
@@ -4034,14 +4096,76 @@ pub fn detile_plane_16(
     size: ImageSize,
     tile_height: usize,
 ) -> Result<(), Error> {
-    if src.len() < src_stride * size.height {
+    // c_int 範囲チェック
+    require_c_int(size.width, "DetilePlane_16", "width exceeds c_int range")?;
+    require_c_int(size.height, "DetilePlane_16", "height exceeds c_int range")?;
+    require_c_int(
+        src_stride,
+        "DetilePlane_16",
+        "source stride exceeds c_int range",
+    )?;
+    require_c_int(
+        dst_stride,
+        "DetilePlane_16",
+        "destination stride exceeds c_int range",
+    )?;
+    require_c_int(
+        tile_height,
+        "DetilePlane_16",
+        "tile_height exceeds c_int range",
+    )?;
+
+    // width == 0 || height == 0 は C 実装の早期 return と同一セマンティクスで no-op
+    if size.width == 0 || size.height == 0 {
+        return Ok(());
+    }
+
+    // tile_height は 2 の累乗でなければならない（libyuv 内部でビットマスクを使用するため）
+    if !tile_height.is_power_of_two() {
+        return Err(Error::with_reason(
+            -1,
+            "DetilePlane_16",
+            "tile_height must be a power of two",
+        ));
+    }
+
+    // stride >= width チェック
+    if src_stride < size.width {
+        return Err(Error::with_reason(
+            -1,
+            "DetilePlane_16",
+            "source stride smaller than width",
+        ));
+    }
+    if dst_stride < size.width {
+        return Err(Error::with_reason(
+            -1,
+            "DetilePlane_16",
+            "destination stride smaller than width",
+        ));
+    }
+
+    // バッファサイズ検証（オーバーフロー安全。要素数ベース）
+    let src_size = checked_buf_size(
+        src_stride,
+        size.height,
+        "DetilePlane_16",
+        "source buffer size overflow",
+    )?;
+    if src.len() < src_size {
         return Err(Error::with_reason(
             -1,
             "DetilePlane_16",
             "source buffer too small",
         ));
     }
-    if dst.len() < dst_stride * size.height {
+    let dst_size = checked_buf_size(
+        dst_stride,
+        size.height,
+        "DetilePlane_16",
+        "destination buffer size overflow",
+    )?;
+    if dst.len() < dst_size {
         return Err(Error::with_reason(
             -1,
             "DetilePlane_16",
