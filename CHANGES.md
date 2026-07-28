@@ -52,6 +52,8 @@
   - `util/cpuid.c` に Intel APX 命令 (`vdpphps`) が含まれ GitHub Actions の binutils ではアセンブルできないため、build.rs で libyuv の `CMakeLists.txt` をパッチして util ツールビルドを除外する
   - 静的ライブラリ (`libyuv.a`) の機能には影響しない
   - @voluntas
+- [FIX] fuzz ターゲットが旧汎用画像型を参照してコンパイル不能になっていたのを修正する
+  - @voluntas
 - [FIX] release ワークフローの prebuilt 生成失敗を修正する
   - `Find OUT_DIR` で BSD `wc -l` の先頭空白による文字列比較が常に失敗していたのを数値比較に修正する
   - `Verify archive contents` で `tar tzf | grep -q` の SIGPIPE が `pipefail` 下でジョブ失敗となるのを変数経由の検査に変更して回避する
