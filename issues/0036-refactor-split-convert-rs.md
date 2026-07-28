@@ -5,12 +5,12 @@
 - Completed: {YYYY-MM-DD}
 - Model: DeepSeek V4 Pro
 - Branch: feature/refactor-split-convert-rs
-- Polished: 2026-07-08
+- Polished: 2026-07-29
 - Reporter: @voluntas
 
 ## 目的
 
-`src/convert.rs` が 6994 行、60 セクション、240 以上の変換関数を単一ファイルに抱えており保守性が著しく低下している。自然な分割境界が明瞭なため `src/convert/` ディレクトリに分割する。
+`src/convert.rs` が 6993 行、60 セクション、243 個の変換関数を単一ファイルに抱えており保守性が著しく低下している。自然な分割境界が明瞭なため `src/convert/` ディレクトリに分割する。
 
 ## 優先度根拠
 
@@ -18,7 +18,7 @@ Medium。現時点で機能上の問題はないが、MJPEG 追加でさらに�
 
 ## 現状
 
-`src/convert.rs` 単一ファイル (6994 行、60 セクション) に以下の変換カテゴリが混在している。全公開関数は互いに独立して libyuv FFI を直接呼び出しており、Rust レベルでの相互依存はない。プライベート関数 (`validate_alpha_src`, `validate_alpha_dst`, `validate_mjpeg_input`) も使用元セクション内でのみ呼ばれており、クロスセクション依存は存在しない。
+`src/convert.rs` 単一ファイル (6993 行、60 セクション) に以下の変換カテゴリが混在している。全公開関数は互いに独立して libyuv FFI を直接呼び出しており、Rust レベルでの相互依存はない。プライベート関数 (`validate_alpha_src`, `validate_alpha_dst`, `validate_mjpeg_input`) も使用元セクション内でのみ呼ばれており、クロスセクション依存は存在しない。
 
 ## 設計方針
 
