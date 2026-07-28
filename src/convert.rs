@@ -16,7 +16,7 @@ use crate::{
     P012ImageMut, P210Image, P210ImageMut, P212ImageMut, P410ImageMut, RawImage, RawImageMut,
     Rgb24Image, Rgb24ImageMut, Rgb565Image, Rgb565ImageMut, RgbaImage, RgbaImageMut, U010Image,
     U210Image, U420Image, U422Image, U444Image, UyvyImage, UyvyImageMut, Yuv24ImageMut, Yuy2Image,
-    Yuy2ImageMut, require_c_int, sys,
+    Yuy2ImageMut, checked_buf_size, require_c_int, sys,
 };
 
 // ============================================================
@@ -4074,7 +4074,124 @@ pub fn detile_split_uv_plane(
     dst_stride_v: usize,
     size: ImageSize,
     tile_height: usize,
-) {
+) -> Result<(), Error> {
+    // c_int 範囲チェック
+    require_c_int(
+        size.width,
+        "DetileSplitUVPlane",
+        "width exceeds c_int range",
+    )?;
+    require_c_int(
+        size.height,
+        "DetileSplitUVPlane",
+        "height exceeds c_int range",
+    )?;
+    require_c_int(
+        src_stride_uv,
+        "DetileSplitUVPlane",
+        "source UV stride exceeds c_int range",
+    )?;
+    require_c_int(
+        dst_stride_u,
+        "DetileSplitUVPlane",
+        "destination U stride exceeds c_int range",
+    )?;
+    require_c_int(
+        dst_stride_v,
+        "DetileSplitUVPlane",
+        "destination V stride exceeds c_int range",
+    )?;
+    require_c_int(
+        tile_height,
+        "DetileSplitUVPlane",
+        "tile_height exceeds c_int range",
+    )?;
+
+    // width == 0 || height == 0 は C 実装の早期 return と同一セマンティクスで no-op
+    if size.width == 0 || size.height == 0 {
+        return Ok(());
+    }
+
+    // tile_height は 2 の累乗でなければならない（libyuv 内部でビットマスクを使用するため）
+    if !tile_height.is_power_of_two() {
+        return Err(Error::with_reason(
+            -1,
+            "DetileSplitUVPlane",
+            "tile_height must be a power of two",
+        ));
+    }
+
+    // stride >= 最小幅チェック
+    // タイル配置は 16 バイト単位で処理するため、src_stride_uv は 16 の倍数に丸めた幅以上必要
+    let src_min_stride = size.width.div_ceil(16) * 16;
+    if src_stride_uv < src_min_stride {
+        return Err(Error::with_reason(
+            -1,
+            "DetileSplitUVPlane",
+            "source UV stride smaller than round_up(width, 16)",
+        ));
+    }
+    // U/V プレーン行は画像幅の半分（(width + 1) / 2）
+    let uv_plane_width = size.width.div_ceil(2);
+    if dst_stride_u < uv_plane_width {
+        return Err(Error::with_reason(
+            -1,
+            "DetileSplitUVPlane",
+            "destination U stride smaller than (width + 1) / 2",
+        ));
+    }
+    if dst_stride_v < uv_plane_width {
+        return Err(Error::with_reason(
+            -1,
+            "DetileSplitUVPlane",
+            "destination V stride smaller than (width + 1) / 2",
+        ));
+    }
+
+    // バッファサイズ検証
+    // src_uv はタイル配置: src_stride_uv * ceil(height / tile_height) * tile_height
+    let tile_groups = size.height.div_ceil(tile_height);
+    let src_size = src_stride_uv
+        .checked_mul(tile_groups)
+        .and_then(|v| v.checked_mul(tile_height))
+        .ok_or_else(|| {
+            Error::with_reason(-1, "DetileSplitUVPlane", "source UV buffer size overflow")
+        })?;
+    if src_uv.len() < src_size {
+        return Err(Error::with_reason(
+            -1,
+            "DetileSplitUVPlane",
+            "source UV buffer too small",
+        ));
+    }
+    // dst_u / dst_v はリニア出力
+    let dst_u_size = checked_buf_size(
+        dst_stride_u,
+        size.height,
+        "DetileSplitUVPlane",
+        "destination U buffer size overflow",
+    )?;
+    if dst_u.len() < dst_u_size {
+        return Err(Error::with_reason(
+            -1,
+            "DetileSplitUVPlane",
+            "destination U buffer too small",
+        ));
+    }
+    let dst_v_size = checked_buf_size(
+        dst_stride_v,
+        size.height,
+        "DetileSplitUVPlane",
+        "destination V buffer size overflow",
+    )?;
+    if dst_v.len() < dst_v_size {
+        return Err(Error::with_reason(
+            -1,
+            "DetileSplitUVPlane",
+            "destination V buffer too small",
+        ));
+    }
+
     unsafe {
         sys::DetileSplitUVPlane(
             src_uv.as_ptr(),
@@ -4088,6 +4205,8 @@ pub fn detile_split_uv_plane(
             tile_height as c_int,
         )
     };
+
+    Ok(())
 }
 
 /// タイル化された Y と UV プレーンから YUY2 に変換する
