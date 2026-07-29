@@ -46,6 +46,8 @@
 
 ### misc
 
+- [CHANGE] convert.rs をサブモジュールに分割する
+  - @voluntas
 - [ADD] MJPEG fuzz ターゲットを追加する
   - @voluntas
 - [UPDATE] CI / release ワークフローに NASM のインストールを追加する

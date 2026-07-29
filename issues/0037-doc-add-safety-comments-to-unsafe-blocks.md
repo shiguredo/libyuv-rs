@@ -22,7 +22,7 @@ High。Rust の unsafe コードガイドラインで強く推奨されており
 
 | ファイル | unsafe ブロック数 |
 |---|---|
-| `src/convert.rs` | 243 |
+| `src/convert/` (10 サブモジュール) | 243 |
 | `src/planar.rs` | 67 |
 | `src/rotate.rs` | 20 |
 | `src/scale.rs` | 18 |

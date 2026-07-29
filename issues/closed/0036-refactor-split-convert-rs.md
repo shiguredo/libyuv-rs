@@ -2,7 +2,7 @@
 
 - Priority: Medium
 - Created: 2026-07-08
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-07-30
 - Model: DeepSeek V4 Pro
 - Branch: feature/refactor-split-convert-rs
 - Polished: 2026-07-29
@@ -70,21 +70,15 @@ Medium。現時点で機能上の問題はないが、MJPEG 追加でさらに�
 
 ## 解決方法
 
-1. `src/convert/` ディレクトリを作成する
-2. `src/convert/mod.rs` を作成し、10 サブモジュールを宣言・再エクスポートする
-3. 各サブモジュールファイルを作成し、対応するセクションの関数を移動する。各ファイルの先頭に `#![expect(clippy::too_many_arguments)]` を付与する
-4. 各ファイルに必要な `use` 文のみを記載する (不要なインポートは clippy で警告される)
-5. プライベートヘルパー (`validate_alpha_src`, `validate_alpha_dst`, `validate_mjpeg_input`) は使用元モジュールに移動する
-6. `src/convert.rs` を削除する
-7. `cargo clippy --all-targets --all-features -- -D warnings` と `cargo test --workspace` で検証する
-8. `CHANGES.md` にエントリを追加する
-9. 0030、0032、0037 のファイルパス参照を更新する
+1. `src/convert/` ディレクトリを作成し、10 サブモジュール (i420, nv, argb, subsampling, high_bitdepth, colorspace, packed, jpeg, hardware, mjpeg) に分割した
+2. `src/convert/mod.rs` で全サブモジュールを `pub use xxx::*;` で再エクスポートし、公開 API 互換性を維持した
+3. 各サブモジュールに必要な `use` 文のみを記載した
+4. プライベートヘルパー (`validate_alpha_src`, `validate_alpha_dst`, `validate_mjpeg_input`) は使用元モジュールに移動した
+5. `src/convert.rs` を削除した
+6. `cargo fmt --all --check` / `cargo clippy --all-targets --all-features -- -D warnings` / `cargo test --workspace` 全て通過した
+7. `CHANGES.md` の `### misc` に `[CHANGE] convert.rs をサブモジュールに分割する` を追記した
+8. 0032, 0037 の issue ファイルで `src/convert.rs` を参照している箇所を新しいファイルパスに更新した
 
-### 分割の補足: 既存コードの構成改善
+### 設計方針からの逸脱
 
-分割と同時に、以下の軽微な構成改善を行う (挙動変更なし、純粋な移動):
-
-- 「追加コピー」セクション (L3622-3713): `i422_copy`, `i444_copy` → `subsampling.rs`、`nv21_copy` → `nv.rs`
-- 「追加 NV12/NV21 変換」セクション (L4120-4377): 出力フォーマットに基づき各モジュールに分散
-- `abgr_to_nv12`, `abgr_to_nv21` → `argb.rs` (ARGB 版と対称のため)
-- `i400_to_i400` → 命名は変更しない (公開 API の破壊的変更を避けるため)
+`#![expect(clippy::too_many_arguments)]` は各サブモジュールに付与しなかった。どのモジュールも 7 引数超の関数がなく lint が発火しないため、`#[expect]` は unfulfilled expectation エラーになる。元の `#![allow(clippy::too_many_arguments)]` は予防的な抑制であり、分割後は不要となった。
