@@ -23,7 +23,7 @@ Medium。規約違反であり動作への影響はない。ただし後述の�
 ### クレートレベル (1 箇所) + モジュールレベル (4 箇所)
 
 - `src/lib.rs:5` — `#![allow(clippy::too_many_arguments)]`（クレートルートの内部属性。クレート全体に適用される）
-- `src/convert.rs:2` — 同上（モジュールレベル。クレートレベルと冗長）
+- `src/convert/` — 0036 で分割済み。`#![allow(clippy::too_many_arguments)]` は分割時に削除済み（対象外）
 - `src/planar.rs:2` — 同上
 - `src/rotate.rs:2` — 同上
 - `src/scale.rs:2` — 同上
@@ -60,7 +60,7 @@ Medium。規約違反であり動作への影響はない。ただし後述の�
 
 `src/lib.rs:5` の `#![allow(clippy::too_many_arguments)]` を `#![expect(clippy::too_many_arguments)]` に置換する。クレート全体に適用されるため、各モジュールの多数引数関数で lint が実在し expect は充足される。
 
-`src/convert.rs:2`, `src/planar.rs:2`, `src/rotate.rs:2`, `src/scale.rs:2` の 4 箇所はクレートレベルと冗長なため**削除**する（`#![expect(...)]` に置換すると unfulfilled expectation になる）。
+`src/planar.rs:2`, `src/rotate.rs:2`, `src/scale.rs:2` の 3 箇所はクレートレベルと冗長なため**削除**する（`#![expect(...)]` に置換すると unfulfilled expectation になる）。`src/convert.rs` は 0036 で `src/convert/` に分割され、`#![allow(clippy::too_many_arguments)]` は削除済み。
 
 ### 2. sys.rs (7 箇所)
 
@@ -75,7 +75,7 @@ Medium。規約違反であり動作への影響はない。ただし後述の�
 ## 完了条件
 
 - `src/lib.rs:5` が `#![expect(clippy::too_many_arguments)]` に置換されていること
-- `src/convert.rs:2`, `src/planar.rs:2`, `src/rotate.rs:2`, `src/scale.rs:2` の `#![allow(clippy::too_many_arguments)]` が削除されていること
+- `src/planar.rs:2`, `src/rotate.rs:2`, `src/scale.rs:2` の `#![allow(clippy::too_many_arguments)]` が削除されていること（`src/convert.rs` は 0036 で分割済み・削除済み）
 - `src/sys.rs` の 7 箇所が `#![expect(...)]` に置換されていること（unfulfilled expectation が発生した場合は該当属性を削除すること）
 - マクロ内 14 箇所の `#[allow(dead_code)]` が削除されていること
 - コードベース内のソースファイルに `#[allow(...)]` および `#![allow(...)]` が存在しないこと
@@ -86,7 +86,7 @@ Medium。規約違反であり動作への影響はない。ただし後述の�
 ## 解決方法
 
 1. クレートレベル: `src/lib.rs:5` の `#![allow(clippy::too_many_arguments)]` を `#![expect(clippy::too_many_arguments)]` に置換する
-2. モジュールレベル: `src/convert.rs:2`, `src/planar.rs:2`, `src/rotate.rs:2`, `src/scale.rs:2` の `#![allow(clippy::too_many_arguments)]` を削除する（クレートレベルと冗長なため）
+2. モジュールレベル: `src/planar.rs:2`, `src/rotate.rs:2`, `src/scale.rs:2` の `#![allow(clippy::too_many_arguments)]` を削除する（クレートレベルと冗長なため。`src/convert.rs` は 0036 で分割済み・削除済み）
 3. sys.rs: `src/sys.rs:1-7` の 7 行の `#![allow(...)]` を `#![expect(...)]` に置換する（lint 名はそのまま）
 4. マクロ定義: `src/lib.rs` の 7 つのマクロ定義内にある `#[allow(dead_code)]` 属性 14 箇所を削除する（行番号: L705, L747, L774, L809, L845, L880, L906, L943, L985, L1027, L1058, L1093, L1119, L1156）
 5. `cargo clippy --all-targets --all-features -- -D warnings` を実行し、unfulfilled expectation が発生した場合は該当属性を削除して再実行する
