@@ -16,12 +16,12 @@ proptest! {
         let mut abgr_buf = vec![0u8; width * height * 4];
         let src = ArgbImage { data: &argb, stride: width * 4 };
         let mut dst = AbgrImageMut { data: &mut abgr_buf, stride: width * 4 };
-        argb_to_abgr(&src, &mut dst, size).unwrap();
+        argb_to_abgr(&src, &mut dst, size).expect("ARGB から ABGR への変換が成功すること");
 
         let mut argb2 = vec![0u8; width * height * 4];
         let src2 = AbgrImage { data: &abgr_buf, stride: width * 4 };
         let mut dst2 = ArgbImageMut { data: &mut argb2, stride: width * 4 };
-        abgr_to_argb(&src2, &mut dst2, size).unwrap();
+        abgr_to_argb(&src2, &mut dst2, size).expect("ABGR から ARGB への変換が成功すること");
 
         prop_assert_eq!(&argb, &argb2);
     }
@@ -43,7 +43,7 @@ proptest! {
             u: &mut u2, u_stride: width / 2,
             v: &mut v2, v_stride: width / 2,
         };
-        nv12_to_i420(&src, &mut i420_dst, size).unwrap();
+        nv12_to_i420(&src, &mut i420_dst, size).expect("NV12 から I420 への変換が成功すること");
 
         let i420_src = I420Image {
             y: &y2, y_stride: width,
@@ -56,7 +56,7 @@ proptest! {
             y: &mut y3, y_stride: width,
             uv: &mut chroma3, uv_stride: width,
         };
-        i420_to_nv12(&i420_src, &mut nv12_dst, size).unwrap();
+        i420_to_nv12(&i420_src, &mut nv12_dst, size).expect("I420 から NV12 への変換が成功すること");
 
         prop_assert_eq!(&y, &y3);
         prop_assert_eq!(&chroma, &chroma3);
@@ -83,7 +83,7 @@ proptest! {
             u: &mut u2, u_stride: width / 2,
             v: &mut v2, v_stride: width / 2,
         };
-        i420_copy(&src, &mut dst, size).unwrap();
+        i420_copy(&src, &mut dst, size).expect("I420 コピーが成功すること");
 
         prop_assert_eq!(&y, &y2);
         prop_assert_eq!(&u, &u2);
@@ -101,7 +101,7 @@ proptest! {
 
         let mut argb2 = vec![0u8; width * height * 4];
         let mut dst = ArgbImageMut { data: &mut argb2, stride: width * 4 };
-        argb_copy(&src, &mut dst, size).unwrap();
+        argb_copy(&src, &mut dst, size).expect("ARGB コピーが成功すること");
 
         prop_assert_eq!(&argb, &argb2);
     }
@@ -121,7 +121,7 @@ proptest! {
             y: &mut y2, y_stride: width,
             uv: &mut chroma2, uv_stride: width,
         };
-        nv12_copy(&src, &mut dst, size).unwrap();
+        nv12_copy(&src, &mut dst, size).expect("NV12 コピーが成功すること");
 
         prop_assert_eq!(&y, &y2);
         prop_assert_eq!(&chroma, &chroma2);

@@ -13,7 +13,7 @@ proptest! {
     ) {
         let size = ImageSize::new(width, height);
         let mut dst = vec![0u8; width * height];
-        copy_plane(&plane, width, &mut dst, width, size).unwrap();
+        copy_plane(&plane, width, &mut dst, width, size).expect("プレーンコピーが成功すること");
 
         prop_assert_eq!(&plane, &dst);
     }
@@ -31,10 +31,10 @@ proptest! {
 
         let mut u = vec![0u8; width * height];
         let mut v = vec![0u8; width * height];
-        split_uv_plane(&uv, width * 2, &mut u, width, &mut v, width, size).unwrap();
+        split_uv_plane(&uv, width * 2, &mut u, width, &mut v, width, size).expect("UV 分割が成功すること");
 
         let mut uv2 = vec![0u8; width * 2 * height];
-        merge_uv_plane(&u, width, &v, width, &mut uv2, width * 2, size).unwrap();
+        merge_uv_plane(&u, width, &v, width, &mut uv2, width * 2, size).expect("UV 結合が成功すること");
 
         prop_assert_eq!(&uv, &uv2);
     }
@@ -51,11 +51,11 @@ proptest! {
         let mut r = vec![0u8; width * height];
         let mut g = vec![0u8; width * height];
         let mut b = vec![0u8; width * height];
-        split_rgb_plane(&src, &mut r, width, &mut g, width, &mut b, width, size).unwrap();
+        split_rgb_plane(&src, &mut r, width, &mut g, width, &mut b, width, size).expect("RGB 分割が成功すること");
 
         let mut rgb2 = vec![0u8; width * height * 3];
         let mut dst = Rgb24ImageMut { data: &mut rgb2, stride: width * 3 };
-        merge_rgb_plane(&r, width, &g, width, &b, width, &mut dst, size).unwrap();
+        merge_rgb_plane(&r, width, &g, width, &b, width, &mut dst, size).expect("RGB 結合が成功すること");
 
         prop_assert_eq!(&rgb, &rgb2);
     }
@@ -82,7 +82,7 @@ proptest! {
                 u: &mut u2, u_stride: width / 2,
                 v: &mut v2, v_stride: width / 2,
             };
-            i420_mirror(&src, &mut dst, size).unwrap();
+            i420_mirror(&src, &mut dst, size).expect("I420 ミラーが成功すること");
         }
 
         let mut y3 = vec![0u8; width * height];
@@ -99,7 +99,7 @@ proptest! {
                 u: &mut u3, u_stride: width / 2,
                 v: &mut v3, v_stride: width / 2,
             };
-            i420_mirror(&src2, &mut dst2, size).unwrap();
+            i420_mirror(&src2, &mut dst2, size).expect("I420 ミラーの二重適用が成功すること");
         }
 
         prop_assert_eq!(&y, &y3);
@@ -119,14 +119,14 @@ proptest! {
         {
             let src = ArgbImage { data: &argb, stride: width * 4 };
             let mut dst = ArgbImageMut { data: &mut argb2, stride: width * 4 };
-            argb_mirror(&src, &mut dst, size).unwrap();
+            argb_mirror(&src, &mut dst, size).expect("ARGB ミラーが成功すること");
         }
 
         let mut argb3 = vec![0u8; width * height * 4];
         {
             let src2 = ArgbImage { data: &argb2, stride: width * 4 };
             let mut dst2 = ArgbImageMut { data: &mut argb3, stride: width * 4 };
-            argb_mirror(&src2, &mut dst2, size).unwrap();
+            argb_mirror(&src2, &mut dst2, size).expect("ARGB ミラーの二重適用が成功すること");
         }
 
         prop_assert_eq!(&argb, &argb3);
@@ -148,7 +148,7 @@ proptest! {
                 y: &mut y2, y_stride: width,
                 uv: &mut chroma2, uv_stride: width,
             };
-            nv12_mirror(&src, &mut dst, size).unwrap();
+            nv12_mirror(&src, &mut dst, size).expect("NV12 ミラーが成功すること");
         }
 
         let mut y3 = vec![0u8; width * height];
@@ -159,7 +159,7 @@ proptest! {
                 y: &mut y3, y_stride: width,
                 uv: &mut chroma3, uv_stride: width,
             };
-            nv12_mirror(&src2, &mut dst2, size).unwrap();
+            nv12_mirror(&src2, &mut dst2, size).expect("NV12 ミラーの二重適用が成功すること");
         }
 
         prop_assert_eq!(&y, &y3);
@@ -178,14 +178,14 @@ proptest! {
         {
             let src = Rgb24Image { data: &rgb, stride: width * 3 };
             let mut dst = Rgb24ImageMut { data: &mut rgb2, stride: width * 3 };
-            rgb24_mirror(&src, &mut dst, size).unwrap();
+            rgb24_mirror(&src, &mut dst, size).expect("RGB24 ミラーが成功すること");
         }
 
         let mut rgb3 = vec![0u8; width * height * 3];
         {
             let src2 = Rgb24Image { data: &rgb2, stride: width * 3 };
             let mut dst2 = Rgb24ImageMut { data: &mut rgb3, stride: width * 3 };
-            rgb24_mirror(&src2, &mut dst2, size).unwrap();
+            rgb24_mirror(&src2, &mut dst2, size).expect("RGB24 ミラーの二重適用が成功すること");
         }
 
         prop_assert_eq!(&rgb, &rgb3);
