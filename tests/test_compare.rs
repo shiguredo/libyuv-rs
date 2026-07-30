@@ -4,7 +4,8 @@
 //! エラーパス・境界値を検証する。
 
 use shiguredo_libyuv::{
-    I420Image, ImageSize, calc_frame_psnr, hash_djb2, i420_psnr, sum_square_error_to_psnr,
+    I420Image, ImageSize, calc_frame_psnr, calc_frame_ssim, hash_djb2, i420_psnr, i420_ssim,
+    sum_square_error_to_psnr,
 };
 
 // 異常系: sum_square_error_to_psnr の count == 0 で Err が返ること
@@ -111,4 +112,65 @@ fn calc_frame_psnr_identical_buffers() {
     let result = calc_frame_psnr(&src, 8, &src, 8, size);
     let psnr = result.expect("同一バッファであれば Ok が返るはず");
     assert!((psnr - 128.0).abs() < f64::EPSILON);
+}
+
+// 異常系: calc_frame_ssim の 8x8（境界値）で Err が返ること
+// libyuv の SSIM は 8x8 ブロック走査のため 9x9 未満では samples == 0 となり NaN になる
+#[test]
+fn calc_frame_ssim_rejects_8x8() {
+    let src = vec![128u8; 64];
+    let size = ImageSize::new(8, 8);
+
+    let result = calc_frame_ssim(&src, 8, &src, 8, size);
+    assert!(result.is_err(), "8x8 では Err が返るべき");
+}
+
+// 異常系: calc_frame_ssim の 4x4 で Err が返ること
+#[test]
+fn calc_frame_ssim_rejects_4x4() {
+    let src = vec![128u8; 16];
+    let size = ImageSize::new(4, 4);
+
+    let result = calc_frame_ssim(&src, 4, &src, 4, size);
+    assert!(result.is_err(), "4x4 では Err が返るべき");
+}
+
+// 異常系: i420_ssim の 8x8（境界値）で Err が返ること
+#[test]
+fn i420_ssim_rejects_8x8() {
+    let y = vec![128u8; 64];
+    let u = vec![128u8; 16];
+    let v = vec![128u8; 16];
+    let src = I420Image {
+        y: &y,
+        y_stride: 8,
+        u: &u,
+        u_stride: 4,
+        v: &v,
+        v_stride: 4,
+    };
+    let size = ImageSize::new(8, 8);
+
+    let result = i420_ssim(&src, &src, size);
+    assert!(result.is_err(), "8x8 では Err が返るべき");
+}
+
+// 異常系: i420_ssim の 4x4 で Err が返ること
+#[test]
+fn i420_ssim_rejects_4x4() {
+    let y = vec![128u8; 16];
+    let u = vec![128u8; 4];
+    let v = vec![128u8; 4];
+    let src = I420Image {
+        y: &y,
+        y_stride: 4,
+        u: &u,
+        u_stride: 2,
+        v: &v,
+        v_stride: 2,
+    };
+    let size = ImageSize::new(4, 4);
+
+    let result = i420_ssim(&src, &src, size);
+    assert!(result.is_err(), "4x4 では Err が返るべき");
 }
