@@ -1391,3 +1391,90 @@ define_packed_image16!(/// AR64 画像 (16bit ARGB, 4 要素/pixel)
 define_packed_image16!(/// AB64 画像 (16bit ABGR, 4 要素/pixel)
     Ab64Image, /// AB64 画像 (可変)
     Ab64ImageMut, 4);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // require_c_int: c_int::MAX は Ok を返すこと
+    #[test]
+    fn require_c_int_max_ok() {
+        let result = require_c_int(c_int::MAX as usize, "test", "test reason");
+        assert!(result.is_ok(), "c_int::MAX は Ok を返すべき");
+    }
+
+    // require_c_int: c_int::MAX + 1 は Err を返すこと
+    #[test]
+    fn require_c_int_overflow_err() {
+        let result = require_c_int(c_int::MAX as usize + 1, "test", "test reason");
+        assert!(result.is_err(), "c_int::MAX + 1 は Err を返すべき");
+    }
+
+    // checked_buf_size: 通常の乗算は Ok を返すこと
+    #[test]
+    fn checked_buf_size_normal_ok() {
+        let result = checked_buf_size(8, 8, "test", "test reason");
+        assert!(result.is_ok(), "8 * 8 は Ok を返すべき");
+        assert_eq!(result.expect("Ok が返るはず"), 64);
+    }
+
+    // checked_buf_size: オーバーフローは Err を返すこと
+    #[test]
+    fn checked_buf_size_overflow_err() {
+        let result = checked_buf_size(usize::MAX, 2, "test", "test reason");
+        assert!(result.is_err(), "usize::MAX * 2 は Err を返すべき");
+    }
+
+    // validate_yuv_src_inner: 正常系で Ok を返すこと
+    #[test]
+    fn validate_yuv_src_inner_ok() {
+        let y = vec![0u8; 64];
+        let u = vec![0u8; 16];
+        let v = vec![0u8; 16];
+        let size = ImageSize::new(8, 8);
+        let result = validate_yuv_src_inner(&y, 8, &u, 4, &v, 4, size, 2, 2, "test");
+        assert!(result.is_ok(), "正常なバッファでは Ok を返すべき");
+    }
+
+    // validate_yuv_src_inner: バッファ不足で Err を返すこと
+    #[test]
+    fn validate_yuv_src_inner_buffer_too_small() {
+        let y = vec![0u8; 10]; // 64 バイト必要だが 10 しか用意しない
+        let u = vec![0u8; 16];
+        let v = vec![0u8; 16];
+        let size = ImageSize::new(8, 8);
+        let result = validate_yuv_src_inner(&y, 8, &u, 4, &v, 4, size, 2, 2, "test");
+        assert!(result.is_err(), "バッファ不足では Err を返すべき");
+    }
+
+    // validate_yuv_src_inner: stride 不足で Err を返すこと
+    #[test]
+    fn validate_yuv_src_inner_stride_too_small() {
+        let y = vec![0u8; 64];
+        let u = vec![0u8; 16];
+        let v = vec![0u8; 16];
+        let size = ImageSize::new(8, 8);
+        let result = validate_yuv_src_inner(&y, 4, &u, 4, &v, 4, size, 2, 2, "test");
+        assert!(result.is_err(), "stride 不足では Err を返すべき");
+    }
+
+    // validate_nv_src_inner: 正常系で Ok を返すこと
+    #[test]
+    fn validate_nv_src_inner_ok() {
+        let y = vec![0u8; 64];
+        let uv = vec![0u8; 32];
+        let size = ImageSize::new(8, 8);
+        let result = validate_nv_src_inner(&y, 8, &uv, 8, size, 2, 2, "test");
+        assert!(result.is_ok(), "正常なバッファでは Ok を返すべき");
+    }
+
+    // validate_nv_src_inner: バッファ不足で Err を返すこと
+    #[test]
+    fn validate_nv_src_inner_buffer_too_small() {
+        let y = vec![0u8; 10];
+        let uv = vec![0u8; 32];
+        let size = ImageSize::new(8, 8);
+        let result = validate_nv_src_inner(&y, 8, &uv, 8, size, 2, 2, "test");
+        assert!(result.is_err(), "バッファ不足では Err を返すべき");
+    }
+}
