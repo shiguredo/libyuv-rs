@@ -39,6 +39,8 @@
 - [UPDATE] `libyuv` のハッシュを `d23308a2a7442be8e559b1b471862fd7588d6a57` に更新する
   - <https://chromium.googlesource.com/libyuv/libyuv/+/d23308a2a7442be8e559b1b471862fd7588d6a57>
   - @voluntas
+- [UPDATE] scale.rs の _12/_16 関数のドキュメントを改善し 12bit/16bit データの意味的差異を明確化する
+  - @voluntas
 - [FIX] calc_frame_psnr と i420_psnr がゼロサイズ入力で意味のない値を返す問題を修正する
   - @voluntas
 - [FIX] detile_plane と detile_plane_16 の入力検証をプロジェクト標準パターンに統一する
