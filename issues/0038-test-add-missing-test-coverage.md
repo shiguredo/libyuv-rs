@@ -2,7 +2,7 @@
 
 - Priority: High
 - Created: 2026-07-08
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-07-30
 - Model: DeepSeek V4 Pro
 - Branch: feature/add-test-coverage
 - Polished: 2026-07-29
@@ -88,19 +88,13 @@ High。以下の深刻な問題がある:
 
 ### Phase 1a
 
-1. `tests/test_convert.rs` を作成し、代表的な変換関数（I420→ARGB, NV12→I420 等）のエラーパステストを実装する
-2. `tests/test_planar.rs` を作成し、代表的な操作（copy_plane, split_uv_plane 等）のエラーパステストを実装する
-3. `tests/test_rotate.rs`, `tests/test_scale.rs`, `tests/test_compare.rs` を同様に作成する
-4. 各テストの `.expect()` メッセージは日本語で記述する
+1. `tests/test_convert.rs` を作成し、i420_to_argb / nv12_to_i420 のエラーパステスト 4 件を実装した
+2. `tests/test_planar.rs` を作成し、copy_plane / split_uv_plane のエラーパステスト 4 件を実装した
+3. `tests/test_rotate.rs` を作成し、i420_rotate のエラーパステスト 2 件を実装した
+4. `tests/test_scale.rs` を作成し、i420_scale のエラーパステスト 2 件を実装した
+5. `tests/test_compare.rs` は 0039 で作成済み（SSIM 最小サイズテスト 4 件含む）
 
 ### Phase 1b
 
-5. `src/lib.rs` の末尾付近に `#[cfg(test)] mod tests { use super::*; ... }` を追加する
-6. `require_c_int` の境界値テスト: `c_int::MAX as usize` → Ok, `c_int::MAX as usize + 1` → Err
-7. `checked_buf_size` のオーバーフローテスト: `checked_buf_size(usize::MAX, 2, ...)` → Err
-8. 各 `validate_*_inner` の基本テスト: 正常系 Ok + バッファ不足 Err + stride 不足 Err
-9. CHANGES.md にエントリを追加する
-
-### 補足
-
-本 issue では PBT プロパティの追加（Phase 2）と fuzz target の拡充（Phase 3）は対象外とする。これらは別 issue で対応する。convert.rs の分割（0036）が先に実施された場合は、新しいファイル構成に合わせて `tests/test_convert.rs` のテストを調整する。
+6. `src/lib.rs` に `#[cfg(test)] mod tests` を追加し、require_c_int / checked_buf_size / validate_yuv_src_inner / validate_nv_src_inner のテスト 9 件を実装した
+7. `CHANGES.md` の `### misc` に `[ADD]` エントリを追加した
