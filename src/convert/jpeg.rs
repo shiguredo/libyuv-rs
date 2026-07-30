@@ -21,6 +21,7 @@ pub fn j400_to_argb(
     src.validate(size, "J400ToARGB")?;
     dst.validate(size, "J400ToARGB")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::J400ToARGB(
             src.y.as_ptr(),
@@ -48,6 +49,7 @@ pub fn j420_to_argb(
     src.validate(size, "J420ToARGB")?;
     dst.validate(size, "J420ToARGB")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::J420ToARGB(
             src.y.as_ptr(),
@@ -75,6 +77,7 @@ pub fn j420_to_abgr(
     src.validate(size, "J420ToABGR")?;
     dst.validate(size, "J420ToABGR")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::J420ToABGR(
             src.y.as_ptr(),
@@ -102,6 +105,7 @@ pub fn j420_to_raw(
     src.validate(size, "J420ToRAW")?;
     dst.validate(size, "J420ToRAW")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::J420ToRAW(
             src.y.as_ptr(),
@@ -129,6 +133,7 @@ pub fn j420_to_rgb24(
     src.validate(size, "J420ToRGB24")?;
     dst.validate(size, "J420ToRGB24")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::J420ToRGB24(
             src.y.as_ptr(),
@@ -156,6 +161,7 @@ pub fn j420_to_rgb565(
     src.validate(size, "J420ToRGB565")?;
     dst.validate(size, "J420ToRGB565")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::J420ToRGB565(
             src.y.as_ptr(),
@@ -183,6 +189,7 @@ pub fn j420_to_i420(
     src.validate(size, "J420ToI420")?;
     dst.validate(size, "J420ToI420")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::J420ToI420(
             src.y.as_ptr(),
@@ -218,6 +225,7 @@ pub fn j422_to_argb(
     src.validate(size, "J422ToARGB")?;
     dst.validate(size, "J422ToARGB")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::J422ToARGB(
             src.y.as_ptr(),
@@ -245,6 +253,7 @@ pub fn j422_to_abgr(
     src.validate(size, "J422ToABGR")?;
     dst.validate(size, "J422ToABGR")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::J422ToABGR(
             src.y.as_ptr(),
@@ -276,6 +285,7 @@ pub fn j444_to_argb(
     src.validate(size, "J444ToARGB")?;
     dst.validate(size, "J444ToARGB")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::J444ToARGB(
             src.y.as_ptr(),
@@ -303,6 +313,7 @@ pub fn j444_to_abgr(
     src.validate(size, "J444ToABGR")?;
     dst.validate(size, "J444ToABGR")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::J444ToABGR(
             src.y.as_ptr(),
@@ -334,6 +345,7 @@ pub fn argb_to_j400(
     src.validate(size, "ARGBToJ400")?;
     dst.validate(size, "ARGBToJ400")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBToJ400(
             src.data.as_ptr(),
@@ -357,6 +369,7 @@ pub fn argb_to_j420(
     src.validate(size, "ARGBToJ420")?;
     dst.validate(size, "ARGBToJ420")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBToJ420(
             src.data.as_ptr(),
@@ -384,6 +397,7 @@ pub fn argb_to_j422(
     src.validate(size, "ARGBToJ422")?;
     dst.validate(size, "ARGBToJ422")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBToJ422(
             src.data.as_ptr(),
@@ -411,6 +425,7 @@ pub fn argb_to_j444(
     src.validate(size, "ARGBToJ444")?;
     dst.validate(size, "ARGBToJ444")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBToJ444(
             src.data.as_ptr(),
@@ -442,6 +457,7 @@ pub fn abgr_to_j400(
     src.validate(size, "ABGRToJ400")?;
     dst.validate(size, "ABGRToJ400")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ABGRToJ400(
             src.data.as_ptr(),
@@ -465,6 +481,7 @@ pub fn abgr_to_j420(
     src.validate(size, "ABGRToJ420")?;
     dst.validate(size, "ABGRToJ420")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ABGRToJ420(
             src.data.as_ptr(),
@@ -492,6 +509,7 @@ pub fn abgr_to_j422(
     src.validate(size, "ABGRToJ422")?;
     dst.validate(size, "ABGRToJ422")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ABGRToJ422(
             src.data.as_ptr(),
@@ -523,6 +541,7 @@ pub fn raw_to_j400(
     src.validate(size, "RAWToJ400")?;
     dst.validate(size, "RAWToJ400")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::RAWToJ400(
             src.data.as_ptr(),
@@ -546,6 +565,7 @@ pub fn raw_to_j420(
     src.validate(size, "RAWToJ420")?;
     dst.validate(size, "RAWToJ420")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::RAWToJ420(
             src.data.as_ptr(),
@@ -573,6 +593,7 @@ pub fn raw_to_j444(
     src.validate(size, "RAWToJ444")?;
     dst.validate(size, "RAWToJ444")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::RAWToJ444(
             src.data.as_ptr(),
@@ -600,6 +621,7 @@ pub fn raw_to_jnv21(
     src.validate(size, "RAWToJNV21")?;
     dst.validate(size, "RAWToJNV21")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::RAWToJNV21(
             src.data.as_ptr(),
@@ -629,6 +651,7 @@ pub fn rgb24_to_j400(
     src.validate(size, "RGB24ToJ400")?;
     dst.validate(size, "RGB24ToJ400")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::RGB24ToJ400(
             src.data.as_ptr(),
@@ -652,6 +675,7 @@ pub fn rgb24_to_j420(
     src.validate(size, "RGB24ToJ420")?;
     dst.validate(size, "RGB24ToJ420")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::RGB24ToJ420(
             src.data.as_ptr(),
@@ -683,6 +707,7 @@ pub fn rgba_to_j400(
     src.validate(size, "RGBAToJ400")?;
     dst.validate(size, "RGBAToJ400")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::RGBAToJ400(
             src.data.as_ptr(),

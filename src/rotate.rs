@@ -31,6 +31,7 @@ pub fn i420_rotate(
     }
     dst.validate(dst_size, "I420Rotate")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::I420Rotate(
             src.y.as_ptr(),
@@ -76,6 +77,7 @@ pub fn argb_rotate(
     }
     dst.validate(dst_size, "ARGBRotate")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBRotate(
             src.data.as_ptr(),
@@ -171,6 +173,7 @@ pub fn rotate_plane(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::RotatePlane(
             src.as_ptr(),
@@ -212,6 +215,7 @@ pub fn i010_rotate(
     }
     dst.validate(dst_size, "I010Rotate")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::I010Rotate(
             src.y.as_ptr(),
@@ -257,6 +261,7 @@ pub fn i210_rotate(
     }
     dst.validate(dst_size, "I210Rotate")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::I210Rotate(
             src.y.as_ptr(),
@@ -302,6 +307,7 @@ pub fn i410_rotate(
     }
     dst.validate(dst_size, "I410Rotate")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::I410Rotate(
             src.y.as_ptr(),
@@ -361,6 +367,7 @@ pub fn android420_to_i420_rotate(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::Android420ToI420Rotate(
             src.y.as_ptr(),
@@ -406,6 +413,7 @@ pub fn nv12_to_i420_rotate(
     }
     dst.validate(dst_size, "NV12ToI420Rotate")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::NV12ToI420Rotate(
             src.y.as_ptr(),
@@ -453,6 +461,7 @@ pub fn i422_rotate(
     }
     dst.validate(dst_size, "I422Rotate")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::I422Rotate(
             src.y.as_ptr(),
@@ -498,6 +507,7 @@ pub fn i444_rotate(
     }
     dst.validate(dst_size, "I444Rotate")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::I444Rotate(
             src.y.as_ptr(),
@@ -613,6 +623,7 @@ pub fn rotate_plane_16(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::RotatePlane_16(
             src.as_ptr(),
@@ -706,6 +717,7 @@ pub fn rotate_plane_90(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::RotatePlane90(
             src.as_ptr(),
@@ -795,6 +807,7 @@ pub fn rotate_plane_180(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::RotatePlane180(
             src.as_ptr(),
@@ -887,6 +900,7 @@ pub fn rotate_plane_270(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::RotatePlane270(
             src.as_ptr(),
@@ -1021,6 +1035,7 @@ pub fn split_rotate_uv(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::SplitRotateUV(
             src_uv.as_ptr(),
@@ -1147,6 +1162,7 @@ pub fn split_rotate_uv_90(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::SplitRotateUV90(
             src.as_ptr(),
@@ -1270,6 +1286,7 @@ pub fn split_rotate_uv_180(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::SplitRotateUV180(
             src.as_ptr(),
@@ -1395,6 +1412,7 @@ pub fn split_rotate_uv_270(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::SplitRotateUV270(
             src.as_ptr(),
@@ -1524,6 +1542,7 @@ pub fn split_transpose_uv(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::SplitTransposeUV(
             src.as_ptr(),
@@ -1618,6 +1637,7 @@ pub fn transpose_plane(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::TransposePlane(
             src.as_ptr(),

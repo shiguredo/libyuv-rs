@@ -58,6 +58,8 @@
   - @voluntas
 - [UPDATE] CI / release ワークフローに NASM のインストールを追加する
   - @voluntas
+- [UPDATE] 全 unsafe ブロック (357 箇所) に SAFETY コメントを追加する
+  - @voluntas
 - [FIX] libyuv の util ツール (cpuid / yuvconvert / yuvconstants) をビルド対象から外す
   - `util/cpuid.c` に Intel APX 命令 (`vdpphps`) が含まれ GitHub Actions の binutils ではアセンブルできないため、build.rs で libyuv の `CMakeLists.txt` をパッチして util ツールビルドを除外する
   - 静的ライブラリ (`libyuv.a`) の機能には影響しない

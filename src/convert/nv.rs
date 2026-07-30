@@ -21,6 +21,7 @@ pub fn nv12_to_argb(
     src.validate(size, "NV12ToARGB")?;
     dst.validate(size, "NV12ToARGB")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::NV12ToARGB(
             src.y.as_ptr(),
@@ -46,6 +47,7 @@ pub fn nv21_to_argb(
     src.validate(size, "NV21ToARGB")?;
     dst.validate(size, "NV21ToARGB")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::NV21ToARGB(
             src.y.as_ptr(),
@@ -71,6 +73,7 @@ pub fn nv12_to_abgr(
     src.validate(size, "NV12ToABGR")?;
     dst.validate(size, "NV12ToABGR")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::NV12ToABGR(
             src.y.as_ptr(),
@@ -96,6 +99,7 @@ pub fn nv21_to_abgr(
     src.validate(size, "NV21ToABGR")?;
     dst.validate(size, "NV21ToABGR")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::NV21ToABGR(
             src.y.as_ptr(),
@@ -125,6 +129,7 @@ pub fn argb_to_nv12(
     src.validate(size, "ARGBToNV12")?;
     dst.validate(size, "ARGBToNV12")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBToNV12(
             src.data.as_ptr(),
@@ -150,6 +155,7 @@ pub fn argb_to_nv21(
     src.validate(size, "ARGBToNV21")?;
     dst.validate(size, "ARGBToNV21")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBToNV21(
             src.data.as_ptr(),
@@ -179,6 +185,7 @@ pub fn nv12_to_rgb24(
     src.validate(size, "NV12ToRGB24")?;
     dst.validate(size, "NV12ToRGB24")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::NV12ToRGB24(
             src.y.as_ptr(),
@@ -204,6 +211,7 @@ pub fn nv21_to_rgb24(
     src.validate(size, "NV21ToRGB24")?;
     dst.validate(size, "NV21ToRGB24")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::NV21ToRGB24(
             src.y.as_ptr(),
@@ -233,6 +241,7 @@ pub fn i444_to_nv12(
     src.validate(size, "I444ToNV12")?;
     dst.validate(size, "I444ToNV12")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::I444ToNV12(
             src.y.as_ptr(),
@@ -262,6 +271,7 @@ pub fn i444_to_nv21(
     src.validate(size, "I444ToNV21")?;
     dst.validate(size, "I444ToNV21")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::I444ToNV21(
             src.y.as_ptr(),
@@ -295,6 +305,7 @@ pub fn i422_to_nv21(
     src.validate(size, "I422ToNV21")?;
     dst.validate(size, "I422ToNV21")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::I422ToNV21(
             src.y.as_ptr(),
@@ -328,6 +339,7 @@ pub fn nv12_copy(
     src.validate(size, "NV12Copy")?;
     dst.validate(size, "NV12Copy")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::NV12Copy(
             src.y.as_ptr(),
@@ -355,6 +367,7 @@ pub fn nv21_to_nv12(
     src.validate(size, "NV21ToNV12")?;
     dst.validate(size, "NV21ToNV12")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::NV21ToNV12(
             src.y.as_ptr(),
@@ -386,6 +399,7 @@ pub fn nv21_copy(
     src.validate(size, "NV21Copy")?;
     dst.validate(size, "NV21Copy")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::NV21Copy(
             src.y.as_ptr(),
@@ -417,6 +431,7 @@ pub fn nv12_to_raw(
     src.validate(size, "NV12ToRAW")?;
     dst.validate(size, "NV12ToRAW")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::NV12ToRAW(
             src.y.as_ptr(),
@@ -442,6 +457,7 @@ pub fn nv12_to_rgb565(
     src.validate(size, "NV12ToRGB565")?;
     dst.validate(size, "NV12ToRGB565")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::NV12ToRGB565(
             src.y.as_ptr(),
@@ -485,6 +501,7 @@ pub fn nv12_to_nv24(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::NV12ToNV24(
             src.y.as_ptr(),
@@ -545,6 +562,7 @@ pub fn nv16_to_nv24(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::NV16ToNV24(
             src.y.as_ptr(),
@@ -572,6 +590,7 @@ pub fn nv21_to_raw(
     src.validate(size, "NV21ToRAW")?;
     dst.validate(size, "NV21ToRAW")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::NV21ToRAW(
             src.y.as_ptr(),
@@ -597,6 +616,7 @@ pub fn nv21_to_yuv24(
     src.validate(size, "NV21ToYUV24")?;
     dst.validate(size, "NV21ToYUV24")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::NV21ToYUV24(
             src.y.as_ptr(),

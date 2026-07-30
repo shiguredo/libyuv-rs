@@ -21,6 +21,7 @@ pub fn h010_to_argb(
     src.validate(size, "H010ToARGB")?;
     dst.validate(size, "H010ToARGB")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::H010ToARGB(
             src.y.as_ptr(),
@@ -48,6 +49,7 @@ pub fn h010_to_abgr(
     src.validate(size, "H010ToABGR")?;
     dst.validate(size, "H010ToABGR")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::H010ToABGR(
             src.y.as_ptr(),
@@ -75,6 +77,7 @@ pub fn h010_to_ar30(
     src.validate(size, "H010ToAR30")?;
     dst.validate(size, "H010ToAR30")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::H010ToAR30(
             src.y.as_ptr(),
@@ -102,6 +105,7 @@ pub fn h010_to_ab30(
     src.validate(size, "H010ToAB30")?;
     dst.validate(size, "H010ToAB30")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::H010ToAB30(
             src.y.as_ptr(),
@@ -129,6 +133,7 @@ pub fn h210_to_argb(
     src.validate(size, "H210ToARGB")?;
     dst.validate(size, "H210ToARGB")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::H210ToARGB(
             src.y.as_ptr(),
@@ -156,6 +161,7 @@ pub fn h210_to_abgr(
     src.validate(size, "H210ToABGR")?;
     dst.validate(size, "H210ToABGR")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::H210ToABGR(
             src.y.as_ptr(),
@@ -183,6 +189,7 @@ pub fn h210_to_ar30(
     src.validate(size, "H210ToAR30")?;
     dst.validate(size, "H210ToAR30")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::H210ToAR30(
             src.y.as_ptr(),
@@ -210,6 +217,7 @@ pub fn h210_to_ab30(
     src.validate(size, "H210ToAB30")?;
     dst.validate(size, "H210ToAB30")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::H210ToAB30(
             src.y.as_ptr(),
@@ -241,6 +249,7 @@ pub fn h420_to_argb(
     src.validate(size, "H420ToARGB")?;
     dst.validate(size, "H420ToARGB")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::H420ToARGB(
             src.y.as_ptr(),
@@ -268,6 +277,7 @@ pub fn h420_to_abgr(
     src.validate(size, "H420ToABGR")?;
     dst.validate(size, "H420ToABGR")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::H420ToABGR(
             src.y.as_ptr(),
@@ -295,6 +305,7 @@ pub fn h420_to_ar30(
     src.validate(size, "H420ToAR30")?;
     dst.validate(size, "H420ToAR30")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::H420ToAR30(
             src.y.as_ptr(),
@@ -322,6 +333,7 @@ pub fn h420_to_ab30(
     src.validate(size, "H420ToAB30")?;
     dst.validate(size, "H420ToAB30")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::H420ToAB30(
             src.y.as_ptr(),
@@ -349,6 +361,7 @@ pub fn h420_to_raw(
     src.validate(size, "H420ToRAW")?;
     dst.validate(size, "H420ToRAW")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::H420ToRAW(
             src.y.as_ptr(),
@@ -376,6 +389,7 @@ pub fn h420_to_rgb24(
     src.validate(size, "H420ToRGB24")?;
     dst.validate(size, "H420ToRGB24")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::H420ToRGB24(
             src.y.as_ptr(),
@@ -403,6 +417,7 @@ pub fn h420_to_rgb565(
     src.validate(size, "H420ToRGB565")?;
     dst.validate(size, "H420ToRGB565")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::H420ToRGB565(
             src.y.as_ptr(),
@@ -430,6 +445,7 @@ pub fn h422_to_argb(
     src.validate(size, "H422ToARGB")?;
     dst.validate(size, "H422ToARGB")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::H422ToARGB(
             src.y.as_ptr(),
@@ -457,6 +473,7 @@ pub fn h422_to_abgr(
     src.validate(size, "H422ToABGR")?;
     dst.validate(size, "H422ToABGR")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::H422ToABGR(
             src.y.as_ptr(),
@@ -484,6 +501,7 @@ pub fn h444_to_argb(
     src.validate(size, "H444ToARGB")?;
     dst.validate(size, "H444ToARGB")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::H444ToARGB(
             src.y.as_ptr(),
@@ -511,6 +529,7 @@ pub fn h444_to_abgr(
     src.validate(size, "H444ToABGR")?;
     dst.validate(size, "H444ToABGR")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::H444ToABGR(
             src.y.as_ptr(),
@@ -542,6 +561,7 @@ pub fn u010_to_argb(
     src.validate(size, "U010ToARGB")?;
     dst.validate(size, "U010ToARGB")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::U010ToARGB(
             src.y.as_ptr(),
@@ -569,6 +589,7 @@ pub fn u010_to_abgr(
     src.validate(size, "U010ToABGR")?;
     dst.validate(size, "U010ToABGR")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::U010ToABGR(
             src.y.as_ptr(),
@@ -596,6 +617,7 @@ pub fn u010_to_ar30(
     src.validate(size, "U010ToAR30")?;
     dst.validate(size, "U010ToAR30")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::U010ToAR30(
             src.y.as_ptr(),
@@ -623,6 +645,7 @@ pub fn u010_to_ab30(
     src.validate(size, "U010ToAB30")?;
     dst.validate(size, "U010ToAB30")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::U010ToAB30(
             src.y.as_ptr(),
@@ -650,6 +673,7 @@ pub fn u210_to_argb(
     src.validate(size, "U210ToARGB")?;
     dst.validate(size, "U210ToARGB")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::U210ToARGB(
             src.y.as_ptr(),
@@ -677,6 +701,7 @@ pub fn u210_to_abgr(
     src.validate(size, "U210ToABGR")?;
     dst.validate(size, "U210ToABGR")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::U210ToABGR(
             src.y.as_ptr(),
@@ -704,6 +729,7 @@ pub fn u210_to_ar30(
     src.validate(size, "U210ToAR30")?;
     dst.validate(size, "U210ToAR30")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::U210ToAR30(
             src.y.as_ptr(),
@@ -731,6 +757,7 @@ pub fn u210_to_ab30(
     src.validate(size, "U210ToAB30")?;
     dst.validate(size, "U210ToAB30")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::U210ToAB30(
             src.y.as_ptr(),
@@ -762,6 +789,7 @@ pub fn u420_to_argb(
     src.validate(size, "U420ToARGB")?;
     dst.validate(size, "U420ToARGB")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::U420ToARGB(
             src.y.as_ptr(),
@@ -789,6 +817,7 @@ pub fn u420_to_abgr(
     src.validate(size, "U420ToABGR")?;
     dst.validate(size, "U420ToABGR")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::U420ToABGR(
             src.y.as_ptr(),
@@ -816,6 +845,7 @@ pub fn u422_to_argb(
     src.validate(size, "U422ToARGB")?;
     dst.validate(size, "U422ToARGB")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::U422ToARGB(
             src.y.as_ptr(),
@@ -843,6 +873,7 @@ pub fn u422_to_abgr(
     src.validate(size, "U422ToABGR")?;
     dst.validate(size, "U422ToABGR")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::U422ToABGR(
             src.y.as_ptr(),
@@ -870,6 +901,7 @@ pub fn u444_to_argb(
     src.validate(size, "U444ToARGB")?;
     dst.validate(size, "U444ToARGB")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::U444ToARGB(
             src.y.as_ptr(),
@@ -897,6 +929,7 @@ pub fn u444_to_abgr(
     src.validate(size, "U444ToABGR")?;
     dst.validate(size, "U444ToABGR")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::U444ToABGR(
             src.y.as_ptr(),

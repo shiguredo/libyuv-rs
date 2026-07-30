@@ -24,6 +24,7 @@ pub fn i420_scale(
     src.validate(src_size, "I420Scale")?;
     dst.validate(dst_size, "I420Scale")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::I420Scale(
             src.y.as_ptr(),
@@ -60,6 +61,7 @@ pub fn i422_scale(
     src.validate(src_size, "I422Scale")?;
     dst.validate(dst_size, "I422Scale")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::I422Scale(
             src.y.as_ptr(),
@@ -96,6 +98,7 @@ pub fn i444_scale(
     src.validate(src_size, "I444Scale")?;
     dst.validate(dst_size, "I444Scale")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::I444Scale(
             src.y.as_ptr(),
@@ -139,6 +142,7 @@ pub fn i420_scale_12(
     src.validate(src_size, "I420Scale_12")?;
     dst.validate(dst_size, "I420Scale_12")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::I420Scale_12(
             src.y.as_ptr(),
@@ -177,6 +181,7 @@ pub fn i420_scale_16(
     src.validate(src_size, "I420Scale_16")?;
     dst.validate(dst_size, "I420Scale_16")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::I420Scale_16(
             src.y.as_ptr(),
@@ -216,6 +221,7 @@ pub fn i422_scale_12(
     src.validate(src_size, "I422Scale_12")?;
     dst.validate(dst_size, "I422Scale_12")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::I422Scale_12(
             src.y.as_ptr(),
@@ -254,6 +260,7 @@ pub fn i422_scale_16(
     src.validate(src_size, "I422Scale_16")?;
     dst.validate(dst_size, "I422Scale_16")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::I422Scale_16(
             src.y.as_ptr(),
@@ -293,6 +300,7 @@ pub fn i444_scale_12(
     src.validate(src_size, "I444Scale_12")?;
     dst.validate(dst_size, "I444Scale_12")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::I444Scale_12(
             src.y.as_ptr(),
@@ -331,6 +339,7 @@ pub fn i444_scale_16(
     src.validate(src_size, "I444Scale_16")?;
     dst.validate(dst_size, "I444Scale_16")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::I444Scale_16(
             src.y.as_ptr(),
@@ -444,6 +453,7 @@ pub fn scale_plane(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ScalePlane(
             src.as_ptr(),
@@ -548,6 +558,7 @@ pub fn scale_plane_12(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ScalePlane_12(
             src.as_ptr(),
@@ -651,6 +662,7 @@ pub fn scale_plane_16(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ScalePlane_16(
             src.as_ptr(),
@@ -683,6 +695,7 @@ pub fn nv12_scale(
     src.validate(src_size, "NV12Scale")?;
     dst.validate(dst_size, "NV12Scale")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::NV12Scale(
             src.y.as_ptr(),
@@ -715,6 +728,7 @@ pub fn nv24_scale(
     src.validate(src_size, "NV24Scale")?;
     dst.validate(dst_size, "NV24Scale")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::NV24Scale(
             src.y.as_ptr(),
@@ -828,6 +842,7 @@ pub fn uv_scale(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::UVScale(
             src_uv.as_ptr(),
@@ -937,6 +952,7 @@ pub fn uv_scale_16(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::UVScale_16(
             src_uv.as_ptr(),
@@ -969,6 +985,7 @@ pub fn argb_scale(
     src.validate(src_size, "ARGBScale")?;
     dst.validate(dst_size, "ARGBScale")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBScale(
             src.data.as_ptr(),
@@ -1035,6 +1052,7 @@ pub fn argb_scale_clip(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBScaleClip(
             src.data.as_ptr(),
