@@ -3,7 +3,7 @@
 #![expect(non_snake_case)]
 #![expect(dead_code)]
 #![expect(unused_imports)]
-#![expect(clippy::all)]
+#![allow(clippy::all)]
 
 include!(concat!(env!("OUT_DIR"), "/metadata.rs"));
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
