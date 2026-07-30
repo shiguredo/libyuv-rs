@@ -126,6 +126,9 @@ pub fn i444_scale(
 // ---------------------------------------------------------------------------
 
 /// I420 形式の 12bit YUV データをリサイズする
+///
+/// `u16` の下位 12 ビットのみが有効。上位 4 ビットの値は libyuv により無視される。
+/// 全 16 ビットを使用する場合は [`i420_scale_16`] を使用すること。
 pub fn i420_scale_12(
     src: &I012Image<'_>,
     src_size: ImageSize,
@@ -162,6 +165,8 @@ pub fn i420_scale_12(
 }
 
 /// I420 形式の 16bit YUV データをリサイズする
+///
+/// `u16` の全 16 ビットが有効。下位 12 ビットのみが有効なデータには [`i420_scale_12`] を使用すること。
 pub fn i420_scale_16(
     src: &I012Image<'_>,
     src_size: ImageSize,
@@ -198,6 +203,9 @@ pub fn i420_scale_16(
 }
 
 /// I422 形式の 12bit YUV データをリサイズする
+///
+/// `u16` の下位 12 ビットのみが有効。上位 4 ビットの値は libyuv により無視される。
+/// 全 16 ビットを使用する場合は [`i422_scale_16`] を使用すること。
 pub fn i422_scale_12(
     src: &I212Image<'_>,
     src_size: ImageSize,
@@ -234,6 +242,8 @@ pub fn i422_scale_12(
 }
 
 /// I422 形式の 16bit YUV データをリサイズする
+///
+/// `u16` の全 16 ビットが有効。下位 12 ビットのみが有効なデータには [`i422_scale_12`] を使用すること。
 pub fn i422_scale_16(
     src: &I212Image<'_>,
     src_size: ImageSize,
@@ -270,6 +280,9 @@ pub fn i422_scale_16(
 }
 
 /// I444 形式の 12bit YUV データをリサイズする
+///
+/// `u16` の下位 12 ビットのみが有効。上位 4 ビットの値は libyuv により無視される。
+/// 全 16 ビットを使用する場合は [`i444_scale_16`] を使用すること。
 pub fn i444_scale_12(
     src: &I412Image<'_>,
     src_size: ImageSize,
@@ -306,6 +319,8 @@ pub fn i444_scale_12(
 }
 
 /// I444 形式の 16bit YUV データをリサイズする
+///
+/// `u16` の全 16 ビットが有効。下位 12 ビットのみが有効なデータには [`i444_scale_12`] を使用すること。
 pub fn i444_scale_16(
     src: &I412Image<'_>,
     src_size: ImageSize,
@@ -447,6 +462,9 @@ pub fn scale_plane(
 }
 
 /// 単一プレーンの 12bit スケーリング
+///
+/// `u16` の下位 12 ビットのみが有効。上位 4 ビットの値は libyuv により無視される。
+/// 全 16 ビットを使用する場合は [`scale_plane_16`] を使用すること。
 pub fn scale_plane_12(
     src: &[u16],
     src_stride: usize,
@@ -548,6 +566,8 @@ pub fn scale_plane_12(
 }
 
 /// 単一プレーンの 16bit スケーリング
+///
+/// `u16` の全 16 ビットが有効。下位 12 ビットのみが有効なデータには [`scale_plane_12`] を使用すること。
 pub fn scale_plane_16(
     src: &[u16],
     src_stride: usize,
