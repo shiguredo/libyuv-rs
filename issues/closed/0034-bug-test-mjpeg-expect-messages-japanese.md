@@ -2,7 +2,7 @@
 
 - Priority: Medium
 - Created: 2026-07-08
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-07-30
 - Model: DeepSeek V4 Pro
 - Branch: feature/fix-test-mjpeg-japanese-messages
 - Polished: 2026-07-29
@@ -39,10 +39,4 @@ Medium。規約違反であり機械的置換で対応可能。動作への影�
 
 ## 解決方法
 
-各 expect メッセージを以下のように日本語化する:
-
-- 「mjpeg_size が既知の正常な JPEG から成功すること」
-- 「mjpeg_to_i420 が既知の正常な JPEG から成功すること」
-- 「mjpeg_to_nv12 が既知の正常な JPEG から成功すること」
-- 「mjpeg_to_nv21 が既知の正常な JPEG から成功すること」
-- 「mjpeg_to_argb が既知の正常な JPEG から成功すること」
+5 箇所の英語 expect メッセージを日本語に置換した。cargo fmt により行折り返しが適用された。
