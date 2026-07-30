@@ -25,6 +25,7 @@ pub fn android420_to_argb(
     src.validate(size, "Android420ToARGB")?;
     dst.validate(size, "Android420ToARGB")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::Android420ToARGB(
             src.y.as_ptr(),
@@ -56,6 +57,7 @@ pub fn android420_to_abgr(
     src.validate(size, "Android420ToABGR")?;
     dst.validate(size, "Android420ToABGR")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::Android420ToABGR(
             src.y.as_ptr(),
@@ -87,6 +89,7 @@ pub fn android420_to_i420(
     src.validate(size, "Android420ToI420")?;
     dst.validate(size, "Android420ToI420")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::Android420ToI420(
             src.y.as_ptr(),
@@ -123,6 +126,7 @@ pub fn mm21_to_i420(
     src.validate(size, "MM21ToI420")?;
     dst.validate(size, "MM21ToI420")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::MM21ToI420(
             src.y.as_ptr(),
@@ -152,6 +156,7 @@ pub fn mm21_to_nv12(
     src.validate(size, "MM21ToNV12")?;
     dst.validate(size, "MM21ToNV12")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::MM21ToNV12(
             src.y.as_ptr(),
@@ -179,6 +184,7 @@ pub fn mm21_to_yuy2(
     src.validate(size, "MM21ToYUY2")?;
     dst.validate(size, "MM21ToYUY2")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::MM21ToYUY2(
             src.y.as_ptr(),
@@ -206,6 +212,7 @@ pub fn mt2t_to_p010(
     src.validate(size, "MT2TToP010")?;
     dst.validate(size, "MT2TToP010")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::MT2TToP010(
             src.y.as_ptr(),
@@ -237,6 +244,7 @@ pub fn ayuv_to_nv12(
     src.validate(size, "AYUVToNV12")?;
     dst.validate(size, "AYUVToNV12")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::AYUVToNV12(
             src.data.as_ptr(),
@@ -262,6 +270,7 @@ pub fn ayuv_to_nv21(
     src.validate(size, "AYUVToNV21")?;
     dst.validate(size, "AYUVToNV21")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::AYUVToNV21(
             src.data.as_ptr(),
@@ -368,6 +377,7 @@ pub fn detile_plane(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::DetilePlane(
             src.as_ptr(),
@@ -469,6 +479,7 @@ pub fn detile_plane_16(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::DetilePlane_16(
             src.as_ptr(),
@@ -612,6 +623,7 @@ pub fn detile_split_uv_plane(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::DetileSplitUVPlane(
             src_uv.as_ptr(),
@@ -639,6 +651,7 @@ pub fn detile_to_yuy2(
     src.validate(size, "DetileToYUY2")?;
     dst.validate(size, "DetileToYUY2")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::DetileToYUY2(
             src.y.as_ptr(),

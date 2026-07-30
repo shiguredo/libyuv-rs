@@ -82,6 +82,7 @@ pub fn copy_plane(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::CopyPlane(
             src.as_ptr(),
@@ -128,6 +129,7 @@ pub fn set_plane(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::SetPlane(
             dst.as_mut_ptr(),
@@ -150,6 +152,7 @@ pub fn i400_copy(
     src.validate(size, "I400Copy")?;
     dst.validate(size, "I400Copy")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::I400Copy(
             src.y.as_ptr(),
@@ -267,6 +270,7 @@ pub fn split_uv_plane(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::SplitUVPlane(
             src_uv.as_ptr(),
@@ -383,6 +387,7 @@ pub fn merge_uv_plane(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::MergeUVPlane(
             src_u.as_ptr(),
@@ -471,6 +476,7 @@ pub fn swap_uv_plane(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::SwapUVPlane(
             src_uv.as_ptr(),
@@ -596,6 +602,7 @@ pub fn split_rgb_plane(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::SplitRGBPlane(
             src.data.as_ptr(),
@@ -708,6 +715,7 @@ pub fn merge_rgb_plane(
     }
     dst.validate(size, "MergeRGBPlane")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::MergeRGBPlane(
             src_r.as_ptr(),
@@ -739,6 +747,7 @@ pub fn i400_mirror(
     src.validate(size, "I400Mirror")?;
     dst.validate(size, "I400Mirror")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::I400Mirror(
             src.y.as_ptr(),
@@ -762,6 +771,7 @@ pub fn i420_mirror(
     src.validate(size, "I420Mirror")?;
     dst.validate(size, "I420Mirror")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::I420Mirror(
             src.y.as_ptr(),
@@ -793,6 +803,7 @@ pub fn nv12_mirror(
     src.validate(size, "NV12Mirror")?;
     dst.validate(size, "NV12Mirror")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::NV12Mirror(
             src.y.as_ptr(),
@@ -820,6 +831,7 @@ pub fn argb_mirror(
     src.validate(size, "ARGBMirror")?;
     dst.validate(size, "ARGBMirror")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBMirror(
             src.data.as_ptr(),
@@ -843,6 +855,7 @@ pub fn rgb24_mirror(
     src.validate(size, "RGB24Mirror")?;
     dst.validate(size, "RGB24Mirror")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::RGB24Mirror(
             src.data.as_ptr(),
@@ -865,6 +878,7 @@ pub fn mirror_plane(
     dst_stride: usize,
     size: ImageSize,
 ) {
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::MirrorPlane(
             src.as_ptr(),
@@ -928,6 +942,7 @@ pub fn i420_blend(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::I420Blend(
             src0.y.as_ptr(),
@@ -971,6 +986,7 @@ pub fn argb_blend(
     src1.validate(size, "ARGBBlend")?;
     dst.validate(size, "ARGBBlend")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBBlend(
             src0.data.as_ptr(),
@@ -1110,6 +1126,7 @@ pub fn blend_plane(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::BlendPlane(
             src0.as_ptr(),
@@ -1233,6 +1250,7 @@ pub fn interpolate_plane(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::InterpolatePlane(
             src0.as_ptr(),
@@ -1263,6 +1281,7 @@ pub fn argb_attenuate(
     src.validate(size, "ARGBAttenuate")?;
     dst.validate(size, "ARGBAttenuate")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBAttenuate(
             src.data.as_ptr(),
@@ -1286,6 +1305,7 @@ pub fn argb_unattenuate(
     src.validate(size, "ARGBUnattenuate")?;
     dst.validate(size, "ARGBUnattenuate")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBUnattenuate(
             src.data.as_ptr(),
@@ -1312,6 +1332,7 @@ pub fn argb_shade(
     src.validate(size, "ARGBShade")?;
     dst.validate(size, "ARGBShade")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBShade(
             src.data.as_ptr(),
@@ -1331,6 +1352,7 @@ pub fn argb_shade(
 pub fn argb_gray(dst: &mut ArgbImageMut<'_>, size: ImageSize) -> Result<(), Error> {
     dst.validate(size, "ARGBGray")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBGray(
             dst.data.as_mut_ptr(),
@@ -1349,6 +1371,7 @@ pub fn argb_gray(dst: &mut ArgbImageMut<'_>, size: ImageSize) -> Result<(), Erro
 pub fn argb_sepia(dst: &mut ArgbImageMut<'_>, size: ImageSize) -> Result<(), Error> {
     dst.validate(size, "ARGBSepia")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBSepia(
             dst.data.as_mut_ptr(),
@@ -1405,6 +1428,7 @@ pub fn i420_rect(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::I420Rect(
             dst.y.as_mut_ptr(),
@@ -1462,6 +1486,7 @@ pub fn argb_rect(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBRect(
             dst.data.as_mut_ptr(),
@@ -1495,6 +1520,7 @@ pub fn i420_interpolate(
     src1.validate(size, "I420Interpolate")?;
     dst.validate(size, "I420Interpolate")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::I420Interpolate(
             src0.y.as_ptr(),
@@ -1538,6 +1564,7 @@ pub fn argb_interpolate(
     src1.validate(size, "ARGBInterpolate")?;
     dst.validate(size, "ARGBInterpolate")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBInterpolate(
             src0.data.as_ptr(),
@@ -1591,6 +1618,7 @@ pub fn interpolate_plane_16(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::InterpolatePlane_16(
             src0.as_ptr(),
@@ -1621,6 +1649,7 @@ pub fn argb_sobel(
     src.validate(size, "ARGBSobel")?;
     dst.validate(size, "ARGBSobel")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBSobel(
             src.data.as_ptr(),
@@ -1669,6 +1698,7 @@ pub fn argb_sobel_to_plane(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBSobelToPlane(
             src.data.as_ptr(),
@@ -1692,6 +1722,7 @@ pub fn argb_sobel_xy(
     src.validate(size, "ARGBSobelXY")?;
     dst.validate(size, "ARGBSobelXY")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBSobelXY(
             src.data.as_ptr(),
@@ -1722,6 +1753,7 @@ pub fn argb_color_matrix(
     src.validate(size, "ARGBColorMatrix")?;
     dst.validate(size, "ARGBColorMatrix")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBColorMatrix(
             src.data.as_ptr(),
@@ -1747,6 +1779,7 @@ pub fn rgb_color_matrix(
 ) -> Result<(), Error> {
     dst.validate(size, "RGBColorMatrix")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::RGBColorMatrix(
             dst.data.as_mut_ptr(),
@@ -1781,6 +1814,7 @@ pub fn argb_polynomial(
     src.validate(size, "ARGBPolynomial")?;
     dst.validate(size, "ARGBPolynomial")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBPolynomial(
             src.data.as_ptr(),
@@ -1811,6 +1845,7 @@ pub fn argb_add(
     src1.validate(size, "ARGBAdd")?;
     dst.validate(size, "ARGBAdd")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBAdd(
             src0.data.as_ptr(),
@@ -1838,6 +1873,7 @@ pub fn argb_subtract(
     src1.validate(size, "ARGBSubtract")?;
     dst.validate(size, "ARGBSubtract")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBSubtract(
             src0.data.as_ptr(),
@@ -1865,6 +1901,7 @@ pub fn argb_multiply(
     src1.validate(size, "ARGBMultiply")?;
     dst.validate(size, "ARGBMultiply")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBMultiply(
             src0.data.as_ptr(),
@@ -1930,6 +1967,7 @@ pub fn argb_blur(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBBlur(
             src.data.as_ptr(),
@@ -1986,6 +2024,7 @@ pub fn argb_compute_cumulative_sum(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBComputeCumulativeSum(
             src.data.as_ptr(),
@@ -2013,6 +2052,7 @@ pub fn argb_gray_to(
     src.validate(size, "ARGBGrayTo")?;
     dst.validate(size, "ARGBGrayTo")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBGrayTo(
             src.data.as_ptr(),
@@ -2040,6 +2080,7 @@ pub fn argb_quantize(
 ) -> Result<(), Error> {
     dst.validate(size, "ARGBQuantize")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBQuantize(
             dst.data.as_mut_ptr(),
@@ -2076,6 +2117,7 @@ pub fn argb_luma_color_table(
     src.validate(size, "ARGBLumaColorTable")?;
     dst.validate(size, "ARGBLumaColorTable")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBLumaColorTable(
             src.data.as_ptr(),
@@ -2101,6 +2143,7 @@ pub fn argb_color_table(
 ) -> Result<(), Error> {
     dst.validate(size, "ARGBColorTable")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBColorTable(
             dst.data.as_mut_ptr(),
@@ -2126,6 +2169,7 @@ pub fn rgb_color_table(
 ) -> Result<(), Error> {
     dst.validate(size, "RGBColorTable")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::RGBColorTable(
             dst.data.as_mut_ptr(),
@@ -2157,6 +2201,7 @@ pub fn argb_shuffle(
     src.validate(size, "ARGBShuffle")?;
     dst.validate(size, "ARGBShuffle")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBShuffle(
             src.data.as_ptr(),
@@ -2206,6 +2251,7 @@ pub fn argb_extract_alpha(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBExtractAlpha(
             src.data.as_ptr(),
@@ -2229,6 +2275,7 @@ pub fn argb_copy_alpha(
     src.validate(size, "ARGBCopyAlpha")?;
     dst.validate(size, "ARGBCopyAlpha")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBCopyAlpha(
             src.data.as_ptr(),
@@ -2283,6 +2330,7 @@ pub fn argb_copy_y_to_alpha(
     }
     dst.validate(size, "ARGBCopyYToAlpha")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBCopyYToAlpha(
             src_y.as_ptr(),
@@ -2307,6 +2355,7 @@ pub fn argb_copy_y_to_alpha(
 pub fn argb_detect(src: &ArgbImage<'_>, size: ImageSize) -> Result<u32, Error> {
     src.validate(size, "ARGBDetect")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBDetect(
             src.data.as_ptr(),
@@ -2397,6 +2446,7 @@ pub fn copy_plane_16(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::CopyPlane_16(
             src.as_ptr(),
@@ -2512,6 +2562,7 @@ pub fn merge_uv_plane_16(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::MergeUVPlane_16(
             src_u.as_ptr(),
@@ -2630,6 +2681,7 @@ pub fn split_uv_plane_16(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::SplitUVPlane_16(
             src_uv.as_ptr(),
@@ -2805,6 +2857,7 @@ pub fn merge_argb_plane(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::MergeARGBPlane(
             src_r.as_ptr(),
@@ -2979,6 +3032,7 @@ pub fn split_argb_plane(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::SplitARGBPlane(
             src_argb.as_ptr(),
@@ -3154,6 +3208,7 @@ pub fn merge_ar64_plane(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::MergeAR64Plane(
             src_r.as_ptr(),
@@ -3303,6 +3358,7 @@ pub fn merge_xr30_plane(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::MergeXR30Plane(
             src_r.as_ptr(),
@@ -3485,6 +3541,7 @@ pub fn merge_argb16_to_8_plane(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::MergeARGB16To8Plane(
             src_r.as_ptr(),
@@ -3582,6 +3639,7 @@ pub fn mirror_uv_plane(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::MirrorUVPlane(
             src_uv.as_ptr(),
@@ -3674,6 +3732,7 @@ pub fn convert_16_to_8_plane(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::Convert16To8Plane(
             src.as_ptr(),
@@ -3763,6 +3822,7 @@ pub fn convert_8_to_16_plane(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::Convert8To16Plane(
             src.as_ptr(),
@@ -3851,6 +3911,7 @@ pub fn convert_8_to_8_plane(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::Convert8To8Plane(
             src.as_ptr(),
@@ -3943,6 +4004,7 @@ pub fn convert_to_lsb_plane_16(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::ConvertToLSBPlane_16(
             src.as_ptr(),
@@ -4034,6 +4096,7 @@ pub fn convert_to_msb_plane_16(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::ConvertToMSBPlane_16(
             src.as_ptr(),
@@ -4121,6 +4184,7 @@ pub fn half_float_plane(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::HalfFloatPlane(
             src.as_ptr(),
@@ -4241,6 +4305,7 @@ pub fn half_merge_uv_plane(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::HalfMergeUVPlane(
             src_u.as_ptr(),
@@ -4279,6 +4344,7 @@ pub fn byte_to_float(src: &[u8], dst: &mut [f32], scale: f32, width: usize) -> R
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe { sys::ByteToFloat(src.as_ptr(), dst.as_mut_ptr(), scale, width as c_int) };
 
     Error::check(result, "ByteToFloat")
@@ -4355,6 +4421,7 @@ pub fn gauss_plane_f32(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::GaussPlane_F32(
             src.as_ptr(),

@@ -19,6 +19,7 @@ pub fn i422_to_i444(
     src.validate(size, "I422ToI444")?;
     dst.validate(size, "I422ToI444")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::I422ToI444(
             src.y.as_ptr(),
@@ -54,6 +55,7 @@ pub fn i444_to_rgb24(
     src.validate(size, "I444ToRGB24")?;
     dst.validate(size, "I444ToRGB24")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::I444ToRGB24(
             src.y.as_ptr(),
@@ -85,6 +87,7 @@ pub fn i422_to_rgb24(
     src.validate(size, "I422ToRGB24")?;
     dst.validate(size, "I422ToRGB24")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::I422ToRGB24(
             src.y.as_ptr(),
@@ -116,6 +119,7 @@ pub fn i422_copy(
     src.validate(size, "I422Copy")?;
     dst.validate(size, "I422Copy")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::I422Copy(
             src.y.as_ptr(),
@@ -147,6 +151,7 @@ pub fn i444_copy(
     src.validate(size, "I444Copy")?;
     dst.validate(size, "I444Copy")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::I444Copy(
             src.y.as_ptr(),

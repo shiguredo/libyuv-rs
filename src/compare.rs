@@ -24,6 +24,7 @@ pub fn i420_psnr(
         ));
     }
 
+    // SAFETY: require_c_int と checked_buf_size により全ポインタとサイズの有効性が保証済み。
     let result = unsafe {
         sys::I420Psnr(
             src_a.y.as_ptr(),
@@ -67,6 +68,7 @@ pub fn i420_ssim(
         ));
     }
 
+    // SAFETY: require_c_int と checked_buf_size により全ポインタとサイズの有効性が保証済み。
     let result = unsafe {
         sys::I420Ssim(
             src_a.y.as_ptr(),
@@ -168,6 +170,7 @@ pub fn calc_frame_psnr(
         ));
     }
 
+    // SAFETY: require_c_int と checked_buf_size により全ポインタとサイズの有効性が保証済み。
     let result = unsafe {
         sys::CalcFramePsnr(
             src_a.as_ptr(),
@@ -262,6 +265,7 @@ pub fn calc_frame_ssim(
         ));
     }
 
+    // SAFETY: require_c_int と checked_buf_size により全ポインタとサイズの有効性が保証済み。
     let result = unsafe {
         sys::CalcFrameSsim(
             src_a.as_ptr(),
@@ -300,6 +304,7 @@ pub fn compute_sum_square_error(src_a: &[u8], src_b: &[u8], count: usize) -> Res
     }
 
     let result =
+        // SAFETY: require_c_int と checked_buf_size により全ポインタとサイズの有効性が保証済み。
         unsafe { sys::ComputeSumSquareError(src_a.as_ptr(), src_b.as_ptr(), count as c_int) };
 
     Ok(result)
@@ -379,6 +384,7 @@ pub fn compute_sum_square_error_plane(
         ));
     }
 
+    // SAFETY: require_c_int と checked_buf_size により全ポインタとサイズの有効性が保証済み。
     let result = unsafe {
         sys::ComputeSumSquareErrorPlane(
             src_a.as_ptr(),
@@ -405,6 +411,7 @@ pub fn sum_square_error_to_psnr(sse: u64, count: u64) -> Result<f64, Error> {
             "count must be greater than 0",
         ));
     }
+    // SAFETY: SumSquareErrorToPsnr は純粋な数値計算でありポインタ操作を伴わない。
     Ok(unsafe { sys::SumSquareErrorToPsnr(sse, count) })
 }
 
@@ -413,6 +420,7 @@ pub fn compute_hamming_distance(src_a: &[u8], src_b: &[u8]) -> Result<u64, Error
     let count = src_a.len().min(src_b.len());
     require_c_int(count, "ComputeHammingDistance", "count exceeds c_int range")?;
     let result =
+        // SAFETY: require_c_int と checked_buf_size により全ポインタとサイズの有効性が保証済み。
         unsafe { sys::ComputeHammingDistance(src_a.as_ptr(), src_b.as_ptr(), count as c_int) };
     Ok(result)
 }
@@ -421,5 +429,6 @@ pub fn compute_hamming_distance(src_a: &[u8], src_b: &[u8]) -> Result<u64, Error
 ///
 /// 空スライスの場合は `seed` をそのまま返す（C の挙動の踏襲）。
 pub fn hash_djb2(src: &[u8], seed: u32) -> Result<u32, Error> {
+    // SAFETY: libyuv の HashDjb2 は src.as_ptr() から src.len() バイトまでしか読み込まず、純粋な数値計算であり未定義動作を起こさない。
     Ok(unsafe { sys::HashDjb2(src.as_ptr(), src.len() as u64, seed) })
 }

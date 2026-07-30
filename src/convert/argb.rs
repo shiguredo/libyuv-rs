@@ -22,6 +22,7 @@ pub fn argb_copy(
     src.validate(size, "ARGBCopy")?;
     dst.validate(size, "ARGBCopy")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBCopy(
             src.data.as_ptr(),
@@ -45,6 +46,7 @@ pub fn argb_to_abgr(
     src.validate(size, "ARGBToABGR")?;
     dst.validate(size, "ARGBToABGR")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBToABGR(
             src.data.as_ptr(),
@@ -68,6 +70,7 @@ pub fn abgr_to_argb(
     src.validate(size, "ABGRToARGB")?;
     dst.validate(size, "ABGRToARGB")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ABGRToARGB(
             src.data.as_ptr(),
@@ -91,6 +94,7 @@ pub fn argb_to_rgb24(
     src.validate(size, "ARGBToRGB24")?;
     dst.validate(size, "ARGBToRGB24")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBToRGB24(
             src.data.as_ptr(),
@@ -114,6 +118,7 @@ pub fn rgb24_to_argb(
     src.validate(size, "RGB24ToARGB")?;
     dst.validate(size, "RGB24ToARGB")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::RGB24ToARGB(
             src.data.as_ptr(),
@@ -141,6 +146,7 @@ pub fn argb_to_i422(
     src.validate(size, "ARGBToI422")?;
     dst.validate(size, "ARGBToI422")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBToI422(
             src.data.as_ptr(),
@@ -168,6 +174,7 @@ pub fn argb_to_i444(
     src.validate(size, "ARGBToI444")?;
     dst.validate(size, "ARGBToI444")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBToI444(
             src.data.as_ptr(),
@@ -199,6 +206,7 @@ pub fn ar30_to_argb(
     src.validate(size, "AR30ToARGB")?;
     dst.validate(size, "AR30ToARGB")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::AR30ToARGB(
             src.data.as_ptr(),
@@ -222,6 +230,7 @@ pub fn ar30_to_abgr(
     src.validate(size, "AR30ToABGR")?;
     dst.validate(size, "AR30ToABGR")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::AR30ToABGR(
             src.data.as_ptr(),
@@ -245,6 +254,7 @@ pub fn ar30_to_ab30(
     src.validate(size, "AR30ToAB30")?;
     dst.validate(size, "AR30ToAB30")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::AR30ToAB30(
             src.data.as_ptr(),
@@ -268,6 +278,7 @@ pub fn argb_to_ar30(
     src.validate(size, "ARGBToAR30")?;
     dst.validate(size, "ARGBToAR30")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBToAR30(
             src.data.as_ptr(),
@@ -291,6 +302,7 @@ pub fn abgr_to_ar30(
     src.validate(size, "ABGRToAR30")?;
     dst.validate(size, "ABGRToAR30")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ABGRToAR30(
             src.data.as_ptr(),
@@ -318,6 +330,7 @@ pub fn ar64_to_argb(
     src.validate(size, "AR64ToARGB")?;
     dst.validate(size, "AR64ToARGB")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::AR64ToARGB(
             src.data.as_ptr(),
@@ -341,6 +354,7 @@ pub fn ar64_to_ab64(
     src.validate(size, "AR64ToAB64")?;
     dst.validate(size, "AR64ToAB64")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::AR64ToAB64(
             src.data.as_ptr(),
@@ -364,6 +378,7 @@ pub fn argb_to_ar64(
     src.validate(size, "ARGBToAR64")?;
     dst.validate(size, "ARGBToAR64")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBToAR64(
             src.data.as_ptr(),
@@ -387,6 +402,7 @@ pub fn ab64_to_argb(
     src.validate(size, "AB64ToARGB")?;
     dst.validate(size, "AB64ToARGB")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::AB64ToARGB(
             src.data.as_ptr(),
@@ -410,6 +426,7 @@ pub fn argb_to_ab64(
     src.validate(size, "ARGBToAB64")?;
     dst.validate(size, "ARGBToAB64")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBToAB64(
             src.data.as_ptr(),
@@ -436,6 +453,7 @@ pub fn ar64_shuffle(
     src.validate(size, "AR64Shuffle")?;
     dst.validate(size, "AR64Shuffle")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::AR64Shuffle(
             src.data.as_ptr(),
@@ -464,6 +482,7 @@ pub fn abgr_to_nv12(
     src.validate(size, "ABGRToNV12")?;
     dst.validate(size, "ABGRToNV12")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ABGRToNV12(
             src.data.as_ptr(),
@@ -489,6 +508,7 @@ pub fn abgr_to_nv21(
     src.validate(size, "ABGRToNV21")?;
     dst.validate(size, "ABGRToNV21")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ABGRToNV21(
             src.data.as_ptr(),
@@ -518,6 +538,7 @@ pub fn argb_to_rgba(
     src.validate(size, "ARGBToRGBA")?;
     dst.validate(size, "ARGBToRGBA")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBToRGBA(
             src.data.as_ptr(),
@@ -541,6 +562,7 @@ pub fn rgba_to_argb(
     src.validate(size, "RGBAToARGB")?;
     dst.validate(size, "RGBAToARGB")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::RGBAToARGB(
             src.data.as_ptr(),
@@ -564,6 +586,7 @@ pub fn rgba_to_i420(
     src.validate(size, "RGBAToI420")?;
     dst.validate(size, "RGBAToI420")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::RGBAToI420(
             src.data.as_ptr(),
@@ -591,6 +614,7 @@ pub fn i420_to_rgba(
     src.validate(size, "I420ToRGBA")?;
     dst.validate(size, "I420ToRGBA")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::I420ToRGBA(
             src.y.as_ptr(),
@@ -618,6 +642,7 @@ pub fn i422_to_rgba(
     src.validate(size, "I422ToRGBA")?;
     dst.validate(size, "I422ToRGBA")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::I422ToRGBA(
             src.y.as_ptr(),
@@ -649,6 +674,7 @@ pub fn bgra_to_argb(
     src.validate(size, "BGRAToARGB")?;
     dst.validate(size, "BGRAToARGB")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::BGRAToARGB(
             src.data.as_ptr(),
@@ -672,6 +698,7 @@ pub fn bgra_to_i420(
     src.validate(size, "BGRAToI420")?;
     dst.validate(size, "BGRAToI420")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::BGRAToI420(
             src.data.as_ptr(),
@@ -699,6 +726,7 @@ pub fn i420_to_bgra(
     src.validate(size, "I420ToBGRA")?;
     dst.validate(size, "I420ToBGRA")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::I420ToBGRA(
             src.y.as_ptr(),
@@ -726,6 +754,7 @@ pub fn i422_to_bgra(
     src.validate(size, "I422ToBGRA")?;
     dst.validate(size, "I422ToBGRA")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::I422ToBGRA(
             src.y.as_ptr(),
@@ -753,6 +782,7 @@ pub fn argb_to_bgra(
     src.validate(size, "ARGBToBGRA")?;
     dst.validate(size, "ARGBToBGRA")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBToBGRA(
             src.data.as_ptr(),
@@ -780,6 +810,7 @@ pub fn raw_to_argb(
     src.validate(size, "RAWToARGB")?;
     dst.validate(size, "RAWToARGB")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::RAWToARGB(
             src.data.as_ptr(),
@@ -803,6 +834,7 @@ pub fn raw_to_i420(
     src.validate(size, "RAWToI420")?;
     dst.validate(size, "RAWToI420")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::RAWToI420(
             src.data.as_ptr(),
@@ -830,6 +862,7 @@ pub fn raw_to_rgb24(
     src.validate(size, "RAWToRGB24")?;
     dst.validate(size, "RAWToRGB24")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::RAWToRGB24(
             src.data.as_ptr(),
@@ -853,6 +886,7 @@ pub fn raw_to_rgba(
     src.validate(size, "RAWToRGBA")?;
     dst.validate(size, "RAWToRGBA")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::RAWToRGBA(
             src.data.as_ptr(),
@@ -876,6 +910,7 @@ pub fn argb_to_raw(
     src.validate(size, "ARGBToRAW")?;
     dst.validate(size, "ARGBToRAW")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBToRAW(
             src.data.as_ptr(),
@@ -899,6 +934,7 @@ pub fn i420_to_raw(
     src.validate(size, "I420ToRAW")?;
     dst.validate(size, "I420ToRAW")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::I420ToRAW(
             src.y.as_ptr(),
@@ -926,6 +962,7 @@ pub fn i422_to_raw(
     src.validate(size, "I422ToRAW")?;
     dst.validate(size, "I422ToRAW")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::I422ToRAW(
             src.y.as_ptr(),
@@ -953,6 +990,7 @@ pub fn i444_to_raw(
     src.validate(size, "I444ToRAW")?;
     dst.validate(size, "I444ToRAW")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::I444ToRAW(
             src.y.as_ptr(),
@@ -980,6 +1018,7 @@ pub fn raw_to_i444(
     src.validate(size, "RAWToI444")?;
     dst.validate(size, "RAWToI444")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::RAWToI444(
             src.data.as_ptr(),

@@ -48,6 +48,7 @@ pub fn mjpeg_size(src: &[u8]) -> Result<ImageSize, Error> {
 
     let mut width: c_int = 0;
     let mut height: c_int = 0;
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::MJPGSize(
             src.as_ptr(),
@@ -82,6 +83,7 @@ pub fn mjpeg_to_i420(src: &[u8], dst: &mut I420ImageMut<'_>, size: ImageSize) ->
     // スケーリング無効化のため 4 つすべてに同じ width / height を渡す
     let w = size.width as c_int;
     let h = size.height as c_int;
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::MJPGToI420(
             src.as_ptr(),
@@ -109,6 +111,7 @@ pub fn mjpeg_to_nv12(src: &[u8], dst: &mut Nv12ImageMut<'_>, size: ImageSize) ->
 
     let w = size.width as c_int;
     let h = size.height as c_int;
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::MJPGToNV12(
             src.as_ptr(),
@@ -134,6 +137,7 @@ pub fn mjpeg_to_nv21(src: &[u8], dst: &mut Nv21ImageMut<'_>, size: ImageSize) ->
 
     let w = size.width as c_int;
     let h = size.height as c_int;
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::MJPGToNV21(
             src.as_ptr(),
@@ -159,6 +163,7 @@ pub fn mjpeg_to_argb(src: &[u8], dst: &mut ArgbImageMut<'_>, size: ImageSize) ->
 
     let w = size.width as c_int;
     let h = size.height as c_int;
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::MJPGToARGB(
             src.as_ptr(),
