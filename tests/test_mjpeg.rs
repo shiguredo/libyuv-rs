@@ -60,7 +60,7 @@ fn mjpeg_size_returns_expected_dimensions() {
     // 各サブサンプリングのテストデータについて、JPEG ヘッダから読み取った
     // 幅・高さがコミット済みのファイル名と一致することを確認する
     for (jpeg, expected) in SAMPLES {
-        let size = mjpeg_size(jpeg).expect("mjpeg_size should succeed for known good JPEG");
+        let size = mjpeg_size(jpeg).expect("mjpeg_size が既知の正常な JPEG から成功すること");
         assert_eq!(
             size.width, expected.width,
             "幅がファイル名と一致しません: 期待 {} 実測 {}",
@@ -89,7 +89,8 @@ fn mjpeg_to_i420_decodes_into_non_zero_buffer() {
             v: &mut v,
             v_stride: uv_stride,
         };
-        mjpeg_to_i420(jpeg, &mut dst, *size).expect("mjpeg_to_i420 succeeds for known good JPEG");
+        mjpeg_to_i420(jpeg, &mut dst, *size)
+            .expect("mjpeg_to_i420 が既知の正常な JPEG から成功すること");
         assert!(
             y.iter().any(|&b| b != 0),
             "Y プレーンが全 0: デコードが実際には行われていない可能性 (size = {} x {})",
@@ -109,7 +110,8 @@ fn mjpeg_to_nv12_decodes_into_non_zero_buffer() {
             uv: &mut uv,
             uv_stride,
         };
-        mjpeg_to_nv12(jpeg, &mut dst, *size).expect("mjpeg_to_nv12 succeeds for known good JPEG");
+        mjpeg_to_nv12(jpeg, &mut dst, *size)
+            .expect("mjpeg_to_nv12 が既知の正常な JPEG から成功すること");
         assert!(
             y.iter().any(|&b| b != 0),
             "Y プレーンが全 0: NV12 デコードが行われていない可能性"
@@ -127,7 +129,8 @@ fn mjpeg_to_nv21_decodes_into_non_zero_buffer() {
             uv: &mut uv,
             uv_stride,
         };
-        mjpeg_to_nv21(jpeg, &mut dst, *size).expect("mjpeg_to_nv21 succeeds for known good JPEG");
+        mjpeg_to_nv21(jpeg, &mut dst, *size)
+            .expect("mjpeg_to_nv21 が既知の正常な JPEG から成功すること");
         assert!(
             y.iter().any(|&b| b != 0),
             "Y プレーンが全 0: NV21 デコードが行われていない可能性"
@@ -143,7 +146,8 @@ fn mjpeg_to_argb_decodes_with_alpha_channel_set() {
             data: &mut data,
             stride,
         };
-        mjpeg_to_argb(jpeg, &mut dst, *size).expect("mjpeg_to_argb succeeds for known good JPEG");
+        mjpeg_to_argb(jpeg, &mut dst, *size)
+            .expect("mjpeg_to_argb が既知の正常な JPEG から成功すること");
         // libyuv の MJPGToARGB は alpha channel に 0xFF を書く。最初の 4 バイトの
         // alpha byte が 0xFF なら ARGB が実際に書かれている (リトルエンディアン上
         // ARGB のメモリ表現は B, G, R, A の順)
