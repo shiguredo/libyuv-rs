@@ -2,7 +2,7 @@
 
 - Priority: Medium
 - Created: 2026-07-08
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-07-30
 - Model: DeepSeek V4 Pro
 - Branch: feature/refactor-allow-to-expect-lint
 - Polished: 2026-07-29
@@ -85,9 +85,11 @@ Medium。規約違反であり動作への影響はない。ただし後述の�
 
 ## 解決方法
 
-1. クレートレベル: `src/lib.rs:5` の `#![allow(clippy::too_many_arguments)]` を `#![expect(clippy::too_many_arguments)]` に置換する
-2. モジュールレベル: `src/planar.rs:2`, `src/rotate.rs:2`, `src/scale.rs:2` の `#![allow(clippy::too_many_arguments)]` を削除する（クレートレベルと冗長なため。`src/convert.rs` は 0036 で分割済み・削除済み）
-3. sys.rs: `src/sys.rs:1-7` の 7 行の `#![allow(...)]` を `#![expect(...)]` に置換する（lint 名はそのまま）
-4. マクロ定義: `src/lib.rs` の 7 つのマクロ定義内にある `#[allow(dead_code)]` 属性 14 箇所を削除する（行番号: L705, L747, L774, L809, L845, L880, L906, L943, L985, L1027, L1058, L1093, L1119, L1156）
-5. `cargo clippy --all-targets --all-features -- -D warnings` を実行し、unfulfilled expectation が発生した場合は該当属性を削除して再実行する
-6. `cargo test --workspace` が成功することを確認する
+1. クレートレベル: `src/lib.rs` の `#![allow(clippy::too_many_arguments)]` を `#![expect(clippy::too_many_arguments)]` に置換した
+2. モジュールレベル: `src/planar.rs`, `src/rotate.rs`, `src/scale.rs` の `#![allow(clippy::too_many_arguments)]` を削除した
+3. sys.rs: 7 行の `#![allow(...)]` を `#![expect(...)]` に置換した。`unnecessary_transmutes` は unfulfilled となったため削除した
+4. マクロ内 `#[allow(dead_code)]` 14 箇所は削除できなかった。一部画像型 (H420, U420, Nv16 等) の validate メソッドが実際に未使用であり、削除すると dead_code 警告が発生する。`#[expect(dead_code)]` も使用されている型では unfulfilled になるため使用不可。マクロ構造上 `#[allow(dead_code)]` が必要
+
+### 設計方針からの逸脱
+
+マクロ内 `#[allow(dead_code)]` 14 箇所は維持した。issue の前提「validate メソッドは全画像型で使用されている」が誤りであり、一部画像型の validate は実際に dead code である。マクロが全画像型に均一に validate を生成する構造上、型ごとの条件分岐ができず `#[allow(dead_code)]` が唯一の解決策である。
