@@ -2,7 +2,7 @@
 
 - Priority: Medium
 - Created: 2026-07-08
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-07-30
 - Model: DeepSeek V4 Pro
 - Branch: feature/refactor-unwrap-to-expect-in-tests
 - Polished: 2026-07-29
@@ -42,5 +42,5 @@ Medium。規約違反であり動作への影響はない。しかし `.unwrap()
 
 ## 解決方法
 
-1. 各 PBT ファイルの `.unwrap()` を `.expect("...")` に置換する
-2. メッセージはテスト内容を日本語で簡潔に表現する
+1. 全 5 PBT ファイルの 34 箇所の `.unwrap()` を日本語メッセージ付き `.expect()` に置換した
+2. メッセージはテスト内容を簡潔に表現（例: 「同一 I420 画像の PSNR 計算が成功すること」）
