@@ -2,7 +2,7 @@
 
 - Priority: High
 - Created: 2026-07-08
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-07-30
 - Model: DeepSeek V4 Pro
 - Branch: feature/fix-ssim-small-image-nan
 - Polished: 2026-07-29
@@ -62,19 +62,7 @@ pub fn calc_frame_ssim(
 
 ## 解決方法
 
-1. `calc_frame_ssim` の検証ブロック（stride チェックの前）に以下を追加する:
-   ```rust
-   // libyuv の CalcFrameSsim は 8x8 ブロックを 4 ピクセルステップで走査する (compare.cc:399-401)。
-   // ループ条件 `i < height - 8`, `j < width - 8` により、width <= 8 または height <= 8 では
-   // samples == 0 となり除算ゼロ (NaN) が発生する。
-   if size.width <= 8 || size.height <= 8 {
-       return Err(Error::with_reason(
-           -1,
-           "CalcFrameSsim",
-           "image must be at least 9x9 for SSIM calculation",
-       ));
-   }
-   ```
-2. `i420_ssim` の `.validate()` 呼び出しの直後に同様のチェックを追加する（関数名は `"I420Ssim"`）
-3. `tests/test_compare.rs` を作成し、width=8, height=8（境界値）および width=4, height=4 のケースで Err が返ることを確認するテストを追加する（既存の `tests/test_mjpeg.rs` の import 規約に準拠する）
-4. `CHANGES.md` に `[FIX]` エントリを追加する
+1. `calc_frame_ssim` の検証ブロックに `size.width <= 8 || size.height <= 8` チェックを追加した
+2. `i420_ssim` の `.validate()` 呼び出し直後に同様のチェックを追加した
+3. `tests/test_compare.rs` に 8x8（境界値）および 4x4 で Err が返るテスト 4 件を追加した
+4. `CHANGES.md` に `[FIX]` エントリを追加した
