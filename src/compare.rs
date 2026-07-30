@@ -57,6 +57,16 @@ pub fn i420_ssim(
     src_a.validate(size, "I420Ssim")?;
     src_b.validate(size, "I420Ssim")?;
 
+    // libyuv の I420Ssim は 8x8 ブロックを走査する (compare.cc)。
+    // width <= 8 または height <= 8 では samples == 0 となり除算ゼロ (NaN) が発生する。
+    if size.width <= 8 || size.height <= 8 {
+        return Err(Error::with_reason(
+            -1,
+            "I420Ssim",
+            "image must be at least 9x9 for SSIM calculation",
+        ));
+    }
+
     let result = unsafe {
         sys::I420Ssim(
             src_a.y.as_ptr(),
@@ -186,6 +196,17 @@ pub fn calc_frame_ssim(
     // c_int 範囲チェック
     require_c_int(size.width, "CalcFrameSsim", "width exceeds c_int range")?;
     require_c_int(size.height, "CalcFrameSsim", "height exceeds c_int range")?;
+
+    // libyuv の CalcFrameSsim は 8x8 ブロックを走査する (compare.cc)。
+    // width <= 8 または height <= 8 では samples == 0 となり除算ゼロ (NaN) が発生する。
+    if size.width <= 8 || size.height <= 8 {
+        return Err(Error::with_reason(
+            -1,
+            "CalcFrameSsim",
+            "image must be at least 9x9 for SSIM calculation",
+        ));
+    }
+
     require_c_int(
         src_a_stride,
         "CalcFrameSsim",
