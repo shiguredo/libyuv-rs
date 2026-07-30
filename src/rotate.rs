@@ -1,5 +1,4 @@
 //! 回転関数
-#![allow(clippy::too_many_arguments)]
 
 use std::ffi::c_int;
 
