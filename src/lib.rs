@@ -2,7 +2,7 @@
 //!
 //! [libyuv]: https://chromium.googlesource.com/libyuv/libyuv/
 #![warn(missing_docs)]
-#![allow(clippy::too_many_arguments)]
+#![expect(clippy::too_many_arguments)]
 
 mod sys;
 
@@ -701,8 +701,8 @@ macro_rules! define_yuv_image {
         }
 
         impl $name<'_> {
-            /// ソースバッファのバリデーション
             #[allow(dead_code)]
+            /// ソースバッファのバリデーション
             pub(crate) fn validate(&self, size: ImageSize, function: &'static str) -> Result<(), Error> {
                 validate_yuv_src_inner(
                     self.y, self.y_stride,
@@ -743,8 +743,8 @@ macro_rules! define_yuv_image {
                 }
             }
 
-            /// デスティネーションバッファのバリデーション
             #[allow(dead_code)]
+            /// デスティネーションバッファのバリデーション
             pub(crate) fn validate(&self, size: ImageSize, function: &'static str) -> Result<(), Error> {
                 validate_yuv_dst_inner(
                     self.y, self.y_stride,
@@ -770,8 +770,8 @@ macro_rules! define_y_image {
         }
 
         impl $name<'_> {
-            /// ソースバッファのバリデーション
             #[allow(dead_code)]
+            /// ソースバッファのバリデーション
             pub(crate) fn validate(&self, size: ImageSize, function: &'static str) -> Result<(), Error> {
                 require_c_int(size.width, function, "width exceeds c_int range")?;
                 require_c_int(size.height, function, "height exceeds c_int range")?;
@@ -805,8 +805,8 @@ macro_rules! define_y_image {
                 }
             }
 
-            /// デスティネーションバッファのバリデーション
             #[allow(dead_code)]
+            /// デスティネーションバッファのバリデーション
             pub(crate) fn validate(&self, size: ImageSize, function: &'static str) -> Result<(), Error> {
                 require_c_int(size.width, function, "width exceeds c_int range")?;
                 require_c_int(size.height, function, "height exceeds c_int range")?;
@@ -841,8 +841,8 @@ macro_rules! define_nv_image {
         }
 
         impl $name<'_> {
-            /// ソースバッファのバリデーション
             #[allow(dead_code)]
+            /// ソースバッファのバリデーション
             pub(crate) fn validate(&self, size: ImageSize, function: &'static str) -> Result<(), Error> {
                 validate_nv_src_inner(
                     self.y, self.y_stride,
@@ -876,8 +876,8 @@ macro_rules! define_nv_image {
                 }
             }
 
-            /// デスティネーションバッファのバリデーション
             #[allow(dead_code)]
+            /// デスティネーションバッファのバリデーション
             pub(crate) fn validate(&self, size: ImageSize, function: &'static str) -> Result<(), Error> {
                 validate_nv_dst_inner(
                     self.y, self.y_stride,
@@ -902,8 +902,8 @@ macro_rules! define_packed_image {
         }
 
         impl $name<'_> {
-            /// ソースバッファのバリデーション
             #[allow(dead_code)]
+            /// ソースバッファのバリデーション
             pub(crate) fn validate(&self, size: ImageSize, function: &'static str) -> Result<(), Error> {
                 require_c_int(size.width, function, "width exceeds c_int range")?;
                 require_c_int(size.height, function, "height exceeds c_int range")?;
@@ -939,8 +939,8 @@ macro_rules! define_packed_image {
                 }
             }
 
-            /// デスティネーションバッファのバリデーション
             #[allow(dead_code)]
+            /// デスティネーションバッファのバリデーション
             pub(crate) fn validate(&self, size: ImageSize, function: &'static str) -> Result<(), Error> {
                 require_c_int(size.width, function, "width exceeds c_int range")?;
                 require_c_int(size.height, function, "height exceeds c_int range")?;
@@ -981,8 +981,8 @@ macro_rules! define_yuv_image16 {
         }
 
         impl $name<'_> {
-            /// ソースバッファのバリデーション
             #[allow(dead_code)]
+            /// ソースバッファのバリデーション
             pub(crate) fn validate(&self, size: ImageSize, function: &'static str) -> Result<(), Error> {
                 validate_yuv16_src_inner(
                     self.y, self.y_stride,
@@ -1023,8 +1023,8 @@ macro_rules! define_yuv_image16 {
                 }
             }
 
-            /// デスティネーションバッファのバリデーション
             #[allow(dead_code)]
+            /// デスティネーションバッファのバリデーション
             pub(crate) fn validate(&self, size: ImageSize, function: &'static str) -> Result<(), Error> {
                 validate_yuv16_dst_inner(
                     self.y, self.y_stride,
@@ -1054,8 +1054,8 @@ macro_rules! define_nv_image16 {
         }
 
         impl $name<'_> {
-            /// ソースバッファのバリデーション
             #[allow(dead_code)]
+            /// ソースバッファのバリデーション
             pub(crate) fn validate(&self, size: ImageSize, function: &'static str) -> Result<(), Error> {
                 validate_nv16_src_inner(
                     self.y, self.y_stride,
@@ -1089,8 +1089,8 @@ macro_rules! define_nv_image16 {
                 }
             }
 
-            /// デスティネーションバッファのバリデーション
             #[allow(dead_code)]
+            /// デスティネーションバッファのバリデーション
             pub(crate) fn validate(&self, size: ImageSize, function: &'static str) -> Result<(), Error> {
                 validate_nv16_dst_inner(
                     self.y, self.y_stride,
@@ -1115,8 +1115,8 @@ macro_rules! define_packed_image16 {
         }
 
         impl $name<'_> {
-            /// ソースバッファのバリデーション
             #[allow(dead_code)]
+            /// ソースバッファのバリデーション
             pub(crate) fn validate(&self, size: ImageSize, function: &'static str) -> Result<(), Error> {
                 require_c_int(size.width, function, "width exceeds c_int range")?;
                 require_c_int(size.height, function, "height exceeds c_int range")?;
@@ -1152,8 +1152,8 @@ macro_rules! define_packed_image16 {
                 }
             }
 
-            /// デスティネーションバッファのバリデーション
             #[allow(dead_code)]
+            /// デスティネーションバッファのバリデーション
             pub(crate) fn validate(&self, size: ImageSize, function: &'static str) -> Result<(), Error> {
                 require_c_int(size.width, function, "width exceeds c_int range")?;
                 require_c_int(size.height, function, "height exceeds c_int range")?;

@@ -50,6 +50,8 @@
   - @voluntas
 - [ADD] MJPEG fuzz ターゲットを追加する
   - @voluntas
+- [UPDATE] lint 抑制を #[allow(...)] から #[expect(...)] に置換する
+  - @voluntas
 - [UPDATE] CI / release ワークフローに NASM のインストールを追加する
   - @voluntas
 - [FIX] libyuv の util ツール (cpuid / yuvconvert / yuvconstants) をビルド対象から外す
