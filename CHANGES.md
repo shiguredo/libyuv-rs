@@ -54,6 +54,8 @@
   - @voluntas
 - [ADD] MJPEG fuzz ターゲットを追加する
   - @voluntas
+- [ADD] 欠落テストファイルを作成しバリデーション内部関数の単体テストを追加する
+  - @voluntas
 - [UPDATE] lint 抑制を #[allow(...)] から #[expect(...)] に置換する
   - @voluntas
 - [UPDATE] CI / release ワークフローに NASM のインストールを追加する
