@@ -36,6 +36,8 @@
   - `mjpeg_size` / `mjpeg_to_i420` / `mjpeg_to_nv12` / `mjpeg_to_nv21` / `mjpeg_to_argb`
   - スケーリング非対応 (`src_size == dst_size` を強制)
   - @voluntas
+- [ADD] Ubuntu 26.04 (x86_64 / arm64) をサポート対象に追加する
+  - @voluntas
 - [UPDATE] `libyuv` のハッシュを `d23308a2a7442be8e559b1b471862fd7588d6a57` に更新する
   - <https://chromium.googlesource.com/libyuv/libyuv/+/d23308a2a7442be8e559b1b471862fd7588d6a57>
   - @voluntas

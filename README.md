@@ -42,6 +42,8 @@ Google の [libyuv](https://chromium.googlesource.com/libyuv/libyuv/) を利用�
 
 ## 動作要件
 
+- Ubuntu 26.04 x86_64
+- Ubuntu 26.04 arm64
 - Ubuntu 24.04 x86_64
 - Ubuntu 24.04 arm64
 - Ubuntu 22.04 x86_64

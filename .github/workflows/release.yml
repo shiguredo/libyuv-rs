@@ -47,6 +47,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - target: ubuntu-26.04_x86_64
+            os: ubuntu-26.04
+            lib_name: libshiguredo_yuv.a
+            jpeg_lib_name: libshiguredo_jpeg.a
+          - target: ubuntu-26.04_arm64
+            os: ubuntu-26.04-arm
+            lib_name: libshiguredo_yuv.a
+            jpeg_lib_name: libshiguredo_jpeg.a
           - target: ubuntu-24.04_x86_64
             os: ubuntu-24.04
             lib_name: libshiguredo_yuv.a
