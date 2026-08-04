@@ -5,7 +5,7 @@
 - Completed: {YYYY-MM-DD}
 - Model: DeepSeek V4 Flash
 - Branch: feature/fix-half-float-plane-stride-unit
-- Polished: {YYYY-MM-DD}
+- Polished: 2026-08-04
 - Reporter: @voluntas
 
 ## 目的
@@ -16,8 +16,7 @@
 
 High。
 
-- エラーを返さずに出力がゴミになる（サイレントなデータ破壊）
-- `src_stride >= width` や `checked_buf_size` の検証はすべて通るため、エラーも出ない
+- エラーで検出できないままサイレントにデータが破壊されるため、呼び出し側で気づく手段がない
 
 ## 現状
 
@@ -33,21 +32,25 @@ libyuv の `planar_functions.h` の `HalfFloatPlane` には次の注記がある
 - `checked_buf_size(src_stride, size.height)` を要素数単位で検証
 - その値をそのまま `sys::HalfFloatPlane` に渡している
 
-そのため stride == width の典型的な入力では、C 側の行送りが width / 2 要素となり行が重なり合い、検証はすべて通過するのに出力がゴミになる。逆にバイト単位で渡すと呼び出し側の検証（要素数計算）に引っかかり呼び出せない。
+そのため stride == width の典型的な入力では、C 側の行送りが width / 2 要素となり行が重なり合い、検証はすべて通過するのに出力がゴミになる。逆にバイト単位の値（2 × width）を要素数として渡すと、典型的な contiguous バッファでは `checked_buf_size` の計算（2 × width × height 要素）に引っかかりエラーになる。
+
+再現例: width = 8、height = 4、stride = 8（要素数）、src / dst に 32 要素のバッファを渡すと、C 側の行送りが 4 要素になり、行 1 は要素 4 から、行 2 は要素 8 ではなく要素 8 行目の値が行 1 の後半に重なって出力される。エラーは返らず結果のみ壊れる。
 
 ## 設計方針
 
 Rust の公開 API は他関数と一貫して「stride は要素数」のまま維持し、`sys::HalfFloatPlane` に渡す直前に `* 2` してバイト単位に変換する（C 側が `>>= 1` するため、結果的に要素数 stride で行送りされる）。
 
 - 検証（要素数単位の `require_c_int` / `checked_buf_size` / `stride >= width`）は現状のままで正しくなる
-- `* 2` のオーバーフローは `checked_mul` で検証し、`require_c_int` の範囲を超える場合はエラーにする
+- 変換値の `require_c_int` チェックは既存の `require_c_int` 検証の直後（バッファサイズ検証より前）に置く。そうしないと 2 GiB 超のバッファ確保がテストに要求される
+- 変換した値が `c_int` の範囲を超える場合はエラーにする（`require_c_int` を通過した stride の 2 倍は `usize` のオーバーフローを起こさないため、オーバーフロー検査は不要）
 - docstring に「stride は u16 要素数」であることを明記する
 
 ## 完了条件
 
-- `half_float_plane` が stride == width の入力で正しい出力を返すこと（変換前後の値が単調・一致する等の検証可能なテスト）
-- stride / width / height の `checked_mul` オーバーフロー時および `c_int` 範囲超過時に `Err` を返すこと
-- `tests/test_planar.rs` に正常系・エラーパスのテストが追加されていること
+- `half_float_plane` が stride == width（height >= 2）の入力で正しい出力を返すこと。ただし stride == width では C 側の行合体（coalesce）により行ごとの stride 送りが検証されないため、stride > width（パディング付き）の入力でも行配置の検証（各行の入力値が出力の正しい行位置に配置されること）が行えること
+- stride の 2 倍変換が `c_int` の範囲を超える場合に `Err` を返すこと（`checked_buf_size` のオーバーフローは 64-bit では到達不能なためテスト対象外）
+- docstring に stride の単位（u16 要素数）が明記されていること
+- エラーパス・境界値のテストが `tests/test_planar.rs`（0053 で分割された場合は `tests/test_planar/` 配下）に、正常系のプロパティ検証が `pbt/tests/prop_planar.rs` に追加されていること
 - `cargo fmt --all --check` が成功すること
 - `cargo clippy --workspace --features source-build -- -D warnings` が成功すること
 - `cargo test --workspace --features source-build` が成功すること
@@ -55,8 +58,8 @@ Rust の公開 API は他関数と一貫して「stride は要素数」のまま
 
 ## 解決方法
 
-1. `half_float_plane` で `sys::HalfFloatPlane` に渡す前に `src_stride` / `dst_stride` を `checked_mul(2)` でバイト単位に変換する
-2. 変換値の `require_c_int` チェックを追加する
+1. `half_float_plane` で `sys::HalfFloatPlane` に渡す前に `src_stride` / `dst_stride` を 2 倍してバイト単位に変換する
+2. 変換値の `require_c_int` チェックを既存の `require_c_int` 検証の直後（バッファサイズ検証より前）に追加する
 3. docstring に stride の単位（u16 要素数）を明記する
-4. `tests/test_planar.rs` にテストを追加する
+4. エラーパス・境界値のテストを `tests/test_planar.rs`（0053 で分割された場合は `tests/test_planar/` 配下）に、正常系のプロパティ検証（libyuv の SIMD 実装と一致する RNE 丸めの純 Rust 参照実装との比較）を `pbt/tests/prop_planar.rs` に追加する
 5. `CHANGES.md` に `[FIX]` エントリを追加する
