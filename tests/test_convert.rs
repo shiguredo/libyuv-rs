@@ -1,6 +1,6 @@
 //! フォーマット変換 API の単体テスト
 //!
-//! エラーパス・境界値を検証する。正常系のプロパティ検証は PBT でカバーする。
+//! エラーパス・境界値と、既知解による正常系（Y 成分の抽出）を検証する。
 
 use std::ffi::c_int;
 
@@ -251,6 +251,8 @@ fn yuy2_to_y_dst_buffer_too_small() {
 // 異常系: yuy2_to_y がゼロサイズ入力で Err を返すこと
 #[test]
 fn yuy2_to_y_zero_size() {
+    // Rust 側の検証はゼロサイズを通過する。Err は libyuv 側の width <= 0 / height == 0
+    // ガードが -1 を返すことによる
     let src_data = vec![0u8; 16];
     let src = Yuy2Image {
         data: &src_data,
@@ -265,6 +267,36 @@ fn yuy2_to_y_zero_size() {
     let size = ImageSize::new(1, 0);
     let result = yuy2_to_y(&src, &mut dst_y, 8, size);
     assert!(result.is_err(), "height == 0 では Err が返るべき");
+}
+
+// 正常系: yuy2_to_y が奇数幅でも末尾ピクセルを正しく取り出すこと
+#[test]
+fn yuy2_to_y_odd_width() {
+    // libyuv の YUY2ToYRow は奇数幅の末尾ピクセルを別分岐で処理する
+    let width = 5;
+    let height = 2;
+    let src_stride = width * 2;
+    let src_data: Vec<u8> = (0..(src_stride * height)).map(|i| i as u8).collect();
+    let src = Yuy2Image {
+        data: &src_data,
+        stride: src_stride,
+    };
+    let mut dst_y = vec![0u8; width * height];
+    let size = ImageSize::new(width, height);
+
+    yuy2_to_y(&src, &mut dst_y, width, size).expect("奇数幅の変換が成功すること");
+
+    for r in 0..height {
+        for x in 0..width {
+            assert_eq!(
+                dst_y[r * width + x],
+                src_data[r * src_stride + x * 2],
+                "行 {} の要素 {} は YUY2 の Y 成分と一致すること",
+                r,
+                x
+            );
+        }
+    }
 }
 
 // 正常系: uyvy_to_y が UYVY の Y 成分を正しく取り出すこと
@@ -401,6 +433,8 @@ fn uyvy_to_y_dst_buffer_too_small() {
 // 異常系: uyvy_to_y がゼロサイズ入力で Err を返すこと
 #[test]
 fn uyvy_to_y_zero_size() {
+    // Rust 側の検証はゼロサイズを通過する。Err は libyuv 側の width <= 0 / height == 0
+    // ガードが -1 を返すことによる
     let src_data = vec![0u8; 16];
     let src = UyvyImage {
         data: &src_data,
@@ -415,4 +449,34 @@ fn uyvy_to_y_zero_size() {
     let size = ImageSize::new(1, 0);
     let result = uyvy_to_y(&src, &mut dst_y, 8, size);
     assert!(result.is_err(), "height == 0 では Err が返るべき");
+}
+
+// 正常系: uyvy_to_y が奇数幅でも末尾ピクセルを正しく取り出すこと
+#[test]
+fn uyvy_to_y_odd_width() {
+    // libyuv の UYVYToYRow は奇数幅の末尾ピクセルを別分岐で処理する
+    let width = 5;
+    let height = 2;
+    let src_stride = width * 2;
+    let src_data: Vec<u8> = (0..(src_stride * height)).map(|i| i as u8).collect();
+    let src = UyvyImage {
+        data: &src_data,
+        stride: src_stride,
+    };
+    let mut dst_y = vec![0u8; width * height];
+    let size = ImageSize::new(width, height);
+
+    uyvy_to_y(&src, &mut dst_y, width, size).expect("奇数幅の変換が成功すること");
+
+    for r in 0..height {
+        for x in 0..width {
+            assert_eq!(
+                dst_y[r * width + x],
+                src_data[r * src_stride + x * 2 + 1],
+                "行 {} の要素 {} は UYVY の Y 成分と一致すること",
+                r,
+                x
+            );
+        }
+    }
 }

@@ -253,6 +253,9 @@ pub fn yuy2_to_nv12(
 }
 
 /// YUY2 から Y プレーンへの変換
+///
+/// `dst_stride_y` は `size.width` 以上である必要がある（libyuv は 1 行あたり
+/// `width` バイトを書き込むため）。
 pub fn yuy2_to_y(
     src: &Yuy2Image<'_>,
     dst_y: &mut [u8],
@@ -277,7 +280,7 @@ pub fn yuy2_to_y(
         ));
     }
 
-    // バッファサイズ計算（オーバーフロー安全）
+    // バッファサイズ検証（オーバーフロー安全）
     let dst_size = checked_buf_size(
         dst_stride_y,
         size.height,
@@ -292,7 +295,7 @@ pub fn yuy2_to_y(
         ));
     }
 
-    // SAFETY: .validate() が全前提条件を検査済み。
+    // SAFETY: src は .validate()、dst は上記のインライン検証で全前提条件を検査済み。
     let result = unsafe {
         sys::YUY2ToY(
             src.data.as_ptr(),
@@ -502,6 +505,9 @@ pub fn uyvy_to_nv12(
 }
 
 /// UYVY から Y プレーンへの変換
+///
+/// `dst_stride_y` は `size.width` 以上である必要がある（libyuv は 1 行あたり
+/// `width` バイトを書き込むため）。
 pub fn uyvy_to_y(
     src: &UyvyImage<'_>,
     dst_y: &mut [u8],
@@ -526,7 +532,7 @@ pub fn uyvy_to_y(
         ));
     }
 
-    // バッファサイズ計算（オーバーフロー安全）
+    // バッファサイズ検証（オーバーフロー安全）
     let dst_size = checked_buf_size(
         dst_stride_y,
         size.height,
@@ -541,7 +547,7 @@ pub fn uyvy_to_y(
         ));
     }
 
-    // SAFETY: .validate() が全前提条件を検査済み。
+    // SAFETY: src は .validate()、dst は上記のインライン検証で全前提条件を検査済み。
     let result = unsafe {
         sys::UYVYToY(
             src.data.as_ptr(),
