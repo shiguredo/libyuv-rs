@@ -2,7 +2,7 @@
 
 - Priority: High
 - Created: 2026-08-04
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-08-06
 - Model: DeepSeek V4 Flash
 - Branch: feature/fix-half-float-plane-stride-unit
 - Polished: 2026-08-04
@@ -59,8 +59,15 @@ Rust の公開 API は他関数と一貫して「stride は要素数」のまま
 
 ## 解決方法
 
-1. `half_float_plane` で `sys::HalfFloatPlane` に渡す前に `src_stride` / `dst_stride` を 2 倍してバイト単位に変換する
-2. 変換値の `require_c_int` チェックを既存の `require_c_int` 検証の直後（バッファサイズ検証より前）に追加する
-3. docstring に stride の単位（u16 要素数）を明記する
-4. 正常系のテスト（stride == width / stride > width の既知解による行配置検証）とエラーパス・境界値のテスト（stride × 2 の `c_int` 範囲超過）を `tests/test_planar.rs`（0053 で分割された場合は `tests/test_planar/` 配下）に追加する
-5. `CHANGES.md` に `[FIX]` エントリを追加する
+実装済み（2026-08-06）。以下のとおり対応した。
+
+- `src/planar.rs` の `half_float_plane` で `sys::HalfFloatPlane` に渡す前に `src_stride` / `dst_stride` を 2 倍してバイト単位に変換する
+- 変換後の値の `require_c_int` チェックを既存の `require_c_int` 検証の直後（バッファサイズ検証より前）に追加する。これにより、要素数単位では c_int の範囲内でもバイト単位変換後に範囲を超える stride を検出できる
+- docstring に stride の単位（u16 要素数）を明記し、libyuv 側がバイト単位で受け取る仕様である根拠（`planar_functions.h` の注記）を併記する
+- `tests/test_planar.rs` にテストを追加する:
+  - stride == width の既知解テスト（2 の冪と 0 は truncation / RNE のいずれのバックエンドでも厳密に一致する）
+  - stride > width のパディング行配置テスト（src 側の読み過ぎ / dst 側の書き過ぎを検出）
+  - stride × 2 が c_int 範囲超過のエラーテスト（src / dst それぞれの reason を検証）
+  - stride < width のエラーテスト（src / dst）
+  - バッファ不足のエラーテスト
+- `CHANGES.md` の `## develop` セクションに `[FIX]` エントリを追加する
