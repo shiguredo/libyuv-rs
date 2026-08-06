@@ -2,7 +2,7 @@
 
 - Priority: High
 - Created: 2026-08-04
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-08-06
 - Model: DeepSeek V4 Flash
 - Branch: feature/fix-half-float-plane-stride-unit
 - Polished: 2026-08-04
@@ -48,9 +48,10 @@ Rust の公開 API は他関数と一貫して「stride は要素数」のまま
 ## 完了条件
 
 - `half_float_plane` が stride == width（height >= 2）の入力で正しい出力を返すこと。ただし stride == width では C 側の行合体（coalesce）により行ごとの stride 送りが検証されないため、stride > width（パディング付き）の入力でも行配置の検証（各行の入力値が出力の正しい行位置に配置されること）が行えること
+- 正常系の検証は参照実装を使わない既知解で行うこと。scale = 1.0 では 2 の冪の入力が変換後も厳密に一致する（2 の冪は仮数が 0 のため、truncation（C / NEON / AVX2）でも RNE 丸め（F16C / SVE2）でも丸めが発生しない）ため、出力を直接期待値として検証できること
 - stride の 2 倍変換が `c_int` の範囲を超える場合に `Err` を返すこと（`checked_buf_size` のオーバーフローは 64-bit では到達不能なためテスト対象外）
 - docstring に stride の単位（u16 要素数）が明記されていること
-- エラーパス・境界値のテストが `tests/test_planar.rs`（0053 で分割された場合は `tests/test_planar/` 配下）に、正常系のプロパティ検証が `pbt/tests/prop_planar.rs` に追加されていること
+- 上記のテストが `tests/test_planar.rs`（0053 で分割された場合は `tests/test_planar/` 配下）に追加されていること
 - `cargo fmt --all --check` が成功すること
 - `cargo clippy --workspace --features source-build -- -D warnings` が成功すること
 - `cargo test --workspace --features source-build` が成功すること
@@ -58,8 +59,15 @@ Rust の公開 API は他関数と一貫して「stride は要素数」のまま
 
 ## 解決方法
 
-1. `half_float_plane` で `sys::HalfFloatPlane` に渡す前に `src_stride` / `dst_stride` を 2 倍してバイト単位に変換する
-2. 変換値の `require_c_int` チェックを既存の `require_c_int` 検証の直後（バッファサイズ検証より前）に追加する
-3. docstring に stride の単位（u16 要素数）を明記する
-4. エラーパス・境界値のテストを `tests/test_planar.rs`（0053 で分割された場合は `tests/test_planar/` 配下）に、正常系のプロパティ検証（libyuv の SIMD 実装と一致する RNE 丸めの純 Rust 参照実装との比較）を `pbt/tests/prop_planar.rs` に追加する
-5. `CHANGES.md` に `[FIX]` エントリを追加する
+実装済み（2026-08-06）。以下のとおり対応した。
+
+- `src/planar.rs` の `half_float_plane` で `sys::HalfFloatPlane` に渡す前に `src_stride` / `dst_stride` を 2 倍してバイト単位に変換する
+- 変換後の値の `require_c_int` チェックを既存の `require_c_int` 検証の直後（バッファサイズ検証より前）に追加する。これにより、要素数単位では c_int の範囲内でもバイト単位変換後に範囲を超える stride を検出できる
+- docstring に stride の単位（u16 要素数）を明記し、libyuv 側がバイト単位で受け取る仕様である根拠（`planar_functions.h` の注記）を併記する
+- `tests/test_planar.rs` にテストを追加する:
+  - stride == width の既知解テスト（2 の冪と 0 は truncation / RNE のいずれのバックエンドでも厳密に一致する）
+  - stride > width のパディング行配置テスト（src 側の読み過ぎ / dst 側の書き過ぎを検出）
+  - stride × 2 が c_int 範囲超過のエラーテスト（src / dst それぞれの reason を検証）
+  - stride < width のエラーテスト（src / dst）
+  - バッファ不足のエラーテスト
+- `CHANGES.md` の `## develop` セクションに `[FIX]` エントリを追加する

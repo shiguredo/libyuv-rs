@@ -4117,6 +4117,12 @@ pub fn convert_to_msb_plane_16(
 // ============================================================
 
 /// 16bit プレーンをハーフフロートに変換する
+///
+/// `src_stride` / `dst_stride` は u16 要素数で指定する。libyuv の `HalfFloatPlane` は
+/// stride をバイト単位で受け取る仕様のため（`planar_functions.h` の注記 "the src_stride_y and
+/// dst_stride_y parameters of HalfFloatPlane() are in bytes, not in units of uint16_t."）、
+/// 内部で 2 倍してから渡す。libyuv 側は冒頭で `src_stride_y >>= 1; dst_stride_y >>= 1;` するため、
+/// 結果的に要素数単位の stride で行送りされる。
 pub fn half_float_plane(
     src: &[u16],
     src_stride: usize,
@@ -4137,6 +4143,20 @@ pub fn half_float_plane(
         dst_stride,
         "HalfFloatPlane",
         "destination stride exceeds c_int range",
+    )?;
+
+    // require_c_int を通過済みの値の 2 倍は usize ではオーバーフローしないため、チェック付き乗算は不要。
+    let src_stride_bytes = src_stride * 2;
+    let dst_stride_bytes = dst_stride * 2;
+    require_c_int(
+        src_stride_bytes,
+        "HalfFloatPlane",
+        "source stride (bytes) exceeds c_int range",
+    )?;
+    require_c_int(
+        dst_stride_bytes,
+        "HalfFloatPlane",
+        "destination stride (bytes) exceeds c_int range",
     )?;
 
     // stride >= width チェック（要素単位）
@@ -4188,9 +4208,9 @@ pub fn half_float_plane(
     let result = unsafe {
         sys::HalfFloatPlane(
             src.as_ptr(),
-            src_stride as c_int,
+            src_stride_bytes as c_int,
             dst.as_mut_ptr(),
-            dst_stride as c_int,
+            dst_stride_bytes as c_int,
             scale,
             size.width as c_int,
             size.height as c_int,
