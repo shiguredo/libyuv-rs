@@ -36,6 +36,7 @@ Low。
 
 - src / dst のペアが 1 関数に統合されていること
 - `define_y_image!` の validate がヘルパー委譲になっていること
+- `packed.rs` の `yuy2_to_y` / `uyvy_to_y` のインライン検証ブロック（`require_c_int` / `stride >= width` / `checked_buf_size` の手書き実装）も統合対象に含まれていること（これらの関数は本 issue のスコープ決定後に追加されたため、追記でスコープを拡大する）
 - エラーメッセージが変更前と同一であること
 - `cargo test --workspace --features source-build` が成功すること
 - `cargo fmt --all --check` と `cargo clippy --workspace --features source-build -- -D warnings` が成功すること
