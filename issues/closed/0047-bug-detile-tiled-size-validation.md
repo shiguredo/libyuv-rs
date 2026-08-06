@@ -2,7 +2,7 @@
 
 - Priority: High
 - Created: 2026-08-04
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-08-06
 - Model: DeepSeek V4 Flash
 - Branch: feature/fix-detile-tiled-size-validation
 - Polished: 2026-08-04
@@ -59,8 +59,8 @@ libyuv の `DetilePlane`（`planar_functions.cc`、commit `d23308a2a7442be8e559b
 
 ## 解決方法
 
-1. `detile_plane` / `detile_plane_16` に round16 stride チェックを追加し、ソースサイズ検証をタイル配置（`div_ceil`）ベースに変更する
-2. `detile_to_yuy2` に `tile_height` の 2 累乗検証（2 以上に限定。`tile_height == 1` は不許可）と `require_c_int` を追加し、Y / UV それぞれのソースサイズ検証をタイル配置ベース（UV は `tile_height / 2`）に変更する
-3. 検証式の根拠コメントを追加する
-4. `tests/test_convert.rs` にテストを追加する
-5. `CHANGES.md` に `[FIX]` エントリを追加する
+1. `detile_plane` / `detile_plane_16` に round_up(width, 16) の stride 下限チェックを追加し、ソースサイズ検証をタイル配置（`src_stride * ceil(height / tile_height) * tile_height`）に変更した。dst はリニア出力のため線形検証のまま
+2. `detile_to_yuy2` に `tile_height` の検証（2 以上かつ 2 累乗。`tile_height == 1` は UV タイル高 0 のため不許可）と `require_c_int` を追加し、Y / UV それぞれのソースサイズ検証をタイル配置ベース（UV はタイル高 `tile_height / 2`）に変更した。検証は `src.validate`（線形）の後にインラインで行う
+3. 検証式の根拠（libyuv の `DetilePlane` / `DetilePlane_16` / `DetileToYUY2` の行送り規則）を docstring に明記した。ゼロサイズ入力（width == 0 / height == 0）は no-op で Ok を返す（detile 系の既存セマンティクスを維持）
+4. `tests/test_convert.rs` に境界値テスト（幅 16 倍数・非倍数 × タイル高倍数・非倍数、パディング付きストライド、stride 下限、不正 tile_height、ゼロサイズ no-op）を追加した
+5. `CHANGES.md` の `## develop` セクションに `[FIX]` エントリを追加した
