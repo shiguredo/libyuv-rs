@@ -191,14 +191,14 @@ fn yuy2_to_y_padded_stride_row_placement() {
 // 正常系: yuy2_to_y が奇数幅でも末尾ピクセルを正しく取り出すこと
 #[test]
 fn yuy2_to_y_odd_width() {
-    // dst_stride_y を width と異なる値にして C 側の行合体（coalesce）を無効化し、
-    // 奇数幅の末尾ピクセル処理（width & 1 の分岐）を実行させる。
-    // src 側もパディングを持たせ、SIMD の余り処理による読み越しをバッファ内に収める
+    // src_stride と dst_stride_y の両方を行合体（coalesce）の条件から外し、
+    // 奇数幅の末尾ピクセル処理（SIMD では余り処理経路、C フォールバックでは width & 1 の
+    // 分岐）を実行させる。src 側もパディングを持たせ、余り処理の読み越しをバッファ内に収める
     let width = 5;
     let height = 2;
     let src_stride = 16; // width * 2 = 10 より大きいパディング
     let dst_stride_y = 6; // width = 5 より大きいパディング
-    let mut src_data = vec![0xEEu8; src_stride * height]; // 読み越し検出用の別値
+    let mut src_data = vec![0u8; src_stride * height];
     for r in 0..height {
         for i in 0..(width * 2) {
             src_data[r * src_stride + i] = (r * src_stride + i) as u8;
@@ -389,14 +389,14 @@ fn uyvy_to_y_padded_stride_row_placement() {
 // 正常系: uyvy_to_y が奇数幅でも末尾ピクセルを正しく取り出すこと
 #[test]
 fn uyvy_to_y_odd_width() {
-    // dst_stride_y を width と異なる値にして C 側の行合体（coalesce）を無効化し、
-    // 奇数幅の末尾ピクセル処理（width & 1 の分岐）を実行させる。
-    // src 側もパディングを持たせ、SIMD の余り処理による読み越しをバッファ内に収める
+    // src_stride と dst_stride_y の両方を行合体（coalesce）の条件から外し、
+    // 奇数幅の末尾ピクセル処理（SIMD では余り処理経路、C フォールバックでは width & 1 の
+    // 分岐）を実行させる。src 側もパディングを持たせ、余り処理の読み越しをバッファ内に収める
     let width = 5;
     let height = 2;
     let src_stride = 16; // width * 2 = 10 より大きいパディング
     let dst_stride_y = 6; // width = 5 より大きいパディング
-    let mut src_data = vec![0xEEu8; src_stride * height]; // 読み越し検出用の別値
+    let mut src_data = vec![0u8; src_stride * height];
     for r in 0..height {
         for i in 0..(width * 2) {
             src_data[r * src_stride + i] = (r * src_stride + i) as u8;
