@@ -255,8 +255,9 @@ fn validate_tiled_nv_src_inner(
         ));
     }
 
-    // stride 下限チェック（線形検証と同じ。タイル行間隔が stride * tile_height のため、
-    // stride が小さすぎるとタイル行の読み出しが次の行と重なる）
+    // stride 下限チェック（線形検証と同じ最小 stride の sanity チェック。
+    // タイル行間の読み出し重なりは必要サイズ検証が担保するため、ここでは
+    // 8bit 換算の最小幅のみを要求する）
     if y_stride < size.width {
         return Err(Error::with_reason(
             -1,
