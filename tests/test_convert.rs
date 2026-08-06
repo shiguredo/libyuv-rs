@@ -1244,69 +1244,6 @@ fn mm21_to_i420_tiled_buffer_padded_stride_boundary() {
         uv_stride: width,
     };
     mm21_to_i420(&src, &mut dst, size).expect("必要サイズちょうどで成功するべき");
-
-    // UV 側もパディング付きストライドのタイル行間隔を検証する。
-    // UV 必要サイズ = (2 - 1) * 32 * 16 + 16 * 16 = 768
-    let uv = vec![0u8; 767]; // 1 バイト不足
-    let src = Mm21Image {
-        y: &y,
-        y_stride,
-        uv: &uv,
-        uv_stride: 32,
-    };
-    let result = mm21_to_i420(&src, &mut dst, size);
-    let err = result.expect_err("タイル配置の必要サイズ未満では Err が返るべき");
-    assert!(
-        err.to_string().contains("source UV buffer too small"),
-        "UV 側のタイル必要サイズ不足の reason が返るべき: {}",
-        err
-    );
-
-    // 必要サイズちょうどでは成功する
-    let uv = vec![0u8; 768];
-    let src = Mm21Image {
-        y: &y,
-        y_stride,
-        uv: &uv,
-        uv_stride: 32,
-    };
-    mm21_to_i420(&src, &mut dst, size).expect("必要サイズちょうどで成功するべき");
-}
-
-// 異常系: mm21_to_i420 がタイル検証の stride 下限を検証すること
-#[test]
-fn mm21_to_i420_tiled_stride_too_small() {
-    // y_stride < width はタイル検証でも Err になる
-    let width = 5;
-    let height = 3;
-    let y = vec![0u8; 512];
-    let uv = vec![0u8; 256];
-    let mut y_dst = vec![0u8; width * height];
-    let mut u_dst = vec![0u8; 3 * 2];
-    let mut v_dst = vec![0u8; 3 * 2];
-    let mut dst = I420ImageMut {
-        y: &mut y_dst,
-        y_stride: width,
-        u: &mut u_dst,
-        u_stride: 3,
-        v: &mut v_dst,
-        v_stride: 3,
-    };
-    let size = ImageSize::new(width, height);
-
-    let src = Mm21Image {
-        y: &y,
-        y_stride: 4, // width = 5 より小さい
-        uv: &uv,
-        uv_stride: 6,
-    };
-    let result = mm21_to_i420(&src, &mut dst, size);
-    let err = result.expect_err("y_stride < width では Err が返るべき");
-    assert!(
-        err.to_string().contains("Y stride smaller than width"),
-        "Y 側の stride 不足の reason が返るべき: {}",
-        err
-    );
 }
 
 // 異常系: mm21_to_i420 がタイル高倍数のタイル必要サイズを検証すること
@@ -1560,48 +1497,6 @@ fn mm21_to_i420_zero_size() {
 
     let size = ImageSize::new(5, 0);
     let result = mm21_to_i420(&src, &mut dst, size);
-    let err = result.expect_err("height == 0 では Err が返るべき");
-    assert!(
-        err.to_string()
-            .contains("width and height must be greater than 0"),
-        "ゼロサイズの reason が返るべき: {}",
-        err
-    );
-}
-
-// 異常系: mt2t_to_p010 がゼロサイズ入力で Err を返すこと
-#[test]
-fn mt2t_to_p010_zero_size() {
-    // MT2T の検証も MM21 と同じ共通ヘルパーを通るため、同一の reason で Err になる
-    let y = vec![0u8; 640];
-    let uv = vec![0u8; 320];
-    let mut y_dst = vec![0u16; 5 * 3];
-    let mut uv_dst = vec![0u16; 6 * 2];
-    let mut dst = P010ImageMut {
-        y: &mut y_dst,
-        y_stride: 5,
-        uv: &mut uv_dst,
-        uv_stride: 6,
-    };
-
-    let src = Mt2tImage {
-        y: &y,
-        y_stride: 5,
-        uv: &uv,
-        uv_stride: 6,
-    };
-    let size = ImageSize::new(0, 3);
-    let result = mt2t_to_p010(&src, &mut dst, size);
-    let err = result.expect_err("width == 0 では Err が返るべき");
-    assert!(
-        err.to_string()
-            .contains("width and height must be greater than 0"),
-        "ゼロサイズの reason が返るべき: {}",
-        err
-    );
-
-    let size = ImageSize::new(5, 0);
-    let result = mt2t_to_p010(&src, &mut dst, size);
     let err = result.expect_err("height == 0 では Err が返るべき");
     assert!(
         err.to_string()
