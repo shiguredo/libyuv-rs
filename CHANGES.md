@@ -50,7 +50,6 @@
 - [FIX] detile_plane と detile_plane_16 の入力検証をプロジェクト標準パターンに統一する
   - @voluntas
 - [FIX] half_float_plane の stride 単位が libyuv 仕様（バイト）と不一致で出力が壊れる問題を修正する
-  - 要素数単位の stride を内部で 2 倍してバイト単位に変換して渡す
   - 変換後の stride が c_int の範囲を超える場合は Err を返す
   - @voluntas
 

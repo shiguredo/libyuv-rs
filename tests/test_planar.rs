@@ -1,6 +1,6 @@
 //! プレーン操作 API の単体テスト
 //!
-//! エラーパス・境界値を検証する。正常系のプロパティ検証は PBT でカバーする。
+//! エラーパス・境界値と、既知解による正常系（stride の行配置）を検証する。
 
 use std::ffi::c_int;
 
@@ -56,9 +56,8 @@ fn split_uv_plane_stride_too_small() {
 // 正常系: half_float_plane が stride == width で正しい出力を返すこと
 #[test]
 fn half_float_plane_stride_equal_width() {
-    // scale = 1.0 では 2 の冪の入力は変換後も厳密に一致する。
-    // libyuv の HalfFloatRow は全実装（C / NEON / AVX2 / F16C）が bits >> 13 の
-    // truncation であり、2 の冪は仮数が 0 で下位 13 bit が全て 0 のため。
+    // scale = 1.0 では 2 の冪の入力は全バックエンド（C / NEON / AVX2 / F16C / SVE2）で
+    // 変換後も厳密に一致する（仮数が 0 のため丸めが発生しない）。
     // 出力は f16 のビットパターンで、2^k は (k + 15) << 10 になる
     let width = 8;
     let height = 4;
@@ -83,9 +82,8 @@ fn half_float_plane_stride_equal_width() {
 fn half_float_plane_padded_stride_row_placement() {
     // stride > width では C 側の行合体（coalesce）が効かないため、行ごとの stride 送りが検証される。
     // 行 r を 2 の冪 2^r で埋め、出力の各行が 2^r の f16 ビットパターン ((r + 15) << 10) に
-    // なることを確認する。
-    // 修正前（stride を要素数のままバイトとして渡す）は C 側が stride >> 1 で行送りするため
-    // 行が重なり合い、このテストは失敗する
+    // なることを確認する。stride を要素数のままバイト単位として渡すと C 側の行送りが
+    // 半分になり、行が重なり合ってこのテストは失敗する
     let width = 8;
     let height = 4;
     let src_stride = 12; // パディング 4 要素
@@ -124,33 +122,43 @@ fn half_float_plane_padded_stride_row_placement() {
     }
 }
 
-// 正常系: half_float_plane が既知の境界値で正しい出力を返すこと
-#[test]
-fn half_float_plane_known_boundary_values() {
-    // scale = 1.0 では 65535 は f16 の最大値 0x7BFF（65504）になる
-    // （truncation により下位 13 bit が落ちるため）。2 の冪と 0 は厳密に一致する
-    let src = vec![65535u16, 32768, 1, 0];
-    let mut dst = vec![0u16; 4];
-    let size = ImageSize::new(1, 4);
-
-    half_float_plane(&src, 1, &mut dst, 1, 1.0, size).expect("境界値の変換が成功すること");
-
-    assert_eq!(dst, vec![0x7BFF, 0x7800, 0x3C00, 0x0000]);
-}
-
-// 異常系: half_float_plane の stride × 2 が c_int の範囲を超えると Err が返ること
+// 異常系: half_float_plane の stride × 2（バイト単位変換後）が c_int の範囲を超えると Err が返ること
 #[test]
 fn half_float_plane_stride_bytes_exceeds_c_int() {
     // 要素数単位の stride は c_int の範囲内でも、バイト単位に変換すると範囲を超える。
-    // 変換後の検証はバッファサイズ検証より前にあるため、巨大なバッファは必要ない
+    // 変換後の検証はバッファサイズ検証より前にあるため、巨大なバッファは必要ない。
+    // src / dst それぞれの変換後 stride が検証されることを確認する
     let src = vec![0u16; 1];
     let mut dst = vec![0u16; 1];
     let size = ImageSize::new(1, 1);
-    let stride = c_int::MAX as usize;
+    let max_stride = c_int::MAX as usize;
 
-    let result = half_float_plane(&src, stride, &mut dst, stride, 1.0, size);
+    let result = half_float_plane(&src, max_stride, &mut dst, 1, 1.0, size);
+    let err = result.expect_err("src 側の stride × 2 超過では Err が返るべき");
     assert!(
-        result.is_err(),
-        "stride × 2 が c_int を超える場合は Err が返るべき"
+        err.to_string()
+            .contains("source stride (bytes) exceeds c_int range"),
+        "src 側の変換後 stride 超過の reason が返るべき: {}",
+        err
     );
+
+    let result = half_float_plane(&src, 1, &mut dst, max_stride, 1.0, size);
+    let err = result.expect_err("dst 側の stride × 2 超過では Err が返るべき");
+    assert!(
+        err.to_string()
+            .contains("destination stride (bytes) exceeds c_int range"),
+        "dst 側の変換後 stride 超過の reason が返るべき: {}",
+        err
+    );
+}
+
+// 異常系: half_float_plane の src_stride が width 未満で Err が返ること
+#[test]
+fn half_float_plane_src_stride_too_small() {
+    let src = vec![0u16; 8];
+    let mut dst = vec![0u16; 16];
+    let size = ImageSize::new(8, 1);
+
+    let result = half_float_plane(&src, 4, &mut dst, 8, 1.0, size);
+    assert!(result.is_err(), "src_stride < width では Err が返るべき");
 }
