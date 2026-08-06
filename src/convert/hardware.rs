@@ -20,10 +20,9 @@ use crate::{
 /// `pixel_stride_uv == 2` のとき、`u` / `v` は同一バッファの連続領域（インターリーブ）で
 /// なければならない（libyuv が `src_v - src_u` のポインタ減算を行うため。別スライスは
 /// C 標準上は未定義動作になる。一般的な実装では整数減算に落ちるため実害はない）。
-/// `u` / `v` のストライドは `2 * ceil(width / 2)` 以上、バッファ長は
-/// `stride * ceil(height / 2)` 以上である必要がある。検証はバッファ長に
-/// `len() >= stride * ceil(height / 2)` を要求するため、`v` 側のバッファ長が
-/// 要求を満たすよう末尾にパディングを確保すること。
+/// `u` / `v` のストライドは `2 * ceil(width / 2)` 以上である必要がある。検証はバッファ長に
+/// `len() >= stride * ceil(height / 2)` を要求するため、共有バッファの末尾に 1 バイトの
+/// パディングを確保すること（NV12 では v 側、NV21 では u 側のバッファ長が要求を満たす）。
 pub fn android420_to_argb(
     src: &Android420Image<'_>,
     pixel_stride_uv: usize,
@@ -36,7 +35,8 @@ pub fn android420_to_argb(
     // pixel_stride_uv == 2 では libyuv は U/V をインターリーブデータとして 1 行
     // 2 * halfwidth バイト読み進める（高速パス NV12/NV21ToARGBMatrix とフォールバックの
     // WeavePixels の読み出し規則。convert_argb.cc の Android420ToARGBMatrix）。
-    // そのためストライドとバッファサイズをインターリーブ前提で検証する
+    // そのためストライドをインターリーブ前提で検証する。バッファ長は src.validate が
+    // u_stride * ceil(height / 2) を同一式で検査済みのため、ここでは検証しない
     match pixel_stride_uv {
         1 => {}
         2 => {
@@ -55,33 +55,6 @@ pub fn android420_to_argb(
                     -1,
                     "Android420ToARGB",
                     "V stride smaller than interleaved chroma width",
-                ));
-            }
-            let uv_height = size.height.div_ceil(2);
-            let u_size = checked_buf_size(
-                src.u_stride,
-                uv_height,
-                "Android420ToARGB",
-                "U buffer size overflow",
-            )?;
-            if src.u.len() < u_size {
-                return Err(Error::with_reason(
-                    -1,
-                    "Android420ToARGB",
-                    "source U buffer too small",
-                ));
-            }
-            let v_size = checked_buf_size(
-                src.v_stride,
-                uv_height,
-                "Android420ToARGB",
-                "V buffer size overflow",
-            )?;
-            if src.v.len() < v_size {
-                return Err(Error::with_reason(
-                    -1,
-                    "Android420ToARGB",
-                    "source V buffer too small",
                 ));
             }
         }
@@ -122,10 +95,9 @@ pub fn android420_to_argb(
 /// `pixel_stride_uv == 2` のとき、`u` / `v` は同一バッファの連続領域（インターリーブ）で
 /// なければならない（libyuv が `src_v - src_u` のポインタ減算を行うため。別スライスは
 /// C 標準上は未定義動作になる。一般的な実装では整数減算に落ちるため実害はない）。
-/// `u` / `v` のストライドは `2 * ceil(width / 2)` 以上、バッファ長は
-/// `stride * ceil(height / 2)` 以上である必要がある。検証はバッファ長に
-/// `len() >= stride * ceil(height / 2)` を要求するため、`v` 側のバッファ長が
-/// 要求を満たすよう末尾にパディングを確保すること。
+/// `u` / `v` のストライドは `2 * ceil(width / 2)` 以上である必要がある。検証はバッファ長に
+/// `len() >= stride * ceil(height / 2)` を要求するため、共有バッファの末尾に 1 バイトの
+/// パディングを確保すること（NV12 では v 側、NV21 では u 側のバッファ長が要求を満たす）。
 pub fn android420_to_abgr(
     src: &Android420Image<'_>,
     pixel_stride_uv: usize,
@@ -138,7 +110,8 @@ pub fn android420_to_abgr(
     // pixel_stride_uv == 2 では libyuv は U/V をインターリーブデータとして 1 行
     // 2 * halfwidth バイト読み進める（高速パス NV12/NV21ToARGBMatrix とフォールバックの
     // WeavePixels の読み出し規則。convert_argb.cc の Android420ToARGBMatrix）。
-    // そのためストライドとバッファサイズをインターリーブ前提で検証する
+    // そのためストライドをインターリーブ前提で検証する。バッファ長は src.validate が
+    // u_stride * ceil(height / 2) を同一式で検査済みのため、ここでは検証しない
     match pixel_stride_uv {
         1 => {}
         2 => {
@@ -157,33 +130,6 @@ pub fn android420_to_abgr(
                     -1,
                     "Android420ToABGR",
                     "V stride smaller than interleaved chroma width",
-                ));
-            }
-            let uv_height = size.height.div_ceil(2);
-            let u_size = checked_buf_size(
-                src.u_stride,
-                uv_height,
-                "Android420ToABGR",
-                "U buffer size overflow",
-            )?;
-            if src.u.len() < u_size {
-                return Err(Error::with_reason(
-                    -1,
-                    "Android420ToABGR",
-                    "source U buffer too small",
-                ));
-            }
-            let v_size = checked_buf_size(
-                src.v_stride,
-                uv_height,
-                "Android420ToABGR",
-                "V buffer size overflow",
-            )?;
-            if src.v.len() < v_size {
-                return Err(Error::with_reason(
-                    -1,
-                    "Android420ToABGR",
-                    "source V buffer too small",
                 ));
             }
         }
@@ -224,10 +170,9 @@ pub fn android420_to_abgr(
 /// `pixel_stride_uv == 2` のとき、`u` / `v` は同一バッファの連続領域（インターリーブ）で
 /// なければならない（libyuv が `src_v - src_u` のポインタ減算を行うため。別スライスは
 /// C 標準上は未定義動作になる。一般的な実装では整数減算に落ちるため実害はない）。
-/// `u` / `v` のストライドは `2 * ceil(width / 2)` 以上、バッファ長は
-/// `stride * ceil(height / 2)` 以上である必要がある。検証はバッファ長に
-/// `len() >= stride * ceil(height / 2)` を要求するため、`v` 側のバッファ長が
-/// 要求を満たすよう末尾にパディングを確保すること。
+/// `u` / `v` のストライドは `2 * ceil(width / 2)` 以上である必要がある。検証はバッファ長に
+/// `len() >= stride * ceil(height / 2)` を要求するため、共有バッファの末尾に 1 バイトの
+/// パディングを確保すること（NV12 では v 側、NV21 では u 側のバッファ長が要求を満たす）。
 pub fn android420_to_i420(
     src: &Android420Image<'_>,
     pixel_stride_uv: usize,
@@ -240,8 +185,9 @@ pub fn android420_to_i420(
     // pixel_stride_uv == 2 では libyuv は U/V をインターリーブデータとして 1 行
     // 2 * halfwidth バイト読み進める（Android420ToI420 は rotate.cc の
     // Android420ToI420Rotate を kRotate0 で呼ぶ。高速パス SplitRotateUV と
-    // フォールバックの SplitPixels の読み出し規則）。そのためストライドと
-    // バッファサイズをインターリーブ前提で検証する
+    // フォールバックの SplitPixels の読み出し規則）。そのためストライドを
+    // インターリーブ前提で検証する。バッファ長は src.validate が
+    // u_stride * ceil(height / 2) を同一式で検査済みのため、ここでは検証しない
     match pixel_stride_uv {
         1 => {}
         2 => {
@@ -260,33 +206,6 @@ pub fn android420_to_i420(
                     -1,
                     "Android420ToI420",
                     "V stride smaller than interleaved chroma width",
-                ));
-            }
-            let uv_height = size.height.div_ceil(2);
-            let u_size = checked_buf_size(
-                src.u_stride,
-                uv_height,
-                "Android420ToI420",
-                "U buffer size overflow",
-            )?;
-            if src.u.len() < u_size {
-                return Err(Error::with_reason(
-                    -1,
-                    "Android420ToI420",
-                    "source U buffer too small",
-                ));
-            }
-            let v_size = checked_buf_size(
-                src.v_stride,
-                uv_height,
-                "Android420ToI420",
-                "V buffer size overflow",
-            )?;
-            if src.v.len() < v_size {
-                return Err(Error::with_reason(
-                    -1,
-                    "Android420ToI420",
-                    "source V buffer too small",
                 ));
             }
         }
