@@ -173,7 +173,8 @@ fn checked_buf_size(
 /// タイル配置の必要サイズ（最終タイル行を含む）をオーバーフロー安全に計算する。
 /// タイル行間隔は stride * tile_height、最終タイル行の読み出しは tile_row_size バイト
 /// （libyuv の行送り規則。planar_functions.cc の DetilePlane と convert.cc の
-/// MT2TToP010 を参照）
+/// MT2TToP010 を参照）。tile_rows は 1 以上であること（呼び出し側でゼロサイズを
+/// Err にしている）
 fn checked_tiled_buf_size(
     tile_rows: usize,
     stride: usize,
@@ -181,8 +182,9 @@ fn checked_tiled_buf_size(
     tile_row_size: usize,
     function: &'static str,
 ) -> Result<usize, Error> {
-    (tile_rows - 1)
-        .checked_mul(stride)
+    tile_rows
+        .checked_sub(1)
+        .and_then(|v| v.checked_mul(stride))
         .and_then(|v| v.checked_mul(tile_height))
         .and_then(|v| v.checked_add(tile_row_size))
         .ok_or_else(|| Error::with_reason(-1, function, "tiled buffer size overflow"))
@@ -208,6 +210,13 @@ fn checked_tile_row_size(
         })
         .ok_or_else(|| Error::with_reason(-1, function, "tile row size overflow"))
 }
+
+/// タイルの幅（ピクセル）
+const TILE_WIDTH: usize = 16;
+/// Y プレーンのタイル高（行）
+const Y_TILE_HEIGHT: usize = 32;
+/// UV プレーンのタイル高（行）
+const UV_TILE_HEIGHT: usize = 16;
 
 /// タイル形式（MM21 / MT2T）のソースバッファ検証。
 ///
@@ -236,7 +245,8 @@ fn validate_tiled_nv_src_inner(
 
     // ゼロサイズはタイル行数の計算（height.div_ceil(32) - 1）がアンダーフローするため
     // 先に Err にする。MM21 は height == 0 でも libyuv が no-op 成功を返すため、
-    // この Err は検証側で一律に定める（0064 のゼロサイズ統一方針と整合）
+    // この Err は検証側で一律に定める（ゼロサイズ入力はモジュール全体で Err に
+    // 統一する方針と整合）
     if size.width == 0 || size.height == 0 {
         return Err(Error::with_reason(
             -1,
@@ -271,19 +281,24 @@ fn validate_tiled_nv_src_inner(
     // 16 の倍数に切り上げると width の切り上げと一致するため、Y / UV とも同じ幅になる
     let padded_width = size
         .width
-        .div_ceil(16)
-        .checked_mul(16)
+        .div_ceil(TILE_WIDTH)
+        .checked_mul(TILE_WIDTH)
         .ok_or_else(|| Error::with_reason(-1, function, "padded width overflow"))?;
 
-    // タイル行数（Y / UV で共通。UV のタイル高 16 と Y の 32 で ceil が一致する）
-    let tile_rows = size.height.div_ceil(32);
+    let tile_rows = size.height.div_ceil(Y_TILE_HEIGHT);
 
     // 最終タイル行の読み出しサイズ（Y: タイル高 32、UV: タイル高 16）
-    let y_tile_row_size = checked_tile_row_size(padded_width, 32, is_10bit, function)?;
-    let uv_tile_row_size = checked_tile_row_size(padded_width, 16, is_10bit, function)?;
+    let y_tile_row_size = checked_tile_row_size(padded_width, Y_TILE_HEIGHT, is_10bit, function)?;
+    let uv_tile_row_size = checked_tile_row_size(padded_width, UV_TILE_HEIGHT, is_10bit, function)?;
 
     // 必要サイズの検証
-    let y_size = checked_tiled_buf_size(tile_rows, y_stride, 32, y_tile_row_size, function)?;
+    let y_size = checked_tiled_buf_size(
+        tile_rows,
+        y_stride,
+        Y_TILE_HEIGHT,
+        y_tile_row_size,
+        function,
+    )?;
     if y.len() < y_size {
         return Err(Error::with_reason(
             -1,
@@ -291,7 +306,13 @@ fn validate_tiled_nv_src_inner(
             "source Y buffer too small",
         ));
     }
-    let uv_size = checked_tiled_buf_size(tile_rows, uv_stride, 16, uv_tile_row_size, function)?;
+    let uv_size = checked_tiled_buf_size(
+        tile_rows,
+        uv_stride,
+        UV_TILE_HEIGHT,
+        uv_tile_row_size,
+        function,
+    )?;
     if uv.len() < uv_size {
         return Err(Error::with_reason(
             -1,
@@ -1379,8 +1400,9 @@ define_nv_image!(/// NV21 画像 (Y + VU インターリーブ, 4:2:0)
 
 /// MM21 画像 (MediaTek タイル形式, 4:2:0)
 ///
-/// libyuv の `MM21To*` はタイル配置で入力バッファを読み出すため、バッファ検証は
-/// 線形サイズではなくタイル配置の必要サイズ（`validate_tiled_nv_src_inner` 参照）で行う。
+/// データはタイル配置（幅 16 ピクセル × 高さ 32 行のブロック）で並ぶため、バッファには
+/// 線形サイズ（stride * height）より過大な「タイル配置の必要サイズ」（幅を 16 の倍数に
+/// 切り上げた値 × タイル高 × タイル行数）が必要になる。
 #[derive(Debug)]
 pub struct Mm21Image<'a> {
     /// Y プレーンデータ
@@ -1396,6 +1418,7 @@ pub struct Mm21Image<'a> {
 impl Mm21Image<'_> {
     /// ソースバッファのバリデーション
     pub(crate) fn validate(&self, size: ImageSize, function: &'static str) -> Result<(), Error> {
+        // MM21 は 8bit のため 10/8 倍しない
         validate_tiled_nv_src_inner(
             self.y,
             self.y_stride,
@@ -1412,8 +1435,9 @@ impl Mm21Image<'_> {
 ///
 /// `y_stride` / `uv_stride` は**バイト単位**で指定する。MT2T は 10bit パックのため、
 /// 1 行のバイト数は幅の 10/8 倍になり、libyuv の `MT2TToP010` は stride をバイト単位で
-/// 受け取る。バッファ検証はタイル配置と 10bit パックを反映した必要サイズ
-/// （`validate_tiled_nv_src_inner` 参照）で行う。
+/// 受け取る。データはタイル配置（幅 16 ピクセル × 高さ 32 行のブロック）で並ぶため、
+/// バッファには線形サイズより過大な「タイル配置の必要サイズ」（幅を 16 の倍数に
+/// 切り上げた値 × タイル高 × タイル行数 × 10/8）が必要になる。
 #[derive(Debug)]
 pub struct Mt2tImage<'a> {
     /// Y プレーンデータ
@@ -1429,6 +1453,7 @@ pub struct Mt2tImage<'a> {
 impl Mt2tImage<'_> {
     /// ソースバッファのバリデーション
     pub(crate) fn validate(&self, size: ImageSize, function: &'static str) -> Result<(), Error> {
+        // MT2T は 10bit パックのため 10/8 倍する
         validate_tiled_nv_src_inner(
             self.y,
             self.y_stride,
@@ -1613,6 +1638,51 @@ mod tests {
     fn checked_buf_size_overflow_err() {
         let result = checked_buf_size(usize::MAX, 2, "test", "test reason");
         assert!(result.is_err(), "usize::MAX * 2 は Err を返すべき");
+    }
+
+    // checked_tiled_buf_size: 通常の計算は Ok を返すこと
+    #[test]
+    fn checked_tiled_buf_size_normal_ok() {
+        let result = checked_tiled_buf_size(3, 8, 32, 512, "test");
+        assert!(result.is_ok(), "タイル配置の必要サイズは Ok を返すべき");
+        assert_eq!(result.expect("Ok が返るはず"), (3 - 1) * 8 * 32 + 512);
+    }
+
+    // checked_tiled_buf_size: tile_rows == 0 でもアンダーフローせず Err を返すこと
+    #[test]
+    fn checked_tiled_buf_size_zero_tile_rows_err() {
+        let result = checked_tiled_buf_size(0, 8, 32, 512, "test");
+        assert!(result.is_err(), "tile_rows == 0 は Err を返すべき");
+    }
+
+    // checked_tiled_buf_size: オーバーフローは Err を返すこと
+    #[test]
+    fn checked_tiled_buf_size_overflow_err() {
+        let result = checked_tiled_buf_size(usize::MAX, usize::MAX, 32, 512, "test");
+        assert!(result.is_err(), "オーバーフローは Err を返すべき");
+    }
+
+    // checked_tile_row_size: 8bit はタイル高倍のサイズを返すこと
+    #[test]
+    fn checked_tile_row_size_eight_bit_ok() {
+        let result = checked_tile_row_size(16, 32, false, "test");
+        assert!(result.is_ok(), "8bit のタイル行サイズは Ok を返すべき");
+        assert_eq!(result.expect("Ok が返るはず"), 16 * 32);
+    }
+
+    // checked_tile_row_size: 10bit は 10/8 倍を返すこと
+    #[test]
+    fn checked_tile_row_size_ten_bit_ok() {
+        let result = checked_tile_row_size(16, 32, true, "test");
+        assert!(result.is_ok(), "10bit のタイル行サイズは Ok を返すべき");
+        assert_eq!(result.expect("Ok が返るはず"), 16 * 32 * 10 / 8);
+    }
+
+    // checked_tile_row_size: オーバーフローは Err を返すこと
+    #[test]
+    fn checked_tile_row_size_overflow_err() {
+        let result = checked_tile_row_size(usize::MAX, 32, false, "test");
+        assert!(result.is_err(), "オーバーフローは Err を返すべき");
     }
 
     // validate_yuv_src_inner: 正常系で Ok を返すこと
