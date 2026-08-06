@@ -1535,33 +1535,23 @@ fn detile_plane_tiled_buffer_boundary() {
         .expect("必要サイズちょうどで成功するべき");
 }
 
-// 異常系: detile_plane が複数タイル段の必要サイズを検証すること
+// 異常系: detile_plane が round_up(width, 16) 未満の stride で Err を返すこと
 #[test]
-fn detile_plane_multi_tile_group_boundary() {
-    // width=32, height=17, tile_height=16, src_stride=32:
-    // ソース必要サイズ = 32 * ceil(17 / 16) * 16 = 1024
-    // （線形サイズ 32 * 17 = 544 の約 2 倍。タイル段数を検証できる）
-    let width = 32;
-    let height = 17;
-    let tile_height = 16;
-    let src_stride = 32;
-    let dst_stride = 32;
-    let mut dst = vec![0u8; dst_stride * height];
-    let size = ImageSize::new(width, height);
+fn detile_plane_stride_too_small() {
+    // width=5 の round_up(width, 16) は 16。src_stride=5（width 以上だが 16 未満）は
+    // タイル配置が 16 バイトチャンク列で読むため拒否される
+    let src = vec![0u8; 64];
+    let mut dst = vec![0u8; 5 * 3];
+    let size = ImageSize::new(5, 3);
 
-    let src = vec![0u8; 1023]; // 1 バイト不足
-    let result = detile_plane(&src, src_stride, &mut dst, dst_stride, size, tile_height);
-    let err = result.expect_err("タイル配置の必要サイズ未満では Err が返るべき");
+    let result = detile_plane(&src, 5, &mut dst, 5, size, 2);
+    let err = result.expect_err("round_up(width, 16) 未満の stride では Err が返るべき");
     assert!(
-        err.to_string().contains("source buffer too small"),
-        "ソース不足の reason が返るべき: {}",
+        err.to_string()
+            .contains("source stride smaller than round_up(width, 16)"),
+        "round_up(width, 16) の reason が返るべき: {}",
         err
     );
-
-    // 必要サイズちょうどでは成功する
-    let src = vec![0u8; 1024];
-    detile_plane(&src, src_stride, &mut dst, dst_stride, size, tile_height)
-        .expect("必要サイズちょうどで成功するべき");
 }
 
 // 異常系: detile_plane_16 がタイル配置の必要サイズを検証すること
@@ -1653,6 +1643,54 @@ fn detile_to_yuy2_tiled_buffer_boundary() {
     assert!(
         err.to_string().contains("source UV buffer too small"),
         "UV 側のタイル必要サイズ不足の reason が返るべき: {}",
+        err
+    );
+}
+
+// 異常系: detile_to_yuy2 が round_up(width, 16) 未満のストライドで Err を返すこと
+#[test]
+fn detile_to_yuy2_stride_too_small() {
+    // width=5 の round_up(width, 16) は 16。y_stride / uv_stride が 16 未満は拒否される
+    let y = vec![0u8; 64];
+    let uv = vec![0u8; 32];
+    let mut dst_data = vec![0u8; 10 * 3];
+    let mut dst = Yuy2ImageMut {
+        data: &mut dst_data,
+        stride: 10,
+    };
+    let size = ImageSize::new(5, 3);
+
+    // y_stride=5 は Nv12Image::validate の y_stride >= width は通るが、
+    // round_up(width, 16) = 16 未満のため Err になる
+    let src = Nv12Image {
+        y: &y,
+        y_stride: 5,
+        uv: &uv,
+        uv_stride: 16,
+    };
+    let result = detile_to_yuy2(&src, &mut dst, size, 2);
+    let err = result.expect_err("round_up(width, 16) 未満の Y stride では Err が返るべき");
+    assert!(
+        err.to_string()
+            .contains("Y stride smaller than round_up(width, 16)"),
+        "Y 側の round_up(width, 16) の reason が返るべき: {}",
+        err
+    );
+
+    // uv_stride=6 は Nv12Image::validate の最小 UV stride（ceil(5 / 2) * 2 = 6）は
+    // 通るが、round_up(width, 16) = 16 未満のため Err になる
+    let src = Nv12Image {
+        y: &y,
+        y_stride: 16,
+        uv: &uv,
+        uv_stride: 6,
+    };
+    let result = detile_to_yuy2(&src, &mut dst, size, 2);
+    let err = result.expect_err("round_up(width, 16) 未満の UV stride では Err が返るべき");
+    assert!(
+        err.to_string()
+            .contains("UV stride smaller than round_up(width, 16)"),
+        "UV 側の round_up(width, 16) の reason が返るべき: {}",
         err
     );
 }

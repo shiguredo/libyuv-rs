@@ -427,7 +427,7 @@ pub fn ayuv_to_nv21(
 /// `src` はタイル配置である必要があり、ソースストライドは幅を 16 の倍数に切り上げた値
 /// （round_up(width, 16)）以上でなければならない。ソースの必要サイズはタイル配置のスパン
 /// `src_stride * ceil(height / tile_height) * tile_height` で検証する
-/// （libyuv の DetilePlane は 1 タイル行を 16 バイト間隔のチャンク列として読み、タイル高
+/// （libyuv の DetilePlane は 1 タイル行を 16 バイトチャンクの列として読み、タイル高
 /// ごとに `src_stride * tile_height` で次のタイル行へジャンプする。planar_functions.cc を
 /// 参照。全タイル段を一括で要求する安全側の過大要求である）
 pub fn detile_plane(
@@ -522,7 +522,7 @@ pub fn detile_plane(
         ));
     }
 
-    // SAFETY: .validate() が全前提条件を検査済み。
+    // SAFETY: 上記の検証が全前提条件を検査済み。
     let result = unsafe {
         sys::DetilePlane(
             src.as_ptr(),
@@ -544,7 +544,7 @@ pub fn detile_plane(
 /// `src` はタイル配置である必要があり、ソースストライドは幅を 16 の倍数に切り上げた値
 /// （round_up(width, 16)）以上でなければならない。ソースの必要サイズはタイル配置のスパン
 /// `src_stride * ceil(height / tile_height) * tile_height` で検証する
-/// （libyuv の DetilePlane_16 は 1 タイル行を 16 要素間隔のチャンク列として読み、タイル高
+/// （libyuv の DetilePlane_16 は 1 タイル行を 16 要素チャンクの列として読み、タイル高
 /// ごとに `src_stride * tile_height` で次のタイル行へジャンプする。planar_functions.cc を
 /// 参照。全タイル段を一括で要求する安全側の過大要求である。要素数ベース）
 pub fn detile_plane_16(
@@ -638,7 +638,7 @@ pub fn detile_plane_16(
         ));
     }
 
-    // SAFETY: .validate() が全前提条件を検査済み。
+    // SAFETY: 上記の検証が全前提条件を検査済み。
     let result = unsafe {
         sys::DetilePlane_16(
             src.as_ptr(),
@@ -809,22 +809,16 @@ pub fn detile_split_uv_plane(
 /// ソースの必要サイズはタイル配置のスパンで検証する（Y は
 /// `y_stride * ceil(height / tile_height) * tile_height`、UV はタイル高が半分の
 /// `uv_stride * ceil(height / tile_height) * (tile_height / 2)`。libyuv の DetileToYUY2 は
-/// 1 タイル行を 16 バイト間隔のチャンク列として読み、タイル高ごとに
-/// ストライド × タイル高で次のタイル行へジャンプする。convert.cc を参照。
-/// 全タイル段を一括で要求する安全側の過大要求である）
+/// 1 タイル行を 16 バイトチャンクの列として読み、タイル高ごとに Y は
+/// `y_stride * tile_height`、UV は `uv_stride * (tile_height / 2)` で次のタイル行へ
+/// ジャンプする。planar_functions.cc を参照。全タイル段を一括で要求する安全側の
+/// 過大要求である）
 pub fn detile_to_yuy2(
     src: &Nv12Image<'_>,
     dst: &mut Yuy2ImageMut<'_>,
     size: ImageSize,
     tile_height: usize,
 ) -> Result<(), Error> {
-    // width == 0 || height == 0 は C 実装の早期 return と同一セマンティクスで no-op。
-    // ゼロサイズチェックを 2 累乗検証より先に置き、tile_height == 0 で div_ceil が
-    // panic しないようにする
-    if size.width == 0 || size.height == 0 {
-        return Ok(());
-    }
-
     // c_int 範囲チェック
     require_c_int(
         tile_height,
@@ -832,8 +826,14 @@ pub fn detile_to_yuy2(
         "tile_height exceeds c_int range",
     )?;
 
-    // tile_height は 2 以上かつ 2 の累乗でなければならない（libyuv 内部でビットマスクを
-    // 使用するため。tile_height == 1 は UV タイル高 tile_height / 2 が 0 になるため不許可）
+    // width == 0 || height == 0 は C 実装の早期 return と同一セマンティクスで no-op。
+    // ゼロサイズ入力は tile_height の検証を省略して Ok を返す
+    // （detile_plane / detile_plane_16 と同じ検証順序）
+    if size.width == 0 || size.height == 0 {
+        return Ok(());
+    }
+
+    // tile_height は 2 以上かつ 2 の累乗でなければならない
     if !tile_height.is_power_of_two() {
         return Err(Error::with_reason(
             -1,
@@ -853,19 +853,18 @@ pub fn detile_to_yuy2(
     dst.validate(size, "DetileToYUY2")?;
 
     // タイル配置は 16 バイト単位で処理するため、各ストライドは 16 の倍数に丸めた幅以上必要
-    let min_stride = size
-        .width
-        .div_ceil(16)
-        .checked_mul(16)
-        .ok_or_else(|| Error::with_reason(-1, "DetileToYUY2", "minimum stride overflow"))?;
-    if src.y_stride < min_stride {
+    let src_min_stride =
+        size.width.div_ceil(16).checked_mul(16).ok_or_else(|| {
+            Error::with_reason(-1, "DetileToYUY2", "source minimum stride overflow")
+        })?;
+    if src.y_stride < src_min_stride {
         return Err(Error::with_reason(
             -1,
             "DetileToYUY2",
             "Y stride smaller than round_up(width, 16)",
         ));
     }
-    if src.uv_stride < min_stride {
+    if src.uv_stride < src_min_stride {
         return Err(Error::with_reason(
             -1,
             "DetileToYUY2",
@@ -880,7 +879,7 @@ pub fn detile_to_yuy2(
         .y_stride
         .checked_mul(tile_groups)
         .and_then(|v| v.checked_mul(tile_height))
-        .ok_or_else(|| Error::with_reason(-1, "DetileToYUY2", "Y buffer size overflow"))?;
+        .ok_or_else(|| Error::with_reason(-1, "DetileToYUY2", "source Y buffer size overflow"))?;
     if src.y.len() < y_size {
         return Err(Error::with_reason(
             -1,
@@ -894,7 +893,7 @@ pub fn detile_to_yuy2(
         .uv_stride
         .checked_mul(tile_groups)
         .and_then(|v| v.checked_mul(tile_height / 2))
-        .ok_or_else(|| Error::with_reason(-1, "DetileToYUY2", "UV buffer size overflow"))?;
+        .ok_or_else(|| Error::with_reason(-1, "DetileToYUY2", "source UV buffer size overflow"))?;
     if src.uv.len() < uv_size {
         return Err(Error::with_reason(
             -1,
