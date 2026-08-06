@@ -2,7 +2,7 @@
 
 - Priority: High
 - Created: 2026-08-04
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-08-06
 - Model: DeepSeek V4 Flash
 - Branch: feature/fix-nv24-p410-handwritten-validation
 - Polished: 2026-08-04
@@ -57,3 +57,19 @@ High。
 2. stale コメント（doc コメントと関数本体コメント）を削除する
 3. `tests/test_convert.rs` にテスト（stride 不足・stride の c_int 超過・バッファ不足・正常系）を追加する
 4. `CHANGES.md` に `[FIX]` エントリを追加する
+
+## 実装内容
+
+- `p210_to_p410`（`src/convert/packed.rs`）: `src.validate` / `dst.validate` に置き換え
+- `nv12_to_nv24`（`src/convert/nv.rs`）: dst を `Nv24ImageMut::validate` に置き換え（src は従来どおり `Nv12Image::validate`）
+- `nv16_to_nv24`（`src/convert/nv.rs`）: `src.validate`（`Nv16Image`）/ `dst.validate`（`Nv24ImageMut`）に置き換え
+- `validate_biplanar_src/dst` の stale コメントと関数本体の stale コメントを削除
+- `tests/test_convert.rs` に 17 本のテスト（1 シナリオ 1 テスト）を追加。stride 不足（Y / UV）・stride の c_int 超過・バッファ不足（Y / UV、src / dst）・正常系を 3 関数で網羅
+- `CHANGES.md` の `## develop` セクションに `[FIX]` エントリを追加
+
+## 検証
+
+- `cargo fmt --all --check`: 成功
+- `cargo clippy --workspace --features source-build -- -D warnings`: 成功
+- `cargo test --workspace --features source-build`: 全 63 passed
+- PR #24 を squash merge（CI 全 5 ジョブ pass）
