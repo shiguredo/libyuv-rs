@@ -55,6 +55,9 @@
 - [FIX] yuy2_to_y と uyvy_to_y のデスティネーション検証を標準パターンに統一する
   - dst_stride_y の c_int 範囲チェックと stride >= width チェックを追加し、非チェック乗算を checked_buf_size に置き換える
   - @voluntas
+- [FIX] android420_to_* の pixel_stride_uv == 2 で U/V プレーンの検証が不足し領域外読み出しが発生する問題を修正する
+  - pixel_stride_uv の値検証（1 / 2 以外は Err）と、インターリーブ前提の U/V ストライド・バッファ検証を追加する
+  - @voluntas
 
 ### misc
 

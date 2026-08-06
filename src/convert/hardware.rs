@@ -16,6 +16,13 @@ use crate::{
 ///
 /// Android の NV12/NV21 系フォーマットから ARGB に変換する。
 /// `pixel_stride_uv` は UV ピクセルストライド（1: planar、2: interleaved）。
+///
+/// `pixel_stride_uv == 2` のとき、`u` / `v` は同一バッファの連続領域（インターリーブ）で
+/// なければならない（libyuv が `src_v - src_u` のポインタ減算を行うため。別スライスは
+/// C 標準上は未定義動作になる。一般的な実装では整数減算に落ちるため実害はない）。
+/// `u` / `v` のストライドは `2 * ceil(width / 2)` 以上である必要がある。検証はバッファ長に
+/// `len() >= stride * ceil(height / 2)` を要求するため、共有バッファの末尾に 1 バイトの
+/// パディングを確保すること（NV12 では v 側、NV21 では u 側のバッファ長が要求を満たす）。
 pub fn android420_to_argb(
     src: &Android420Image<'_>,
     pixel_stride_uv: usize,
@@ -25,7 +32,43 @@ pub fn android420_to_argb(
     src.validate(size, "Android420ToARGB")?;
     dst.validate(size, "Android420ToARGB")?;
 
-    // SAFETY: .validate() が全前提条件を検査済み。
+    // pixel_stride_uv == 2 では libyuv は U/V をインターリーブデータとして 1 行
+    // 2 * halfwidth バイト読み進める（高速パス NV12/NV21ToARGBMatrix とフォールバックの
+    // WeavePixels の読み出し規則。convert_argb.cc の Android420ToARGBMatrix）。
+    // そのためストライドをインターリーブ前提で検証する。バッファ長は src.validate が
+    // u_stride * ceil(height / 2) を同一式で検査済みのため、ここでは検証しない
+    match pixel_stride_uv {
+        1 => {}
+        2 => {
+            let uv_stride = size.width.div_ceil(2).checked_mul(2).ok_or_else(|| {
+                Error::with_reason(-1, "Android420ToARGB", "UV minimum stride overflow")
+            })?;
+            if src.u_stride < uv_stride {
+                return Err(Error::with_reason(
+                    -1,
+                    "Android420ToARGB",
+                    "U stride smaller than interleaved chroma width",
+                ));
+            }
+            if src.v_stride < uv_stride {
+                return Err(Error::with_reason(
+                    -1,
+                    "Android420ToARGB",
+                    "V stride smaller than interleaved chroma width",
+                ));
+            }
+        }
+        _ => {
+            return Err(Error::with_reason(
+                -1,
+                "Android420ToARGB",
+                "pixel_stride_uv must be 1 or 2",
+            ));
+        }
+    }
+
+    // SAFETY: src / dst は .validate() と上記のインライン検証で検査可能な前提を検査済み。
+    // 同一バッファ前提（pixel_stride_uv == 2）は docstring の契約に依存する。
     let result = unsafe {
         sys::Android420ToARGB(
             src.y.as_ptr(),
@@ -48,6 +91,13 @@ pub fn android420_to_argb(
 /// Android420 から ABGR への変換
 ///
 /// `pixel_stride_uv` は UV ピクセルストライド（1: planar、2: interleaved）。
+///
+/// `pixel_stride_uv == 2` のとき、`u` / `v` は同一バッファの連続領域（インターリーブ）で
+/// なければならない（libyuv が `src_v - src_u` のポインタ減算を行うため。別スライスは
+/// C 標準上は未定義動作になる。一般的な実装では整数減算に落ちるため実害はない）。
+/// `u` / `v` のストライドは `2 * ceil(width / 2)` 以上である必要がある。検証はバッファ長に
+/// `len() >= stride * ceil(height / 2)` を要求するため、共有バッファの末尾に 1 バイトの
+/// パディングを確保すること（NV12 では v 側、NV21 では u 側のバッファ長が要求を満たす）。
 pub fn android420_to_abgr(
     src: &Android420Image<'_>,
     pixel_stride_uv: usize,
@@ -57,7 +107,43 @@ pub fn android420_to_abgr(
     src.validate(size, "Android420ToABGR")?;
     dst.validate(size, "Android420ToABGR")?;
 
-    // SAFETY: .validate() が全前提条件を検査済み。
+    // pixel_stride_uv == 2 では libyuv は U/V をインターリーブデータとして 1 行
+    // 2 * halfwidth バイト読み進める（高速パス NV12/NV21ToARGBMatrix とフォールバックの
+    // WeavePixels の読み出し規則。convert_argb.cc の Android420ToARGBMatrix）。
+    // そのためストライドをインターリーブ前提で検証する。バッファ長は src.validate が
+    // u_stride * ceil(height / 2) を同一式で検査済みのため、ここでは検証しない
+    match pixel_stride_uv {
+        1 => {}
+        2 => {
+            let uv_stride = size.width.div_ceil(2).checked_mul(2).ok_or_else(|| {
+                Error::with_reason(-1, "Android420ToABGR", "UV minimum stride overflow")
+            })?;
+            if src.u_stride < uv_stride {
+                return Err(Error::with_reason(
+                    -1,
+                    "Android420ToABGR",
+                    "U stride smaller than interleaved chroma width",
+                ));
+            }
+            if src.v_stride < uv_stride {
+                return Err(Error::with_reason(
+                    -1,
+                    "Android420ToABGR",
+                    "V stride smaller than interleaved chroma width",
+                ));
+            }
+        }
+        _ => {
+            return Err(Error::with_reason(
+                -1,
+                "Android420ToABGR",
+                "pixel_stride_uv must be 1 or 2",
+            ));
+        }
+    }
+
+    // SAFETY: src / dst は .validate() と上記のインライン検証で検査可能な前提を検査済み。
+    // 同一バッファ前提（pixel_stride_uv == 2）は docstring の契約に依存する。
     let result = unsafe {
         sys::Android420ToABGR(
             src.y.as_ptr(),
@@ -80,6 +166,13 @@ pub fn android420_to_abgr(
 /// Android420 から I420 への変換
 ///
 /// `pixel_stride_uv` は UV ピクセルストライド（1: planar、2: interleaved）。
+///
+/// `pixel_stride_uv == 2` のとき、`u` / `v` は同一バッファの連続領域（インターリーブ）で
+/// なければならない（libyuv が `src_v - src_u` のポインタ減算を行うため。別スライスは
+/// C 標準上は未定義動作になる。一般的な実装では整数減算に落ちるため実害はない）。
+/// `u` / `v` のストライドは `2 * ceil(width / 2)` 以上である必要がある。検証はバッファ長に
+/// `len() >= stride * ceil(height / 2)` を要求するため、共有バッファの末尾に 1 バイトの
+/// パディングを確保すること（NV12 では v 側、NV21 では u 側のバッファ長が要求を満たす）。
 pub fn android420_to_i420(
     src: &Android420Image<'_>,
     pixel_stride_uv: usize,
@@ -89,7 +182,44 @@ pub fn android420_to_i420(
     src.validate(size, "Android420ToI420")?;
     dst.validate(size, "Android420ToI420")?;
 
-    // SAFETY: .validate() が全前提条件を検査済み。
+    // pixel_stride_uv == 2 では libyuv は U/V をインターリーブデータとして 1 行
+    // 2 * halfwidth バイト読み進める（Android420ToI420 は rotate.cc の
+    // Android420ToI420Rotate を kRotate0 で呼ぶ。高速パス SplitRotateUV と
+    // フォールバックの SplitPixels の読み出し規則）。そのためストライドを
+    // インターリーブ前提で検証する。バッファ長は src.validate が
+    // u_stride * ceil(height / 2) を同一式で検査済みのため、ここでは検証しない
+    match pixel_stride_uv {
+        1 => {}
+        2 => {
+            let uv_stride = size.width.div_ceil(2).checked_mul(2).ok_or_else(|| {
+                Error::with_reason(-1, "Android420ToI420", "UV minimum stride overflow")
+            })?;
+            if src.u_stride < uv_stride {
+                return Err(Error::with_reason(
+                    -1,
+                    "Android420ToI420",
+                    "U stride smaller than interleaved chroma width",
+                ));
+            }
+            if src.v_stride < uv_stride {
+                return Err(Error::with_reason(
+                    -1,
+                    "Android420ToI420",
+                    "V stride smaller than interleaved chroma width",
+                ));
+            }
+        }
+        _ => {
+            return Err(Error::with_reason(
+                -1,
+                "Android420ToI420",
+                "pixel_stride_uv must be 1 or 2",
+            ));
+        }
+    }
+
+    // SAFETY: src / dst は .validate() と上記のインライン検証で検査可能な前提を検査済み。
+    // 同一バッファ前提（pixel_stride_uv == 2）は docstring の契約に依存する。
     let result = unsafe {
         sys::Android420ToI420(
             src.y.as_ptr(),
