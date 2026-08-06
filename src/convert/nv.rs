@@ -477,29 +477,14 @@ pub fn nv12_to_rgb565(
 /// NV12 から NV24 への変換
 ///
 /// NV24 は 4:4:4 サブサンプリングのため、chroma の高さが luma と同じになる。
-/// validate_biplanar_dst は chroma を height/2 で検証するため、
-/// dst の chroma バッファサイズを別途検証する。
+/// `Nv24ImageMut::validate` は chroma を height で検証する。
 pub fn nv12_to_nv24(
     src: &Nv12Image<'_>,
     dst: &mut Nv24ImageMut<'_>,
     size: ImageSize,
 ) -> Result<(), Error> {
     src.validate(size, "NV12ToNV24")?;
-    // NV24 の dst は chroma の高さが luma と同じなので個別に検証する
-    if dst.y.len() < dst.y_stride * size.height {
-        return Err(Error::with_reason(
-            -1,
-            "NV12ToNV24",
-            "destination Y buffer too small",
-        ));
-    }
-    if dst.uv.len() < dst.uv_stride * size.height {
-        return Err(Error::with_reason(
-            -1,
-            "NV12ToNV24",
-            "destination UV buffer too small",
-        ));
-    }
+    dst.validate(size, "NV12ToNV24")?;
 
     // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
@@ -524,43 +509,14 @@ pub fn nv12_to_nv24(
 ///
 /// NV16 は 4:2:2 サブサンプリングのため、chroma の高さが luma と同じになる。
 /// NV24 は 4:4:4 サブサンプリングのため、chroma の高さが luma と同じになる。
-/// validate_biplanar_src/dst は chroma を height/2 で検証するため、
-/// src/dst の chroma バッファサイズを別途検証する。
+/// `Nv16Image::validate` は chroma を height で検証する。
 pub fn nv16_to_nv24(
     src: &Nv16Image<'_>,
     dst: &mut Nv24ImageMut<'_>,
     size: ImageSize,
 ) -> Result<(), Error> {
-    // NV16 の src は chroma の高さが luma と同じなので個別に検証する
-    if src.y.len() < src.y_stride * size.height {
-        return Err(Error::with_reason(
-            -1,
-            "NV16ToNV24",
-            "source Y buffer too small",
-        ));
-    }
-    if src.uv.len() < src.uv_stride * size.height {
-        return Err(Error::with_reason(
-            -1,
-            "NV16ToNV24",
-            "source UV buffer too small",
-        ));
-    }
-    // NV24 の dst は chroma の高さが luma と同じなので個別に検証する
-    if dst.y.len() < dst.y_stride * size.height {
-        return Err(Error::with_reason(
-            -1,
-            "NV16ToNV24",
-            "destination Y buffer too small",
-        ));
-    }
-    if dst.uv.len() < dst.uv_stride * size.height {
-        return Err(Error::with_reason(
-            -1,
-            "NV16ToNV24",
-            "destination UV buffer too small",
-        ));
-    }
+    src.validate(size, "NV16ToNV24")?;
+    dst.validate(size, "NV16ToNV24")?;
 
     // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {

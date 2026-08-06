@@ -71,6 +71,9 @@
   - detile_to_yuy2 は Y / UV それぞれのタイル配置サイズ（UV はタイル高 tile_height / 2）で検証し、tile_height の検証（2 以上かつ 2 累乗）と c_int 範囲チェックを追加する
   - ゼロサイズ入力（width / height == 0）は no-op で Ok を返す（detile 系の既存セマンティクスを維持する）
   - @voluntas
+- [FIX] p210_to_p410 / nv12_to_nv24 / nv16_to_nv24 の手書き検証が不十分で領域外アクセスのリスクがある問題を修正する
+  - 手書き検証を生成済みの validate に置き換え、require_c_int・最小ストライドチェック・オーバーフロー安全なサイズ計算を適用する
+  - @voluntas
 
 ### misc
 

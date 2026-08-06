@@ -6,9 +6,10 @@ use std::ffi::c_int;
 
 use shiguredo_libyuv::{
     AbgrImageMut, Android420Image, ArgbImageMut, I420Image, I420ImageMut, ImageSize, Mm21Image,
-    Mt2tImage, Nv12Image, P010ImageMut, UyvyImage, Yuy2Image, Yuy2ImageMut, android420_to_abgr,
-    android420_to_argb, android420_to_i420, detile_plane, detile_plane_16, detile_to_yuy2,
-    i420_to_argb, mm21_to_i420, mt2t_to_p010, nv12_to_i420, uyvy_to_y, yuy2_to_y,
+    Mt2tImage, Nv12Image, Nv16Image, Nv24ImageMut, P010ImageMut, P210Image, P410ImageMut,
+    UyvyImage, Yuy2Image, Yuy2ImageMut, android420_to_abgr, android420_to_argb, android420_to_i420,
+    detile_plane, detile_plane_16, detile_to_yuy2, i420_to_argb, mm21_to_i420, mt2t_to_p010,
+    nv12_to_i420, nv12_to_nv24, nv16_to_nv24, p210_to_p410, uyvy_to_y, yuy2_to_y,
 };
 
 // 異常系: i420_to_argb のバッファ不足で Err が返ること
@@ -1842,4 +1843,218 @@ fn detile_to_yuy2_zero_size_ok() {
         .expect("height == 0 では Ok が返るべき");
     detile_to_yuy2(&src, &mut dst, ImageSize::new(0, 3), 3)
         .expect("ゼロサイズでは不正な tile_height でも Ok が返るべき");
+}
+
+// 異常系: p210_to_p410 が検証済み validate で stride 不足・c_int 超過・バッファ不足を捕捉すること
+#[test]
+fn p210_to_p410_validation() {
+    // width=8, height=4: Y 必要サイズ = 8 * 4 = 32、UV 必要サイズ = 8 * 4 = 32（u16 要素数。
+    // P210Image は UV 高さ = height を検証する）
+    let width = 8;
+    let height = 4;
+    let y_stride = 8;
+    let uv_stride = 8;
+    let uv = vec![0u16; 32];
+    let mut y_dst = vec![0u16; 32];
+    let mut uv_dst = vec![0u16; 64];
+    let mut dst = P410ImageMut {
+        y: &mut y_dst,
+        y_stride,
+        uv: &mut uv_dst,
+        uv_stride: 16,
+    };
+    let size = ImageSize::new(width, height);
+
+    // stride 不足（y_stride < width）は Err になる
+    let y = vec![0u16; 32];
+    let src = P210Image {
+        y: &y,
+        y_stride: 7,
+        uv: &uv,
+        uv_stride,
+    };
+    let result = p210_to_p410(&src, &mut dst, size);
+    let err = result.expect_err("y_stride < width では Err が返るべき");
+    assert!(
+        err.to_string().contains("Y stride smaller than width"),
+        "Y 側の stride 不足の reason が返るべき: {}",
+        err
+    );
+
+    // stride の c_int 超過は Err になる
+    let src = P210Image {
+        y: &y,
+        y_stride: i32::MAX as usize + 1,
+        uv: &uv,
+        uv_stride,
+    };
+    let result = p210_to_p410(&src, &mut dst, size);
+    let err = result.expect_err("c_int 範囲を超える stride では Err が返るべき");
+    assert!(
+        err.to_string().contains("Y stride exceeds c_int range"),
+        "c_int 範囲超過の reason が返るべき: {}",
+        err
+    );
+
+    // バッファ不足は Err になる
+    let y = vec![0u16; 31]; // 1 要素不足
+    let src = P210Image {
+        y: &y,
+        y_stride,
+        uv: &uv,
+        uv_stride,
+    };
+    let result = p210_to_p410(&src, &mut dst, size);
+    let err = result.expect_err("必要サイズ未満では Err が返るべき");
+    assert!(
+        err.to_string().contains("source Y buffer too small"),
+        "Y 側のバッファ不足の reason が返るべき: {}",
+        err
+    );
+
+    // 必要サイズちょうどでは成功する
+    let y = vec![0u16; 32];
+    let src = P210Image {
+        y: &y,
+        y_stride,
+        uv: &uv,
+        uv_stride,
+    };
+    p210_to_p410(&src, &mut dst, size).expect("必要サイズちょうどで成功するべき");
+}
+
+// 異常系: nv12_to_nv24 が検証済み validate で dst の stride 不足・バッファ不足を捕捉すること
+#[test]
+fn nv12_to_nv24_validation() {
+    // width=8, height=4: src は NV12（UV 高さ = 2）、dst は NV24（UV 高さ = 4）。
+    // dst の Y / UV 必要サイズはどちらも 8 * 4 = 32
+    let width = 8;
+    let height = 4;
+    let y_stride = 8;
+    let uv_stride = 8;
+    let y = vec![0u8; 32];
+    let uv = vec![0u8; 16];
+    let src = Nv12Image {
+        y: &y,
+        y_stride,
+        uv: &uv,
+        uv_stride,
+    };
+    let size = ImageSize::new(width, height);
+
+    // dst の stride 不足（y_stride < width）は Err になる
+    let mut y_dst = vec![0u8; 32];
+    let mut uv_dst = vec![0u8; 64];
+    let mut dst = Nv24ImageMut {
+        y: &mut y_dst,
+        y_stride: 7,
+        uv: &mut uv_dst,
+        uv_stride: 16,
+    };
+    let result = nv12_to_nv24(&src, &mut dst, size);
+    let err = result.expect_err("dst の y_stride < width では Err が返るべき");
+    assert!(
+        err.to_string().contains("Y stride smaller than width"),
+        "dst の Y 側の stride 不足の reason が返るべき: {}",
+        err
+    );
+
+    // dst のバッファ不足（UV 必要サイズ = 16 * 4 = 64）は Err になる
+    let mut y_dst = vec![0u8; 32];
+    let mut uv_dst = vec![0u8; 63]; // 1 バイト不足
+    let mut dst = Nv24ImageMut {
+        y: &mut y_dst,
+        y_stride,
+        uv: &mut uv_dst,
+        uv_stride: 16,
+    };
+    let result = nv12_to_nv24(&src, &mut dst, size);
+    let err = result.expect_err("dst の UV 必要サイズ未満では Err が返るべき");
+    assert!(
+        err.to_string().contains("destination UV buffer too small"),
+        "dst の UV 側のバッファ不足の reason が返るべき: {}",
+        err
+    );
+
+    // 必要サイズちょうどでは成功する
+    let mut y_dst = vec![0u8; 32];
+    let mut uv_dst = vec![0u8; 64];
+    let mut dst = Nv24ImageMut {
+        y: &mut y_dst,
+        y_stride,
+        uv: &mut uv_dst,
+        uv_stride: 16,
+    };
+    nv12_to_nv24(&src, &mut dst, size).expect("必要サイズちょうどで成功するべき");
+}
+
+// 異常系: nv16_to_nv24 が検証済み validate で src / dst のバッファ不足を捕捉すること
+#[test]
+fn nv16_to_nv24_validation() {
+    // width=8, height=4: src は NV16（UV 高さ = 4）、dst は NV24（UV 高さ = 4）。
+    // どちらも Y / UV 必要サイズ = 8 * 4 = 32
+    let width = 8;
+    let height = 4;
+    let y_stride = 8;
+    let uv_stride = 8;
+    let size = ImageSize::new(width, height);
+
+    // src の Y バッファ不足は Err になる
+    let y = vec![0u8; 31]; // 1 バイト不足
+    let uv = vec![0u8; 32];
+    let src = Nv16Image {
+        y: &y,
+        y_stride,
+        uv: &uv,
+        uv_stride,
+    };
+    let mut y_dst = vec![0u8; 32];
+    let mut uv_dst = vec![0u8; 64];
+    let mut dst = Nv24ImageMut {
+        y: &mut y_dst,
+        y_stride,
+        uv: &mut uv_dst,
+        uv_stride: 16,
+    };
+    let result = nv16_to_nv24(&src, &mut dst, size);
+    let err = result.expect_err("src の Y 必要サイズ未満では Err が返るべき");
+    assert!(
+        err.to_string().contains("source Y buffer too small"),
+        "src の Y 側のバッファ不足の reason が返るべき: {}",
+        err
+    );
+
+    // dst の UV バッファ不足は Err になる
+    let y = vec![0u8; 32];
+    let src = Nv16Image {
+        y: &y,
+        y_stride,
+        uv: &uv,
+        uv_stride,
+    };
+    let mut y_dst = vec![0u8; 32];
+    let mut uv_dst = vec![0u8; 63]; // 1 バイト不足
+    let mut dst = Nv24ImageMut {
+        y: &mut y_dst,
+        y_stride,
+        uv: &mut uv_dst,
+        uv_stride: 16,
+    };
+    let result = nv16_to_nv24(&src, &mut dst, size);
+    let err = result.expect_err("dst の UV 必要サイズ未満では Err が返るべき");
+    assert!(
+        err.to_string().contains("destination UV buffer too small"),
+        "dst の UV 側のバッファ不足の reason が返るべき: {}",
+        err
+    );
+
+    // 必要サイズちょうどでは成功する
+    let mut uv_dst = vec![0u8; 64];
+    let mut dst = Nv24ImageMut {
+        y: &mut y_dst,
+        y_stride,
+        uv: &mut uv_dst,
+        uv_stride: 16,
+    };
+    nv16_to_nv24(&src, &mut dst, size).expect("必要サイズちょうどで成功するべき");
 }
