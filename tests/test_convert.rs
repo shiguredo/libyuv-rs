@@ -1845,7 +1845,7 @@ fn detile_to_yuy2_zero_size_ok() {
         .expect("ゼロサイズでは不正な tile_height でも Ok が返るべき");
 }
 
-// 異常系: p210_to_p410 の src の stride 不足で Err が返ること
+// 異常系: p210_to_p410 の src の Y の stride 不足で Err が返ること
 #[test]
 fn p210_to_p410_src_y_stride_too_small() {
     // width=8, height=4: Y 必要サイズ = 8 * 4 = 32、UV 必要サイズ = 8 * 4 = 32（u16 要素数。
@@ -1882,7 +1882,7 @@ fn p210_to_p410_src_y_stride_too_small() {
     );
 }
 
-// 異常系: p210_to_p410 の src の stride の c_int 超過で Err が返ること
+// 異常系: p210_to_p410 の src の Y の stride の c_int 超過で Err が返ること
 #[test]
 fn p210_to_p410_src_y_stride_exceeds_c_int() {
     let width = 8;
@@ -2011,7 +2011,7 @@ fn p210_to_p410_success() {
     p210_to_p410(&src, &mut dst, size).expect("必要サイズちょうどで成功するべき");
 }
 
-// 異常系: nv12_to_nv24 の dst の stride 不足で Err が返ること
+// 異常系: nv12_to_nv24 の dst の Y の stride 不足で Err が返ること
 #[test]
 fn nv12_to_nv24_dst_y_stride_too_small() {
     // width=8, height=4: src は NV12（UV 高さ = 2）、dst は NV24（UV 高さ = 4）。
@@ -2084,7 +2084,7 @@ fn nv12_to_nv24_dst_uv_stride_too_small() {
     );
 }
 
-// 異常系: nv12_to_nv24 の dst の stride の c_int 超過で Err が返ること
+// 異常系: nv12_to_nv24 の dst の Y の stride の c_int 超過で Err が返ること
 #[test]
 fn nv12_to_nv24_dst_y_stride_exceeds_c_int() {
     let width = 8;
@@ -2216,7 +2216,7 @@ fn nv12_to_nv24_success() {
     nv12_to_nv24(&src, &mut dst, size).expect("必要サイズちょうどで成功するべき");
 }
 
-// 異常系: nv16_to_nv24 の src の stride 不足で Err が返ること
+// 異常系: nv16_to_nv24 の src の Y の stride 不足で Err が返ること
 #[test]
 fn nv16_to_nv24_src_y_stride_too_small() {
     // width=8, height=4: src は NV16（UV 高さ = 4）、dst は NV24（UV 高さ = 4）。
@@ -2253,7 +2253,7 @@ fn nv16_to_nv24_src_y_stride_too_small() {
     );
 }
 
-// 異常系: nv16_to_nv24 の src の stride の c_int 超過で Err が返ること
+// 異常系: nv16_to_nv24 の src の Y の stride の c_int 超過で Err が返ること
 #[test]
 fn nv16_to_nv24_src_y_stride_exceeds_c_int() {
     let width = 8;

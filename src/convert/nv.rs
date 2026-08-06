@@ -509,7 +509,7 @@ pub fn nv12_to_nv24(
 ///
 /// NV16 は 4:2:2 サブサンプリングのため、chroma の高さが luma と同じになる。
 /// NV24 は 4:4:4 サブサンプリングのため、chroma の高さが luma と同じになる。
-/// `Nv16Image::validate` は chroma を height で検証する。
+/// `Nv16Image::validate` は chroma を height で検証し、`Nv24ImageMut::validate` も chroma を height で検証する。
 pub fn nv16_to_nv24(
     src: &Nv16Image<'_>,
     dst: &mut Nv24ImageMut<'_>,
