@@ -1554,6 +1554,54 @@ fn detile_plane_stride_too_small() {
     );
 }
 
+// 異常系: detile_plane がパディング付きストライドのタイル配置サイズを検証すること
+#[test]
+fn detile_plane_padded_stride_boundary() {
+    // width=5, height=3, tile_height=2, src_stride=32（round_up(width, 16) = 16 より大きい）:
+    // ソース必要サイズ = 32 * ceil(3 / 2) * 2 = 128
+    // （タイル行間隔が src_stride 基準であることを直接検証できる。src_stride の代わりに
+    //  round_up(width, 16) を使う実装バグがあると 64 バイトで通過してしまう）
+    let width = 5;
+    let height = 3;
+    let tile_height = 2;
+    let src_stride = 32;
+    let dst_stride = 5;
+    let mut dst = vec![0u8; dst_stride * height];
+    let size = ImageSize::new(width, height);
+
+    let src = vec![0u8; 127]; // 1 バイト不足
+    let result = detile_plane(&src, src_stride, &mut dst, dst_stride, size, tile_height);
+    let err = result.expect_err("タイル配置の必要サイズ未満では Err が返るべき");
+    assert!(
+        err.to_string().contains("source buffer too small"),
+        "ソース不足の reason が返るべき: {}",
+        err
+    );
+
+    // 必要サイズちょうどでは成功する
+    let src = vec![0u8; 128];
+    detile_plane(&src, src_stride, &mut dst, dst_stride, size, tile_height)
+        .expect("必要サイズちょうどで成功するべき");
+}
+
+// 異常系: detile_plane_16 が round_up(width, 16) 未満の stride で Err を返すこと
+#[test]
+fn detile_plane_16_stride_too_small() {
+    // detile_plane と同じく、width=5 の round_up(width, 16) = 16 未満の stride は拒否される
+    let src = vec![0u16; 64];
+    let mut dst = vec![0u16; 5 * 3];
+    let size = ImageSize::new(5, 3);
+
+    let result = detile_plane_16(&src, 5, &mut dst, 5, size, 2);
+    let err = result.expect_err("round_up(width, 16) 未満の stride では Err が返るべき");
+    assert!(
+        err.to_string()
+            .contains("source stride smaller than round_up(width, 16)"),
+        "round_up(width, 16) の reason が返るべき: {}",
+        err
+    );
+}
+
 // 異常系: detile_plane_16 がタイル配置の必要サイズを検証すること
 #[test]
 fn detile_plane_16_tiled_buffer_boundary() {
@@ -1743,7 +1791,9 @@ fn detile_to_yuy2_tile_height_invalid() {
 // 正常系: detile_to_yuy2 がゼロサイズ入力で no-op を返すこと
 #[test]
 fn detile_to_yuy2_zero_size_ok() {
-    // width == 0 / height == 0 は C 実装の早期 return と同一セマンティクスで Ok（no-op）
+    // width == 0 / height == 0 は C 実装と同一セマンティクスで Ok（no-op）。
+    // ゼロサイズ入力は tile_height の検証をすべて省略するため、不正な
+    // tile_height（非 2 累乗）でも Ok になる
     let y = vec![0u8; 64];
     let uv = vec![0u8; 32];
     let mut dst_data = vec![0u8; 10 * 3];
@@ -1761,4 +1811,6 @@ fn detile_to_yuy2_zero_size_ok() {
     detile_to_yuy2(&src, &mut dst, ImageSize::new(0, 3), 2).expect("width == 0 では Ok が返るべき");
     detile_to_yuy2(&src, &mut dst, ImageSize::new(5, 0), 2)
         .expect("height == 0 では Ok が返るべき");
+    detile_to_yuy2(&src, &mut dst, ImageSize::new(0, 3), 3)
+        .expect("ゼロサイズでは不正な tile_height でも Ok が返るべき");
 }

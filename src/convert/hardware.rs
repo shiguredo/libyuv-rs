@@ -457,7 +457,9 @@ pub fn detile_plane(
         "tile_height exceeds c_int range",
     )?;
 
-    // width == 0 || height == 0 は C 実装の早期 return と同一セマンティクスで no-op
+    // width == 0 || height == 0 は no-op で Ok を返す
+    // （libyuv の DetilePlane は -1 を返すが、このクレートではゼロサイズ入力を
+    //  no-op に統一する方針）
     if size.width == 0 || size.height == 0 {
         return Ok(());
     }
@@ -574,7 +576,9 @@ pub fn detile_plane_16(
         "tile_height exceeds c_int range",
     )?;
 
-    // width == 0 || height == 0 は C 実装の早期 return と同一セマンティクスで no-op
+    // width == 0 || height == 0 は no-op で Ok を返す
+    // （libyuv の DetilePlane_16 は -1 を返すが、このクレートではゼロサイズ入力を
+    //  no-op に統一する方針）
     if size.width == 0 || size.height == 0 {
         return Ok(());
     }
@@ -819,19 +823,19 @@ pub fn detile_to_yuy2(
     size: ImageSize,
     tile_height: usize,
 ) -> Result<(), Error> {
+    // width == 0 || height == 0 は C 実装（DetileToYUY2 は width <= 0 で return する）
+    // と同一セマンティクスで no-op。ゼロサイズ入力は tile_height の検証を含め
+    // すべての検証を省略して Ok を返す
+    if size.width == 0 || size.height == 0 {
+        return Ok(());
+    }
+
     // c_int 範囲チェック
     require_c_int(
         tile_height,
         "DetileToYUY2",
         "tile_height exceeds c_int range",
     )?;
-
-    // width == 0 || height == 0 は C 実装の早期 return と同一セマンティクスで no-op。
-    // ゼロサイズ入力は tile_height の検証を省略して Ok を返す
-    // （detile_plane / detile_plane_16 と同じ検証順序）
-    if size.width == 0 || size.height == 0 {
-        return Ok(());
-    }
 
     // tile_height は 2 以上かつ 2 の累乗でなければならない
     if !tile_height.is_power_of_two() {
