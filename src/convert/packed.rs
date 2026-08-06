@@ -6,7 +6,7 @@ use crate::{
     Argb1555Image, Argb1555ImageMut, Argb4444Image, Argb4444ImageMut, ArgbImage, ArgbImageMut,
     Error, I010ImageMut, I420Image, I420ImageMut, I422Image, I422ImageMut, ImageSize, Nv12ImageMut,
     P010Image, P210Image, P410ImageMut, Rgb565Image, Rgb565ImageMut, UyvyImage, UyvyImageMut,
-    Yuy2Image, Yuy2ImageMut, sys,
+    Yuy2Image, Yuy2ImageMut, checked_buf_size, require_c_int, sys,
 };
 
 // ============================================================
@@ -260,7 +260,31 @@ pub fn yuy2_to_y(
     size: ImageSize,
 ) -> Result<(), Error> {
     src.validate(size, "YUY2ToY")?;
-    if dst_y.len() < dst_stride_y * size.height {
+
+    // c_int 範囲チェック（width / height は src.validate が検査済み）
+    require_c_int(
+        dst_stride_y,
+        "YUY2ToY",
+        "destination stride exceeds c_int range",
+    )?;
+
+    // stride >= width チェック
+    if dst_stride_y < size.width {
+        return Err(Error::with_reason(
+            -1,
+            "YUY2ToY",
+            "destination stride smaller than width",
+        ));
+    }
+
+    // バッファサイズ計算（オーバーフロー安全）
+    let dst_size = checked_buf_size(
+        dst_stride_y,
+        size.height,
+        "YUY2ToY",
+        "destination buffer size overflow",
+    )?;
+    if dst_y.len() < dst_size {
         return Err(Error::with_reason(
             -1,
             "YUY2ToY",
@@ -485,7 +509,31 @@ pub fn uyvy_to_y(
     size: ImageSize,
 ) -> Result<(), Error> {
     src.validate(size, "UYVYToY")?;
-    if dst_y.len() < dst_stride_y * size.height {
+
+    // c_int 範囲チェック（width / height は src.validate が検査済み）
+    require_c_int(
+        dst_stride_y,
+        "UYVYToY",
+        "destination stride exceeds c_int range",
+    )?;
+
+    // stride >= width チェック
+    if dst_stride_y < size.width {
+        return Err(Error::with_reason(
+            -1,
+            "UYVYToY",
+            "destination stride smaller than width",
+        ));
+    }
+
+    // バッファサイズ計算（オーバーフロー安全）
+    let dst_size = checked_buf_size(
+        dst_stride_y,
+        size.height,
+        "UYVYToY",
+        "destination buffer size overflow",
+    )?;
+    if dst_y.len() < dst_size {
         return Err(Error::with_reason(
             -1,
             "UYVYToY",

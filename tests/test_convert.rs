@@ -2,8 +2,11 @@
 //!
 //! エラーパス・境界値を検証する。正常系のプロパティ検証は PBT でカバーする。
 
+use std::ffi::c_int;
+
 use shiguredo_libyuv::{
-    ArgbImageMut, I420Image, I420ImageMut, ImageSize, Nv12Image, i420_to_argb, nv12_to_i420,
+    ArgbImageMut, I420Image, I420ImageMut, ImageSize, Nv12Image, UyvyImage, Yuy2Image,
+    i420_to_argb, nv12_to_i420, uyvy_to_y, yuy2_to_y,
 };
 
 // 異常系: i420_to_argb のバッファ不足で Err が返ること
@@ -112,4 +115,304 @@ fn nv12_to_i420_stride_too_small() {
 
     let result = nv12_to_i420(&src, &mut dst, size);
     assert!(result.is_err(), "stride 不足では Err が返るべき");
+}
+
+// 正常系: yuy2_to_y が YUY2 の Y 成分を正しく取り出すこと
+#[test]
+fn yuy2_to_y_extracts_y() {
+    // libyuv の YUY2ToYRow は src の偶数インデックス（Y 成分）を dst に出力する
+    let width = 8;
+    let height = 4;
+    let src_stride = width * 2;
+    let src_data: Vec<u8> = (0..(src_stride * height)).map(|i| i as u8).collect();
+    let src = Yuy2Image {
+        data: &src_data,
+        stride: src_stride,
+    };
+    let mut dst_y = vec![0u8; width * height];
+    let size = ImageSize::new(width, height);
+
+    yuy2_to_y(&src, &mut dst_y, width, size).expect("YUY2 から Y 成分の抽出が成功すること");
+
+    for r in 0..height {
+        for x in 0..width {
+            assert_eq!(
+                dst_y[r * width + x],
+                src_data[r * src_stride + x * 2],
+                "行 {} の要素 {} は YUY2 の Y 成分と一致すること",
+                r,
+                x
+            );
+        }
+    }
+}
+
+// 正常系: yuy2_to_y がパディング付きデスティネーションで行配置を正しく行うこと
+#[test]
+fn yuy2_to_y_padded_stride_row_placement() {
+    // dst_stride_y > width では C 側の行合体（coalesce）が効かないため、行ごとの stride 送りが検証される
+    let width = 8;
+    let height = 4;
+    let src_stride = width * 2;
+    let dst_stride_y = 12; // パディング 4 要素
+    let src_data: Vec<u8> = (0..(src_stride * height)).map(|i| i as u8).collect();
+    let src = Yuy2Image {
+        data: &src_data,
+        stride: src_stride,
+    };
+    let mut dst_y = vec![0xFFu8; dst_stride_y * height]; // 未書き込み領域の検出用
+    let size = ImageSize::new(width, height);
+
+    yuy2_to_y(&src, &mut dst_y, dst_stride_y, size).expect("パディング付き変換が成功すること");
+
+    for r in 0..height {
+        for x in 0..width {
+            assert_eq!(
+                dst_y[r * dst_stride_y + x],
+                src_data[r * src_stride + x * 2],
+                "行 {} の要素 {} が正しく配置されること",
+                r,
+                x
+            );
+        }
+        // libyuv は 1 行あたり width バイトだけ書き込むため、パディング領域は書き換わらない
+        for x in width..dst_stride_y {
+            assert_eq!(
+                dst_y[r * dst_stride_y + x],
+                0xFF,
+                "パディング領域は書き換わらないこと"
+            );
+        }
+    }
+}
+
+// 異常系: yuy2_to_y の dst_stride_y が width 未満で Err が返ること
+#[test]
+fn yuy2_to_y_dst_stride_too_small() {
+    let src_data = vec![0u8; 16 * 4];
+    let src = Yuy2Image {
+        data: &src_data,
+        stride: 16,
+    };
+    let mut dst_y = vec![0u8; 8 * 4];
+    let size = ImageSize::new(8, 4);
+
+    let result = yuy2_to_y(&src, &mut dst_y, 4, size);
+    let err = result.expect_err("dst_stride_y < width では Err が返るべき");
+    assert!(
+        err.to_string()
+            .contains("destination stride smaller than width"),
+        "dst 側の stride 不足の reason が返るべき: {}",
+        err
+    );
+}
+
+// 異常系: yuy2_to_y の dst_stride_y が c_int の範囲を超えると Err が返ること
+#[test]
+fn yuy2_to_y_dst_stride_exceeds_c_int() {
+    let src_data = vec![0u8; 16 * 4];
+    let src = Yuy2Image {
+        data: &src_data,
+        stride: 16,
+    };
+    let mut dst_y = vec![0u8; 8 * 4];
+    let size = ImageSize::new(8, 4);
+
+    let result = yuy2_to_y(&src, &mut dst_y, c_int::MAX as usize + 1, size);
+    let err = result.expect_err("dst_stride_y が c_int を超える場合は Err が返るべき");
+    assert!(
+        err.to_string()
+            .contains("destination stride exceeds c_int range"),
+        "dst 側の c_int 超過の reason が返るべき: {}",
+        err
+    );
+}
+
+// 異常系: yuy2_to_y のデスティネーションバッファ不足で Err が返ること
+#[test]
+fn yuy2_to_y_dst_buffer_too_small() {
+    let src_data = vec![0u8; 16 * 4];
+    let src = Yuy2Image {
+        data: &src_data,
+        stride: 16,
+    };
+    let mut dst_y = vec![0u8; 8 * 4 - 1]; // 1 バイト不足
+    let size = ImageSize::new(8, 4);
+
+    let result = yuy2_to_y(&src, &mut dst_y, 8, size);
+    let err = result.expect_err("dst バッファ不足では Err が返るべき");
+    assert!(
+        err.to_string().contains("destination Y buffer too small"),
+        "dst バッファ不足の reason が返るべき: {}",
+        err
+    );
+}
+
+// 異常系: yuy2_to_y がゼロサイズ入力で Err を返すこと
+#[test]
+fn yuy2_to_y_zero_size() {
+    let src_data = vec![0u8; 16];
+    let src = Yuy2Image {
+        data: &src_data,
+        stride: 16,
+    };
+    let mut dst_y = vec![0u8; 8];
+    let size = ImageSize::new(0, 1);
+
+    let result = yuy2_to_y(&src, &mut dst_y, 8, size);
+    assert!(result.is_err(), "width == 0 では Err が返るべき");
+
+    let size = ImageSize::new(1, 0);
+    let result = yuy2_to_y(&src, &mut dst_y, 8, size);
+    assert!(result.is_err(), "height == 0 では Err が返るべき");
+}
+
+// 正常系: uyvy_to_y が UYVY の Y 成分を正しく取り出すこと
+#[test]
+fn uyvy_to_y_extracts_y() {
+    // libyuv の UYVYToYRow は src の奇数インデックス（Y 成分）を dst に出力する
+    let width = 8;
+    let height = 4;
+    let src_stride = width * 2;
+    let src_data: Vec<u8> = (0..(src_stride * height)).map(|i| i as u8).collect();
+    let src = UyvyImage {
+        data: &src_data,
+        stride: src_stride,
+    };
+    let mut dst_y = vec![0u8; width * height];
+    let size = ImageSize::new(width, height);
+
+    uyvy_to_y(&src, &mut dst_y, width, size).expect("UYVY から Y 成分の抽出が成功すること");
+
+    for r in 0..height {
+        for x in 0..width {
+            assert_eq!(
+                dst_y[r * width + x],
+                src_data[r * src_stride + x * 2 + 1],
+                "行 {} の要素 {} は UYVY の Y 成分と一致すること",
+                r,
+                x
+            );
+        }
+    }
+}
+
+// 正常系: uyvy_to_y がパディング付きデスティネーションで行配置を正しく行うこと
+#[test]
+fn uyvy_to_y_padded_stride_row_placement() {
+    // dst_stride_y > width では C 側の行合体（coalesce）が効かないため、行ごとの stride 送りが検証される
+    let width = 8;
+    let height = 4;
+    let src_stride = width * 2;
+    let dst_stride_y = 12; // パディング 4 要素
+    let src_data: Vec<u8> = (0..(src_stride * height)).map(|i| i as u8).collect();
+    let src = UyvyImage {
+        data: &src_data,
+        stride: src_stride,
+    };
+    let mut dst_y = vec![0xFFu8; dst_stride_y * height]; // 未書き込み領域の検出用
+    let size = ImageSize::new(width, height);
+
+    uyvy_to_y(&src, &mut dst_y, dst_stride_y, size).expect("パディング付き変換が成功すること");
+
+    for r in 0..height {
+        for x in 0..width {
+            assert_eq!(
+                dst_y[r * dst_stride_y + x],
+                src_data[r * src_stride + x * 2 + 1],
+                "行 {} の要素 {} が正しく配置されること",
+                r,
+                x
+            );
+        }
+        // libyuv は 1 行あたり width バイトだけ書き込むため、パディング領域は書き換わらない
+        for x in width..dst_stride_y {
+            assert_eq!(
+                dst_y[r * dst_stride_y + x],
+                0xFF,
+                "パディング領域は書き換わらないこと"
+            );
+        }
+    }
+}
+
+// 異常系: uyvy_to_y の dst_stride_y が width 未満で Err が返ること
+#[test]
+fn uyvy_to_y_dst_stride_too_small() {
+    let src_data = vec![0u8; 16 * 4];
+    let src = UyvyImage {
+        data: &src_data,
+        stride: 16,
+    };
+    let mut dst_y = vec![0u8; 8 * 4];
+    let size = ImageSize::new(8, 4);
+
+    let result = uyvy_to_y(&src, &mut dst_y, 4, size);
+    let err = result.expect_err("dst_stride_y < width では Err が返るべき");
+    assert!(
+        err.to_string()
+            .contains("destination stride smaller than width"),
+        "dst 側の stride 不足の reason が返るべき: {}",
+        err
+    );
+}
+
+// 異常系: uyvy_to_y の dst_stride_y が c_int の範囲を超えると Err が返ること
+#[test]
+fn uyvy_to_y_dst_stride_exceeds_c_int() {
+    let src_data = vec![0u8; 16 * 4];
+    let src = UyvyImage {
+        data: &src_data,
+        stride: 16,
+    };
+    let mut dst_y = vec![0u8; 8 * 4];
+    let size = ImageSize::new(8, 4);
+
+    let result = uyvy_to_y(&src, &mut dst_y, c_int::MAX as usize + 1, size);
+    let err = result.expect_err("dst_stride_y が c_int を超える場合は Err が返るべき");
+    assert!(
+        err.to_string()
+            .contains("destination stride exceeds c_int range"),
+        "dst 側の c_int 超過の reason が返るべき: {}",
+        err
+    );
+}
+
+// 異常系: uyvy_to_y のデスティネーションバッファ不足で Err が返ること
+#[test]
+fn uyvy_to_y_dst_buffer_too_small() {
+    let src_data = vec![0u8; 16 * 4];
+    let src = UyvyImage {
+        data: &src_data,
+        stride: 16,
+    };
+    let mut dst_y = vec![0u8; 8 * 4 - 1]; // 1 バイト不足
+    let size = ImageSize::new(8, 4);
+
+    let result = uyvy_to_y(&src, &mut dst_y, 8, size);
+    let err = result.expect_err("dst バッファ不足では Err が返るべき");
+    assert!(
+        err.to_string().contains("destination Y buffer too small"),
+        "dst バッファ不足の reason が返るべき: {}",
+        err
+    );
+}
+
+// 異常系: uyvy_to_y がゼロサイズ入力で Err を返すこと
+#[test]
+fn uyvy_to_y_zero_size() {
+    let src_data = vec![0u8; 16];
+    let src = UyvyImage {
+        data: &src_data,
+        stride: 16,
+    };
+    let mut dst_y = vec![0u8; 8];
+    let size = ImageSize::new(0, 1);
+
+    let result = uyvy_to_y(&src, &mut dst_y, 8, size);
+    assert!(result.is_err(), "width == 0 では Err が返るべき");
+
+    let size = ImageSize::new(1, 0);
+    let result = uyvy_to_y(&src, &mut dst_y, 8, size);
+    assert!(result.is_err(), "height == 0 では Err が返るべき");
 }
