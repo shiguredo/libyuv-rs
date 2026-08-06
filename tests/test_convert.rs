@@ -1847,7 +1847,7 @@ fn detile_to_yuy2_zero_size_ok() {
 
 // 異常系: p210_to_p410 の src の stride 不足で Err が返ること
 #[test]
-fn p210_to_p410_src_stride_too_small() {
+fn p210_to_p410_src_y_stride_too_small() {
     // width=8, height=4: Y 必要サイズ = 8 * 4 = 32、UV 必要サイズ = 8 * 4 = 32（u16 要素数。
     // P210Image は UV 高さ = height を検証する）
     let width = 8;
@@ -1884,7 +1884,7 @@ fn p210_to_p410_src_stride_too_small() {
 
 // 異常系: p210_to_p410 の src の stride の c_int 超過で Err が返ること
 #[test]
-fn p210_to_p410_src_stride_exceeds_c_int() {
+fn p210_to_p410_src_y_stride_exceeds_c_int() {
     let width = 8;
     let height = 4;
     let uv_stride = 8;
@@ -2013,7 +2013,7 @@ fn p210_to_p410_success() {
 
 // 異常系: nv12_to_nv24 の dst の stride 不足で Err が返ること
 #[test]
-fn nv12_to_nv24_dst_stride_too_small() {
+fn nv12_to_nv24_dst_y_stride_too_small() {
     // width=8, height=4: src は NV12（UV 高さ = 2）、dst は NV24（UV 高さ = 4）。
     // dst の Y 必要サイズ = 8 * 4 = 32、UV 必要サイズ = 16 * 4 = 64
     let width = 8;
@@ -2086,7 +2086,7 @@ fn nv12_to_nv24_dst_uv_stride_too_small() {
 
 // 異常系: nv12_to_nv24 の dst の stride の c_int 超過で Err が返ること
 #[test]
-fn nv12_to_nv24_dst_stride_exceeds_c_int() {
+fn nv12_to_nv24_dst_y_stride_exceeds_c_int() {
     let width = 8;
     let height = 4;
     let y_stride = 8;
@@ -2114,6 +2114,41 @@ fn nv12_to_nv24_dst_stride_exceeds_c_int() {
     assert!(
         err.to_string().contains("Y stride exceeds c_int range"),
         "c_int 範囲超過の reason が返るべき: {}",
+        err
+    );
+}
+
+// 異常系: nv12_to_nv24 の dst の Y バッファ不足で Err が返ること
+#[test]
+fn nv12_to_nv24_dst_y_buffer_too_small() {
+    let width = 8;
+    let height = 4;
+    let y_stride = 8;
+    let uv_stride = 8;
+    let y = vec![0u8; 32];
+    let uv = vec![0u8; 16];
+    let src = Nv12Image {
+        y: &y,
+        y_stride,
+        uv: &uv,
+        uv_stride,
+    };
+    let size = ImageSize::new(width, height);
+
+    // dst のバッファ不足（Y 必要サイズ = 8 * 4 = 32）は Err になる
+    let mut y_dst = vec![0u8; 31]; // 1 バイト不足
+    let mut uv_dst = vec![0u8; 64];
+    let mut dst = Nv24ImageMut {
+        y: &mut y_dst,
+        y_stride,
+        uv: &mut uv_dst,
+        uv_stride: 16,
+    };
+    let result = nv12_to_nv24(&src, &mut dst, size);
+    let err = result.expect_err("dst の Y 必要サイズ未満では Err が返るべき");
+    assert!(
+        err.to_string().contains("destination Y buffer too small"),
+        "dst の Y 側のバッファ不足の reason が返るべき: {}",
         err
     );
 }
@@ -2183,7 +2218,7 @@ fn nv12_to_nv24_success() {
 
 // 異常系: nv16_to_nv24 の src の stride 不足で Err が返ること
 #[test]
-fn nv16_to_nv24_src_stride_too_small() {
+fn nv16_to_nv24_src_y_stride_too_small() {
     // width=8, height=4: src は NV16（UV 高さ = 4）、dst は NV24（UV 高さ = 4）。
     // Y 必要サイズ = 8 * 4 = 32、UV 必要サイズ = 8 * 4 = 32
     let width = 8;
@@ -2220,7 +2255,7 @@ fn nv16_to_nv24_src_stride_too_small() {
 
 // 異常系: nv16_to_nv24 の src の stride の c_int 超過で Err が返ること
 #[test]
-fn nv16_to_nv24_src_stride_exceeds_c_int() {
+fn nv16_to_nv24_src_y_stride_exceeds_c_int() {
     let width = 8;
     let height = 4;
     let y_stride = 8;
