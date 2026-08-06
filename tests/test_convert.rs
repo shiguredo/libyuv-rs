@@ -1595,23 +1595,26 @@ fn detile_plane_16_tiled_buffer_boundary() {
 // 異常系: detile_to_yuy2 がタイル配置の必要サイズを検証すること
 #[test]
 fn detile_to_yuy2_tiled_buffer_boundary() {
-    // width=5, height=3, tile_height=2:
-    // Y 必要サイズ = 16 * ceil(3 / 2) * 2 = 64（y_stride は round16 の 16）
-    // UV 必要サイズ = 16 * ceil(3 / 2) * (2 / 2) = 32（UV タイル高は tile_height / 2）
-    let width = 5;
-    let height = 3;
-    let tile_height = 2;
-    let y_stride = 16;
-    let uv_stride = 16;
-    let uv = vec![0u8; 32];
-    let mut dst_data = vec![0u8; 10 * 3];
+    // width=32, height=17, tile_height=16:
+    // Y 必要サイズ = 32 * ceil(17 / 16) * 16 = 1024
+    //   （線形サイズ 32 * 17 = 544 より大きく、タイル段数を検証できる）
+    // UV 必要サイズ = 32 * ceil(17 / 16) * (16 / 2) = 512
+    //   （線形サイズ 32 * ceil(17 / 2) = 288 より大きく、UV タイル高が
+    //    tile_height / 2 であることを検証できる）
+    let width = 32;
+    let height = 17;
+    let tile_height = 16;
+    let y_stride = 32;
+    let uv_stride = 32;
+    let uv = vec![0u8; 512];
+    let mut dst_data = vec![0u8; 64 * 17];
     let mut dst = Yuy2ImageMut {
         data: &mut dst_data,
-        stride: 10,
+        stride: 64,
     };
     let size = ImageSize::new(width, height);
 
-    let y = vec![0u8; 63]; // 1 バイト不足
+    let y = vec![0u8; 1023]; // 1 バイト不足
     let src = Nv12Image {
         y: &y,
         y_stride,
@@ -1627,7 +1630,7 @@ fn detile_to_yuy2_tiled_buffer_boundary() {
     );
 
     // 必要サイズちょうどでは成功する
-    let y = vec![0u8; 64];
+    let y = vec![0u8; 1024];
     let src = Nv12Image {
         y: &y,
         y_stride,
@@ -1637,8 +1640,8 @@ fn detile_to_yuy2_tiled_buffer_boundary() {
     detile_to_yuy2(&src, &mut dst, size, tile_height).expect("必要サイズちょうどで成功するべき");
 
     // UV 側もタイル配置の必要サイズを検証する
-    let y = vec![0u8; 64];
-    let uv = vec![0u8; 31]; // 1 バイト不足
+    let y = vec![0u8; 1024];
+    let uv = vec![0u8; 511]; // 1 バイト不足
     let src = Nv12Image {
         y: &y,
         y_stride,
