@@ -117,10 +117,12 @@ fn nv12_to_i420_stride_too_small() {
     assert!(result.is_err(), "stride 不足では Err が返るべき");
 }
 
-// 正常系: yuy2_to_y が YUY2 の Y 成分を正しく取り出すこと
+// 正常系: yuy2_to_y が stride == width で正しい出力を返すこと
 #[test]
 fn yuy2_to_y_extracts_y() {
-    // libyuv の YUY2ToYRow は src の偶数インデックス（Y 成分）を dst に出力する
+    // libyuv の YUY2ToYRow は src の偶数インデックス（Y 成分）を dst に出力する。
+    // src_stride == width * 2 かつ dst_stride_y == width のため、C 側の行合体（coalesce）
+    // により全行が 1 回の行関数呼び出しで処理される
     let width = 8;
     let height = 4;
     let src_stride = width * 2;
@@ -171,6 +173,52 @@ fn yuy2_to_y_padded_stride_row_placement() {
                 dst_y[r * dst_stride_y + x],
                 src_data[r * src_stride + x * 2],
                 "行 {} の要素 {} が正しく配置されること",
+                r,
+                x
+            );
+        }
+        // libyuv は 1 行あたり width バイトだけ書き込むため、パディング領域は書き換わらない
+        for x in width..dst_stride_y {
+            assert_eq!(
+                dst_y[r * dst_stride_y + x],
+                0xFF,
+                "パディング領域は書き換わらないこと"
+            );
+        }
+    }
+}
+
+// 正常系: yuy2_to_y が奇数幅でも末尾ピクセルを正しく取り出すこと
+#[test]
+fn yuy2_to_y_odd_width() {
+    // dst_stride_y を width と異なる値にして C 側の行合体（coalesce）を無効化し、
+    // 奇数幅の末尾ピクセル処理（width & 1 の分岐）を実行させる。
+    // src 側もパディングを持たせ、SIMD の余り処理による読み越しをバッファ内に収める
+    let width = 5;
+    let height = 2;
+    let src_stride = 16; // width * 2 = 10 より大きいパディング
+    let dst_stride_y = 6; // width = 5 より大きいパディング
+    let mut src_data = vec![0xEEu8; src_stride * height]; // 読み越し検出用の別値
+    for r in 0..height {
+        for i in 0..(width * 2) {
+            src_data[r * src_stride + i] = (r * src_stride + i) as u8;
+        }
+    }
+    let src = Yuy2Image {
+        data: &src_data,
+        stride: src_stride,
+    };
+    let mut dst_y = vec![0xFFu8; dst_stride_y * height]; // 未書き込み領域の検出用
+    let size = ImageSize::new(width, height);
+
+    yuy2_to_y(&src, &mut dst_y, dst_stride_y, size).expect("奇数幅の変換が成功すること");
+
+    for r in 0..height {
+        for x in 0..width {
+            assert_eq!(
+                dst_y[r * dst_stride_y + x],
+                src_data[r * src_stride + x * 2],
+                "行 {} の要素 {} は YUY2 の Y 成分と一致すること",
                 r,
                 x
             );
@@ -269,36 +317,6 @@ fn yuy2_to_y_zero_size() {
     assert!(result.is_err(), "height == 0 では Err が返るべき");
 }
 
-// 正常系: yuy2_to_y が奇数幅でも末尾ピクセルを正しく取り出すこと
-#[test]
-fn yuy2_to_y_odd_width() {
-    // libyuv の YUY2ToYRow は奇数幅の末尾ピクセルを別分岐で処理する
-    let width = 5;
-    let height = 2;
-    let src_stride = width * 2;
-    let src_data: Vec<u8> = (0..(src_stride * height)).map(|i| i as u8).collect();
-    let src = Yuy2Image {
-        data: &src_data,
-        stride: src_stride,
-    };
-    let mut dst_y = vec![0u8; width * height];
-    let size = ImageSize::new(width, height);
-
-    yuy2_to_y(&src, &mut dst_y, width, size).expect("奇数幅の変換が成功すること");
-
-    for r in 0..height {
-        for x in 0..width {
-            assert_eq!(
-                dst_y[r * width + x],
-                src_data[r * src_stride + x * 2],
-                "行 {} の要素 {} は YUY2 の Y 成分と一致すること",
-                r,
-                x
-            );
-        }
-    }
-}
-
 // 正常系: uyvy_to_y が UYVY の Y 成分を正しく取り出すこと
 #[test]
 fn uyvy_to_y_extracts_y() {
@@ -353,6 +371,52 @@ fn uyvy_to_y_padded_stride_row_placement() {
                 dst_y[r * dst_stride_y + x],
                 src_data[r * src_stride + x * 2 + 1],
                 "行 {} の要素 {} が正しく配置されること",
+                r,
+                x
+            );
+        }
+        // libyuv は 1 行あたり width バイトだけ書き込むため、パディング領域は書き換わらない
+        for x in width..dst_stride_y {
+            assert_eq!(
+                dst_y[r * dst_stride_y + x],
+                0xFF,
+                "パディング領域は書き換わらないこと"
+            );
+        }
+    }
+}
+
+// 正常系: uyvy_to_y が奇数幅でも末尾ピクセルを正しく取り出すこと
+#[test]
+fn uyvy_to_y_odd_width() {
+    // dst_stride_y を width と異なる値にして C 側の行合体（coalesce）を無効化し、
+    // 奇数幅の末尾ピクセル処理（width & 1 の分岐）を実行させる。
+    // src 側もパディングを持たせ、SIMD の余り処理による読み越しをバッファ内に収める
+    let width = 5;
+    let height = 2;
+    let src_stride = 16; // width * 2 = 10 より大きいパディング
+    let dst_stride_y = 6; // width = 5 より大きいパディング
+    let mut src_data = vec![0xEEu8; src_stride * height]; // 読み越し検出用の別値
+    for r in 0..height {
+        for i in 0..(width * 2) {
+            src_data[r * src_stride + i] = (r * src_stride + i) as u8;
+        }
+    }
+    let src = UyvyImage {
+        data: &src_data,
+        stride: src_stride,
+    };
+    let mut dst_y = vec![0xFFu8; dst_stride_y * height]; // 未書き込み領域の検出用
+    let size = ImageSize::new(width, height);
+
+    uyvy_to_y(&src, &mut dst_y, dst_stride_y, size).expect("奇数幅の変換が成功すること");
+
+    for r in 0..height {
+        for x in 0..width {
+            assert_eq!(
+                dst_y[r * dst_stride_y + x],
+                src_data[r * src_stride + x * 2 + 1],
+                "行 {} の要素 {} は UYVY の Y 成分と一致すること",
                 r,
                 x
             );
@@ -449,34 +513,4 @@ fn uyvy_to_y_zero_size() {
     let size = ImageSize::new(1, 0);
     let result = uyvy_to_y(&src, &mut dst_y, 8, size);
     assert!(result.is_err(), "height == 0 では Err が返るべき");
-}
-
-// 正常系: uyvy_to_y が奇数幅でも末尾ピクセルを正しく取り出すこと
-#[test]
-fn uyvy_to_y_odd_width() {
-    // libyuv の UYVYToYRow は奇数幅の末尾ピクセルを別分岐で処理する
-    let width = 5;
-    let height = 2;
-    let src_stride = width * 2;
-    let src_data: Vec<u8> = (0..(src_stride * height)).map(|i| i as u8).collect();
-    let src = UyvyImage {
-        data: &src_data,
-        stride: src_stride,
-    };
-    let mut dst_y = vec![0u8; width * height];
-    let size = ImageSize::new(width, height);
-
-    uyvy_to_y(&src, &mut dst_y, width, size).expect("奇数幅の変換が成功すること");
-
-    for r in 0..height {
-        for x in 0..width {
-            assert_eq!(
-                dst_y[r * width + x],
-                src_data[r * src_stride + x * 2 + 1],
-                "行 {} の要素 {} は UYVY の Y 成分と一致すること",
-                r,
-                x
-            );
-        }
-    }
 }

@@ -53,6 +53,7 @@
   - 変換後の stride が c_int の範囲を超える場合は Err を返す
   - @voluntas
 - [FIX] yuy2_to_y と uyvy_to_y のデスティネーション検証を標準パターンに統一する
+  - dst_stride_y の c_int 範囲チェックと stride >= width チェックを追加し、非チェック乗算を checked_buf_size に置き換える
   - @voluntas
 
 ### misc
