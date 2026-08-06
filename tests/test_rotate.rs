@@ -149,15 +149,16 @@ fn android420_to_i420_rotate_interleaved_stride_boundary() {
         err
     );
 
-    // バッファをインターリーブ幅に合わせれば成功する
-    let u_interleaved = vec![0u8; halfwidth * 2 * uv_height];
-    let v_interleaved = vec![0u8; halfwidth * 2 * uv_height];
+    // バッファをインターリーブ幅に合わせ、同一バッファの連続領域（v は u の 1 バイト後）で
+    // 渡せば成功する。末尾 1 バイトは v 側の検証（len >= stride * ceil(height / 2)）を
+    // 満たすためのパディング
+    let buf = vec![0u8; halfwidth * 2 * uv_height + 1];
     let src = Android420Image {
         y: &y,
         y_stride: width,
-        u: &u_interleaved,
+        u: &buf[..buf.len() - 1],
         u_stride: halfwidth * 2,
-        v: &v_interleaved,
+        v: &buf[1..],
         v_stride: halfwidth * 2,
     };
     android420_to_i420_rotate(&src, src_size, 2, &mut dst, src_size, RotationMode::None)

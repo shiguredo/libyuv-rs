@@ -37,6 +37,7 @@ Low。
 - src / dst のペアが 1 関数に統合されていること
 - `define_y_image!` の validate がヘルパー委譲になっていること
 - `packed.rs` の `yuy2_to_y` / `uyvy_to_y` のインライン検証ブロック（`require_c_int` / `stride >= width` / `checked_buf_size` の手書き実装）も統合対象に含まれていること（これらの関数は本 issue のスコープ決定後に追加されたため、追記でスコープを拡大する）
+- `hardware.rs` の `android420_to_argb` / `android420_to_abgr` / `android420_to_i420` と `rotate.rs` の `android420_to_i420_rotate` のインターリーブ検証ブロック（`pixel_stride_uv` の値検証と `pixel_stride_uv == 2` の U/V ストライド・バッファ検証）も統合対象に含まれていること（4 関数で約 50 行 × 4 が重複しており、本 issue のスコープ決定後に追加された）
 - エラーメッセージが変更前と同一であること
 - `cargo test --workspace --features source-build` が成功すること
 - `cargo fmt --all --check` と `cargo clippy --workspace --features source-build -- -D warnings` が成功すること
