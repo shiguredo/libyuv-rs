@@ -4145,9 +4145,7 @@ pub fn half_float_plane(
         "destination stride exceeds c_int range",
     )?;
 
-    // HalfFloatPlane は stride をバイト単位で受け取る仕様のため（docstring 参照）、
-    // 要素数単位の stride を 2 倍して渡す。require_c_int を通過済みの値の 2 倍は
-    // usize ではオーバーフローしないため、チェック付き乗算は不要。
+    // require_c_int を通過済みの値の 2 倍は usize ではオーバーフローしないため、チェック付き乗算は不要。
     let src_stride_bytes = src_stride * 2;
     let dst_stride_bytes = dst_stride * 2;
     require_c_int(

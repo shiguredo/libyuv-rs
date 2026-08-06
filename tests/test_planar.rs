@@ -6,6 +6,13 @@ use std::ffi::c_int;
 
 use shiguredo_libyuv::{ImageSize, copy_plane, half_float_plane, split_uv_plane};
 
+// scale = 1.0 で 2 の冪 2^k の入力を変換したときの f16 出力のビットパターンを返す。
+// 2 の冪は仮数が 0 のため、truncation（C / NEON / AVX2）でも RNE 丸め（F16C / SVE2）でも
+// 丸めが発生せず、f16 の指数バイアス 15 の規則で (k + 15) << 10 になる
+fn f16_bits_of_pow2(k: u16) -> u16 {
+    (k + 15) << 10
+}
+
 // 異常系: copy_plane のバッファ不足で Err が返ること
 #[test]
 fn copy_plane_buffer_too_small() {
@@ -56,14 +63,20 @@ fn split_uv_plane_stride_too_small() {
 // 正常系: half_float_plane が stride == width で正しい出力を返すこと
 #[test]
 fn half_float_plane_stride_equal_width() {
-    // scale = 1.0 では 2 の冪の入力は全バックエンド（C / NEON / AVX2 / F16C / SVE2）で
-    // 変換後も厳密に一致する（仮数が 0 のため丸めが発生しない）。
-    // 出力は f16 のビットパターンで、2^k は (k + 15) << 10 になる
+    // scale = 1.0 では 2 の冪と 0 の入力は全バックエンドで変換後も厳密に一致する
     let width = 8;
     let height = 4;
-    let src: Vec<u16> = (0..(width * height)).map(|i| 1u16 << (i % 16)).collect();
+    let src: Vec<u16> = (0..(width * height))
+        .map(|i| match i % 17 {
+            16 => 0,
+            k => 1u16 << k,
+        })
+        .collect();
     let expected: Vec<u16> = (0..(width * height))
-        .map(|i| (((i % 16) + 15) << 10) as u16)
+        .map(|i| match i % 17 {
+            16 => 0,
+            k => f16_bits_of_pow2(k as u16),
+        })
         .collect();
     let mut dst = vec![0u16; width * height];
     let size = ImageSize::new(width, height);
@@ -81,9 +94,7 @@ fn half_float_plane_stride_equal_width() {
 #[test]
 fn half_float_plane_padded_stride_row_placement() {
     // stride > width では C 側の行合体（coalesce）が効かないため、行ごとの stride 送りが検証される。
-    // 行 r を 2 の冪 2^r で埋め、出力の各行が 2^r の f16 ビットパターン ((r + 15) << 10) に
-    // なることを確認する。stride を要素数のままバイト単位として渡すと C 側の行送りが
-    // 半分になり、行が重なり合ってこのテストは失敗する
+    // 行 r を 2 の冪 2^r で埋め、出力の各行が f16 ビットパターンに変換されることを確認する
     let width = 8;
     let height = 4;
     let src_stride = 12; // パディング 4 要素
@@ -101,7 +112,7 @@ fn half_float_plane_padded_stride_row_placement() {
         .expect("パディング付きの変換が成功すること");
 
     for r in 0..height {
-        let expected = ((r as u16) + 15) << 10;
+        let expected = f16_bits_of_pow2(r as u16);
         for i in 0..width {
             assert_eq!(
                 dst[r * dst_stride + i],
@@ -127,7 +138,8 @@ fn half_float_plane_padded_stride_row_placement() {
 fn half_float_plane_stride_bytes_exceeds_c_int() {
     // 要素数単位の stride は c_int の範囲内でも、バイト単位に変換すると範囲を超える。
     // 変換後の検証はバッファサイズ検証より前にあるため、巨大なバッファは必要ない。
-    // src / dst それぞれの変換後 stride が検証されることを確認する
+    // 相手側の stride は width == 1 の最小有効値 1 にする（0 だと stride < width チェックが
+    // 先に発火するため、対象の変換後 stride 検証に到達しない）
     let src = vec![0u16; 1];
     let mut dst = vec![0u16; 1];
     let size = ImageSize::new(1, 1);
@@ -160,5 +172,27 @@ fn half_float_plane_src_stride_too_small() {
     let size = ImageSize::new(8, 1);
 
     let result = half_float_plane(&src, 4, &mut dst, 8, 1.0, size);
-    assert!(result.is_err(), "src_stride < width では Err が返るべき");
+    let err = result.expect_err("src_stride < width では Err が返るべき");
+    assert!(
+        err.to_string().contains("source stride smaller than width"),
+        "src 側の stride 不足の reason が返るべき: {}",
+        err
+    );
+}
+
+// 異常系: half_float_plane の dst_stride が width 未満で Err が返ること
+#[test]
+fn half_float_plane_dst_stride_too_small() {
+    let src = vec![0u16; 16];
+    let mut dst = vec![0u16; 8];
+    let size = ImageSize::new(8, 1);
+
+    let result = half_float_plane(&src, 8, &mut dst, 4, 1.0, size);
+    let err = result.expect_err("dst_stride < width では Err が返るべき");
+    assert!(
+        err.to_string()
+            .contains("destination stride smaller than width"),
+        "dst 側の stride 不足の reason が返るべき: {}",
+        err
+    );
 }

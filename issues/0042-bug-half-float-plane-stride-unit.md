@@ -48,7 +48,7 @@ Rust の公開 API は他関数と一貫して「stride は要素数」のまま
 ## 完了条件
 
 - `half_float_plane` が stride == width（height >= 2）の入力で正しい出力を返すこと。ただし stride == width では C 側の行合体（coalesce）により行ごとの stride 送りが検証されないため、stride > width（パディング付き）の入力でも行配置の検証（各行の入力値が出力の正しい行位置に配置されること）が行えること
-- 正常系の検証は参照実装を使わない既知解で行うこと。scale = 1.0 では 2 の冪の入力が変換後も厳密に一致する（libyuv の `HalfFloatRow` は全実装（C / NEON / AVX2 / F16C）が `bits >> 13` による truncation であり、2 の冪は下位 13 bit が全て 0 のため）ため、出力を直接期待値として検証できること
+- 正常系の検証は参照実装を使わない既知解で行うこと。scale = 1.0 では 2 の冪の入力が変換後も厳密に一致する（2 の冪は仮数が 0 のため、truncation（C / NEON / AVX2）でも RNE 丸め（F16C / SVE2）でも丸めが発生しない）ため、出力を直接期待値として検証できること
 - stride の 2 倍変換が `c_int` の範囲を超える場合に `Err` を返すこと（`checked_buf_size` のオーバーフローは 64-bit では到達不能なためテスト対象外）
 - docstring に stride の単位（u16 要素数）が明記されていること
 - 上記のテストが `tests/test_planar.rs`（0053 で分割された場合は `tests/test_planar/` 配下）に追加されていること
