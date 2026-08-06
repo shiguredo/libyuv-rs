@@ -5,9 +5,10 @@
 use std::ffi::c_int;
 
 use shiguredo_libyuv::{
-    AbgrImageMut, Android420Image, ArgbImageMut, I420Image, I420ImageMut, ImageSize, Nv12Image,
-    UyvyImage, Yuy2Image, android420_to_abgr, android420_to_argb, android420_to_i420, i420_to_argb,
-    nv12_to_i420, uyvy_to_y, yuy2_to_y,
+    AbgrImageMut, Android420Image, ArgbImageMut, I420Image, I420ImageMut, ImageSize, Mm21Image,
+    Mt2tImage, Nv12Image, P010ImageMut, UyvyImage, Yuy2Image, android420_to_abgr,
+    android420_to_argb, android420_to_i420, i420_to_argb, mm21_to_i420, mt2t_to_p010, nv12_to_i420,
+    uyvy_to_y, yuy2_to_y,
 };
 
 // 異常系: i420_to_argb のバッファ不足で Err が返ること
@@ -1026,4 +1027,240 @@ fn android420_to_abgr_interleaved_stride_boundary() {
     };
     android420_to_abgr(&src, 2, &mut dst, size)
         .expect("インターリーブ幅の U ストライドでは成功するべき");
+}
+
+// 異常系: mm21_to_i420 がタイル配置の必要サイズを下回る Y バッファを Err にすること
+#[test]
+fn mm21_to_i420_tiled_y_buffer_boundary() {
+    // width=5, height=3: タイル行幅 16（16 の倍数に切り上げ）、タイル行数 1。
+    // Y 必要サイズ = 16 * 32 = 512（線形サイズ 5 * 3 = 15 より過大）
+    let width = 5;
+    let height = 3;
+    let uv = vec![0u8; 256];
+    let mut y_dst = vec![0u8; width * height];
+    let mut u_dst = vec![0u8; 3 * 2];
+    let mut v_dst = vec![0u8; 3 * 2];
+    let mut dst = I420ImageMut {
+        y: &mut y_dst,
+        y_stride: width,
+        u: &mut u_dst,
+        u_stride: 3,
+        v: &mut v_dst,
+        v_stride: 3,
+    };
+    let size = ImageSize::new(width, height);
+
+    let y = vec![0u8; 511]; // 1 バイト不足
+    let src = Mm21Image {
+        y: &y,
+        y_stride: width,
+        uv: &uv,
+        uv_stride: 6,
+    };
+    let result = mm21_to_i420(&src, &mut dst, size);
+    let err = result.expect_err("タイル配置の必要サイズ未満では Err が返るべき");
+    assert!(
+        err.to_string().contains("source Y buffer too small"),
+        "Y 側のタイル必要サイズ不足の reason が返るべき: {}",
+        err
+    );
+
+    // 必要サイズちょうどでは成功する
+    let y = vec![0u8; 512];
+    let src = Mm21Image {
+        y: &y,
+        y_stride: width,
+        uv: &uv,
+        uv_stride: 6,
+    };
+    mm21_to_i420(&src, &mut dst, size).expect("必要サイズちょうどで成功するべき");
+}
+
+// 異常系: mm21_to_i420 がタイル配置の必要サイズを下回る UV バッファを Err にすること
+#[test]
+fn mm21_to_i420_tiled_uv_buffer_boundary() {
+    // UV 必要サイズ = 16 * 16 = 256（タイル行幅 16、タイル高 16、タイル行数 1）
+    let width = 5;
+    let height = 3;
+    let y = vec![0u8; 512];
+    let mut y_dst = vec![0u8; width * height];
+    let mut u_dst = vec![0u8; 3 * 2];
+    let mut v_dst = vec![0u8; 3 * 2];
+    let mut dst = I420ImageMut {
+        y: &mut y_dst,
+        y_stride: width,
+        u: &mut u_dst,
+        u_stride: 3,
+        v: &mut v_dst,
+        v_stride: 3,
+    };
+    let size = ImageSize::new(width, height);
+
+    let uv = vec![0u8; 255]; // 1 バイト不足
+    let src = Mm21Image {
+        y: &y,
+        y_stride: width,
+        uv: &uv,
+        uv_stride: 6,
+    };
+    let result = mm21_to_i420(&src, &mut dst, size);
+    let err = result.expect_err("タイル配置の必要サイズ未満では Err が返るべき");
+    assert!(
+        err.to_string().contains("source UV buffer too small"),
+        "UV 側のタイル必要サイズ不足の reason が返るべき: {}",
+        err
+    );
+
+    // 必要サイズちょうどでは成功する
+    let uv = vec![0u8; 256];
+    let src = Mm21Image {
+        y: &y,
+        y_stride: width,
+        uv: &uv,
+        uv_stride: 6,
+    };
+    mm21_to_i420(&src, &mut dst, size).expect("必要サイズちょうどで成功するべき");
+}
+
+// 異常系: mm21_to_i420 がタイル高非倍数 × 幅 16 倍数のタイル必要サイズを検証すること
+#[test]
+fn mm21_to_i420_tiled_buffer_16_width_boundary() {
+    // width=16, height=33: タイル行幅 16、タイル行数 2（33 は 32 の倍数でない）。
+    // Y 必要サイズ = (2 - 1) * 16 * 32 + 16 * 32 = 1024（線形サイズ 16 * 33 = 528 より過大）
+    let width = 16;
+    let height = 33;
+    let uv = vec![0u8; 512];
+    let mut y_dst = vec![0u8; width * height];
+    let mut u_dst = vec![0u8; 8 * 17];
+    let mut v_dst = vec![0u8; 8 * 17];
+    let mut dst = I420ImageMut {
+        y: &mut y_dst,
+        y_stride: width,
+        u: &mut u_dst,
+        u_stride: 8,
+        v: &mut v_dst,
+        v_stride: 8,
+    };
+    let size = ImageSize::new(width, height);
+
+    let y = vec![0u8; 1023]; // 1 バイト不足
+    let src = Mm21Image {
+        y: &y,
+        y_stride: width,
+        uv: &uv,
+        uv_stride: width,
+    };
+    let result = mm21_to_i420(&src, &mut dst, size);
+    let err = result.expect_err("タイル配置の必要サイズ未満では Err が返るべき");
+    assert!(
+        err.to_string().contains("source Y buffer too small"),
+        "Y 側のタイル必要サイズ不足の reason が返るべき: {}",
+        err
+    );
+
+    // 必要サイズちょうどでは成功する
+    let y = vec![0u8; 1024];
+    let src = Mm21Image {
+        y: &y,
+        y_stride: width,
+        uv: &uv,
+        uv_stride: width,
+    };
+    mm21_to_i420(&src, &mut dst, size).expect("必要サイズちょうどで成功するべき");
+}
+
+// 異常系: mt2t_to_p010 が 10bit パックのタイル必要サイズを下回るバッファを Err にすること
+#[test]
+fn mt2t_to_p010_tiled_buffer_boundary() {
+    // width=5, height=3: タイル行幅 16、タイル行数 1。
+    // 10bit パック（10/8 倍）で Y 必要サイズ = 16 * 32 * 10 / 8 = 640、
+    // UV 必要サイズ = 16 * 16 * 10 / 8 = 320（MM21 の 512 / 256 より過大）
+    let width = 5;
+    let height = 3;
+    let mut y_dst = vec![0u16; width * height];
+    let mut uv_dst = vec![0u16; 6 * 2];
+    let mut dst = P010ImageMut {
+        y: &mut y_dst,
+        y_stride: width,
+        uv: &mut uv_dst,
+        uv_stride: 6,
+    };
+    let size = ImageSize::new(width, height);
+
+    let y = vec![0u8; 639]; // 1 バイト不足
+    let uv = vec![0u8; 320];
+    let src = Mt2tImage {
+        y: &y,
+        y_stride: width,
+        uv: &uv,
+        uv_stride: 6,
+    };
+    let result = mt2t_to_p010(&src, &mut dst, size);
+    let err = result.expect_err("10bit パックの必要サイズ未満では Err が返るべき");
+    assert!(
+        err.to_string().contains("source Y buffer too small"),
+        "Y 側の 10bit 必要サイズ不足の reason が返るべき: {}",
+        err
+    );
+
+    // Y 必要サイズちょうど、UV が 1 バイト不足
+    let y = vec![0u8; 640];
+    let uv = vec![0u8; 319];
+    let src = Mt2tImage {
+        y: &y,
+        y_stride: width,
+        uv: &uv,
+        uv_stride: 6,
+    };
+    let result = mt2t_to_p010(&src, &mut dst, size);
+    let err = result.expect_err("UV の 10bit 必要サイズ未満では Err が返るべき");
+    assert!(
+        err.to_string().contains("source UV buffer too small"),
+        "UV 側の 10bit 必要サイズ不足の reason が返るべき: {}",
+        err
+    );
+
+    // 必要サイズちょうどでは成功する
+    let uv = vec![0u8; 320];
+    let src = Mt2tImage {
+        y: &y,
+        y_stride: width,
+        uv: &uv,
+        uv_stride: 6,
+    };
+    mt2t_to_p010(&src, &mut dst, size).expect("必要サイズちょうどで成功するべき");
+}
+
+// 異常系: mm21_to_i420 がゼロサイズ入力で Err を返すこと
+#[test]
+fn mm21_to_i420_zero_size() {
+    // タイル行数の計算（height.div_ceil(32) - 1）がアンダーフローするため、
+    // ゼロサイズは検証で先に Err になる
+    let y = vec![0u8; 512];
+    let uv = vec![0u8; 256];
+    let mut y_dst = vec![0u8; 5 * 3];
+    let mut u_dst = vec![0u8; 3 * 2];
+    let mut v_dst = vec![0u8; 3 * 2];
+    let mut dst = I420ImageMut {
+        y: &mut y_dst,
+        y_stride: 5,
+        u: &mut u_dst,
+        u_stride: 3,
+        v: &mut v_dst,
+        v_stride: 3,
+    };
+
+    let src = Mm21Image {
+        y: &y,
+        y_stride: 5,
+        uv: &uv,
+        uv_stride: 6,
+    };
+    let size = ImageSize::new(0, 3);
+    let result = mm21_to_i420(&src, &mut dst, size);
+    assert!(result.is_err(), "width == 0 では Err が返るべき");
+
+    let size = ImageSize::new(5, 0);
+    let result = mm21_to_i420(&src, &mut dst, size);
+    assert!(result.is_err(), "height == 0 では Err が返るべき");
 }

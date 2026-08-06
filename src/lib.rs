@@ -170,6 +170,139 @@ fn checked_buf_size(
         .ok_or_else(|| Error::with_reason(-1, function, reason))
 }
 
+/// タイル配置の必要サイズ（最終タイル行を含む）をオーバーフロー安全に計算する。
+/// タイル行間隔は stride * tile_height、最終タイル行の読み出しは tile_row_size バイト
+/// （libyuv の行送り規則。planar_functions.cc の DetilePlane と convert.cc の
+/// MT2TToP010 を参照）
+fn checked_tiled_buf_size(
+    tile_rows: usize,
+    stride: usize,
+    tile_height: usize,
+    tile_row_size: usize,
+    function: &'static str,
+) -> Result<usize, Error> {
+    (tile_rows - 1)
+        .checked_mul(stride)
+        .and_then(|v| v.checked_mul(tile_height))
+        .and_then(|v| v.checked_add(tile_row_size))
+        .ok_or_else(|| Error::with_reason(-1, function, "tiled buffer size overflow"))
+}
+
+/// タイル形式（MM21 / MT2T）のソースバッファ検証。
+///
+/// タイル配置では 1 タイル行の読み出し幅が、幅を 16 の倍数に切り上げた値 × タイル高になり、
+/// 線形サイズ（stride * height）より大きくなりうる。タイル行数は Y / UV とも
+/// `height.div_ceil(32)`（`ceil(ceil(h / 2) / 16) == ceil(h / 32)` のため。UV の
+/// タイル高は 16、Y は 32）。MM21 は 8bit、MT2T は 10bit パック（10/8 倍）で読み出す。
+///
+/// 検証は安全側（過大要求）である。MM21 は実際には最終タイル列の余り分と最終タイル行の
+/// 端数行分を読まないため、式は最大で 1 タイル行分過大になる。MT2T は部分タイル行でも
+/// フルサイズを読むため正確。
+fn validate_tiled_nv_src_inner(
+    y: &[u8],
+    y_stride: usize,
+    uv: &[u8],
+    uv_stride: usize,
+    size: ImageSize,
+    function: &'static str,
+    is_10bit: bool,
+) -> Result<(), Error> {
+    // c_int 範囲チェック
+    require_c_int(size.width, function, "width exceeds c_int range")?;
+    require_c_int(size.height, function, "height exceeds c_int range")?;
+    require_c_int(y_stride, function, "Y stride exceeds c_int range")?;
+    require_c_int(uv_stride, function, "UV stride exceeds c_int range")?;
+
+    // ゼロサイズはタイル行数の計算（height.div_ceil(32) - 1）がアンダーフローするため
+    // 先に Err にする（libyuv 側も -1 を返す）
+    if size.width == 0 || size.height == 0 {
+        return Err(Error::with_reason(-1, function, "zero size input"));
+    }
+
+    // stride 下限チェック（線形検証と同じ。タイル行間隔が stride * tile_height のため、
+    // stride が小さすぎるとタイル行の読み出しが次の行と重なる）
+    if y_stride < size.width {
+        return Err(Error::with_reason(
+            -1,
+            function,
+            "Y stride smaller than width",
+        ));
+    }
+    let min_uv_stride = size
+        .width
+        .div_ceil(2)
+        .checked_mul(2)
+        .ok_or_else(|| Error::with_reason(-1, function, "UV minimum stride overflow"))?;
+    if uv_stride < min_uv_stride {
+        return Err(Error::with_reason(
+            -1,
+            function,
+            "UV stride smaller than chroma width",
+        ));
+    }
+
+    // タイル行の読み出し幅（16 の倍数に切り上げ）。MM21 の UV 幅 (width + 1) & ~1 も
+    // 16 の倍数に切り上げると width の切り上げと一致するため、Y / UV とも同じ幅になる
+    let padded_width = size
+        .width
+        .div_ceil(16)
+        .checked_mul(16)
+        .ok_or_else(|| Error::with_reason(-1, function, "padded width overflow"))?;
+
+    // 最終タイル行の読み出しサイズ（Y: タイル高 32、UV: タイル高 16。10bit は 10/8 倍）
+    let y_tile_row_size = padded_width
+        .checked_mul(32)
+        .and_then(|v| {
+            if is_10bit {
+                v.checked_mul(10).map(|w| w / 8)
+            } else {
+                Some(v)
+            }
+        })
+        .ok_or_else(|| Error::with_reason(-1, function, "Y tile row size overflow"))?;
+    let uv_tile_row_size = padded_width
+        .checked_mul(16)
+        .and_then(|v| {
+            if is_10bit {
+                v.checked_mul(10).map(|w| w / 8)
+            } else {
+                Some(v)
+            }
+        })
+        .ok_or_else(|| Error::with_reason(-1, function, "UV tile row size overflow"))?;
+
+    // 必要サイズの検証
+    let y_size = checked_tiled_buf_size(
+        size.height.div_ceil(32),
+        y_stride,
+        32,
+        y_tile_row_size,
+        function,
+    )?;
+    if y.len() < y_size {
+        return Err(Error::with_reason(
+            -1,
+            function,
+            "source Y buffer too small",
+        ));
+    }
+    let uv_size = checked_tiled_buf_size(
+        size.height.div_ceil(32),
+        uv_stride,
+        16,
+        uv_tile_row_size,
+        function,
+    )?;
+    if uv.len() < uv_size {
+        return Err(Error::with_reason(
+            -1,
+            function,
+            "source UV buffer too small",
+        ));
+    }
+    Ok(())
+}
+
 fn validate_yuv_src_inner(
     y: &[u8],
     y_stride: usize,
@@ -1244,12 +1377,152 @@ define_nv_image!(/// NV12 画像 (Y + UV インターリーブ, 4:2:0)
 define_nv_image!(/// NV21 画像 (Y + VU インターリーブ, 4:2:0)
     Nv21Image, /// NV21 画像 (可変)
     Nv21ImageMut, 2, 2);
-define_nv_image!(/// MM21 画像 (タイル形式, 4:2:0)
-    Mm21Image, /// MM21 画像 (可変)
-    Mm21ImageMut, 2, 2);
-define_nv_image!(/// MT2T 画像 (10bit タイル形式, 4:2:0)
-    Mt2tImage, /// MT2T 画像 (可変)
-    Mt2tImageMut, 2, 2);
+
+/// MM21 画像 (MediaTek タイル形式, 4:2:0)
+///
+/// libyuv の `MM21To*` はタイル配置で入力バッファを読み出すため、バッファ検証は
+/// 線形サイズではなくタイル配置の必要サイズ（`validate_tiled_nv_src_inner` 参照）で行う。
+#[derive(Debug)]
+pub struct Mm21Image<'a> {
+    /// Y プレーンデータ
+    pub y: &'a [u8],
+    /// Y プレーンのストライド（行あたりのバイト数）
+    pub y_stride: usize,
+    /// UV プレーンデータ（インターリーブ）
+    pub uv: &'a [u8],
+    /// UV プレーンのストライド
+    pub uv_stride: usize,
+}
+
+impl Mm21Image<'_> {
+    /// ソースバッファのバリデーション
+    pub(crate) fn validate(&self, size: ImageSize, function: &'static str) -> Result<(), Error> {
+        validate_tiled_nv_src_inner(
+            self.y,
+            self.y_stride,
+            self.uv,
+            self.uv_stride,
+            size,
+            function,
+            false,
+        )
+    }
+}
+
+/// MM21 画像 (可変)
+#[derive(Debug)]
+pub struct Mm21ImageMut<'a> {
+    /// Y プレーンデータ
+    pub y: &'a mut [u8],
+    /// Y プレーンのストライド（行あたりのバイト数）
+    pub y_stride: usize,
+    /// UV プレーンデータ（インターリーブ）
+    pub uv: &'a mut [u8],
+    /// UV プレーンのストライド
+    pub uv_stride: usize,
+}
+
+impl Mm21ImageMut<'_> {
+    /// 不変参照への変換
+    pub fn as_ref(&self) -> Mm21Image<'_> {
+        Mm21Image {
+            y: self.y,
+            y_stride: self.y_stride,
+            uv: self.uv,
+            uv_stride: self.uv_stride,
+        }
+    }
+
+    /// デスティネーションバッファのバリデーション
+    /// （MM21 を出力する変換は存在しないが、型の整合性のため線形検証を提供する）
+    #[allow(dead_code)]
+    pub(crate) fn validate(&self, size: ImageSize, function: &'static str) -> Result<(), Error> {
+        validate_nv_dst_inner(
+            self.y,
+            self.y_stride,
+            self.uv,
+            self.uv_stride,
+            size,
+            2,
+            2,
+            function,
+        )
+    }
+}
+
+/// MT2T 画像 (MediaTek 10bit タイル形式, 4:2:0)
+///
+/// `y_stride` / `uv_stride` は**バイト単位**で指定する。MT2T は 10bit パックのため、
+/// 1 行のバイト数は幅の 10/8 倍になり、libyuv の `MT2TToP010` は stride をバイト単位で
+/// 受け取る。バッファ検証はタイル配置と 10bit パックを反映した必要サイズ
+/// （`validate_tiled_nv_src_inner` 参照）で行う。
+#[derive(Debug)]
+pub struct Mt2tImage<'a> {
+    /// Y プレーンデータ
+    pub y: &'a [u8],
+    /// Y プレーンのストライド（行あたりのバイト数）
+    pub y_stride: usize,
+    /// UV プレーンデータ（インターリーブ）
+    pub uv: &'a [u8],
+    /// UV プレーンのストライド
+    pub uv_stride: usize,
+}
+
+impl Mt2tImage<'_> {
+    /// ソースバッファのバリデーション
+    pub(crate) fn validate(&self, size: ImageSize, function: &'static str) -> Result<(), Error> {
+        validate_tiled_nv_src_inner(
+            self.y,
+            self.y_stride,
+            self.uv,
+            self.uv_stride,
+            size,
+            function,
+            true,
+        )
+    }
+}
+
+/// MT2T 画像 (可変)
+#[derive(Debug)]
+pub struct Mt2tImageMut<'a> {
+    /// Y プレーンデータ
+    pub y: &'a mut [u8],
+    /// Y プレーンのストライド（行あたりのバイト数）
+    pub y_stride: usize,
+    /// UV プレーンデータ（インターリーブ）
+    pub uv: &'a mut [u8],
+    /// UV プレーンのストライド
+    pub uv_stride: usize,
+}
+
+impl Mt2tImageMut<'_> {
+    /// 不変参照への変換
+    pub fn as_ref(&self) -> Mt2tImage<'_> {
+        Mt2tImage {
+            y: self.y,
+            y_stride: self.y_stride,
+            uv: self.uv,
+            uv_stride: self.uv_stride,
+        }
+    }
+
+    /// デスティネーションバッファのバリデーション
+    /// （MT2T を出力する変換は存在しないが、型の整合性のため線形検証を提供する）
+    #[allow(dead_code)]
+    pub(crate) fn validate(&self, size: ImageSize, function: &'static str) -> Result<(), Error> {
+        validate_nv_dst_inner(
+            self.y,
+            self.y_stride,
+            self.uv,
+            self.uv_stride,
+            size,
+            2,
+            2,
+            function,
+        )
+    }
+}
 
 // 4:2:2 (UV 高さ = height, UV 幅 = width / 2)
 define_nv_image!(/// NV16 画像 (Y + UV インターリーブ, 4:2:2)
