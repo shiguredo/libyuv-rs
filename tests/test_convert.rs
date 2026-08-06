@@ -1124,7 +1124,7 @@ fn mm21_to_i420_tiled_uv_buffer_boundary() {
 
 // 異常系: mm21_to_i420 がタイル高非倍数 × 幅 16 倍数のタイル必要サイズを検証すること
 #[test]
-fn mm21_to_i420_tiled_buffer_16_width_boundary() {
+fn mm21_to_i420_tiled_buffer_multi_tile_row_boundary() {
     // width=16, height=33: タイル行幅 16、タイル行数 2（33 は 32 の倍数でない）。
     // Y 必要サイズ = (2 - 1) * 16 * 32 + 16 * 32 = 1024（線形サイズ 16 * 33 = 528 より過大）
     let width = 16;
@@ -1160,6 +1160,95 @@ fn mm21_to_i420_tiled_buffer_16_width_boundary() {
 
     // 必要サイズちょうどでは成功する
     let y = vec![0u8; 1024];
+    let src = Mm21Image {
+        y: &y,
+        y_stride: width,
+        uv: &uv,
+        uv_stride: width,
+    };
+    mm21_to_i420(&src, &mut dst, size).expect("必要サイズちょうどで成功するべき");
+}
+
+// 異常系: mm21_to_i420 がタイル高倍数のタイル必要サイズを検証すること
+#[test]
+fn mm21_to_i420_tiled_buffer_tile_height_multiple_boundary() {
+    // height = 32（タイル高の倍数）でも、幅が 16 の倍数でないとタイル行幅 16 の
+    // 必要サイズになる。Y 必要サイズ = 16 * 32 = 512
+    // （線形サイズ 5 * 32 = 160 より過大）
+    let width = 5;
+    let height = 32;
+    let uv = vec![0u8; 256];
+    let mut y_dst = vec![0u8; width * height];
+    let mut u_dst = vec![0u8; 3 * 16];
+    let mut v_dst = vec![0u8; 3 * 16];
+    let mut dst = I420ImageMut {
+        y: &mut y_dst,
+        y_stride: width,
+        u: &mut u_dst,
+        u_stride: 3,
+        v: &mut v_dst,
+        v_stride: 3,
+    };
+    let size = ImageSize::new(width, height);
+
+    let y = vec![0u8; 511]; // 1 バイト不足
+    let src = Mm21Image {
+        y: &y,
+        y_stride: width,
+        uv: &uv,
+        uv_stride: 6,
+    };
+    let result = mm21_to_i420(&src, &mut dst, size);
+    let err = result.expect_err("タイル配置の必要サイズ未満では Err が返るべき");
+    assert!(
+        err.to_string().contains("source Y buffer too small"),
+        "Y 側のタイル必要サイズ不足の reason が返るべき: {}",
+        err
+    );
+
+    // 必要サイズちょうどでは成功する
+    let y = vec![0u8; 512];
+    let src = Mm21Image {
+        y: &y,
+        y_stride: width,
+        uv: &uv,
+        uv_stride: 6,
+    };
+    mm21_to_i420(&src, &mut dst, size).expect("必要サイズちょうどで成功するべき");
+
+    // 幅が 16 の倍数の場合はタイル必要サイズが線形サイズと一致する。
+    // Y 必要サイズ = 16 * 32 = 512 = 線形サイズ
+    let width = 16;
+    let height = 32;
+    let mut y_dst = vec![0u8; width * height];
+    let mut u_dst = vec![0u8; 8 * 16];
+    let mut v_dst = vec![0u8; 8 * 16];
+    let mut dst = I420ImageMut {
+        y: &mut y_dst,
+        y_stride: width,
+        u: &mut u_dst,
+        u_stride: 8,
+        v: &mut v_dst,
+        v_stride: 8,
+    };
+    let size = ImageSize::new(width, height);
+    let y = vec![0u8; 511]; // 1 バイト不足
+    let src = Mm21Image {
+        y: &y,
+        y_stride: width,
+        uv: &uv,
+        uv_stride: width,
+    };
+    let result = mm21_to_i420(&src, &mut dst, size);
+    let err = result.expect_err("タイル配置の必要サイズ未満では Err が返るべき");
+    assert!(
+        err.to_string().contains("source Y buffer too small"),
+        "Y 側のタイル必要サイズ不足の reason が返るべき: {}",
+        err
+    );
+
+    // 必要サイズちょうどでは成功する
+    let y = vec![0u8; 512];
     let src = Mm21Image {
         y: &y,
         y_stride: width,
@@ -1235,7 +1324,8 @@ fn mt2t_to_p010_tiled_buffer_boundary() {
 #[test]
 fn mm21_to_i420_zero_size() {
     // タイル行数の計算（height.div_ceil(32) - 1）がアンダーフローするため、
-    // ゼロサイズは検証で先に Err になる
+    // ゼロサイズは検証で先に Err になる。MM21 は height == 0 でも libyuv が
+    // no-op 成功を返すため、この Err は検証側で一律に定める
     let y = vec![0u8; 512];
     let uv = vec![0u8; 256];
     let mut y_dst = vec![0u8; 5 * 3];
@@ -1258,9 +1348,21 @@ fn mm21_to_i420_zero_size() {
     };
     let size = ImageSize::new(0, 3);
     let result = mm21_to_i420(&src, &mut dst, size);
-    assert!(result.is_err(), "width == 0 では Err が返るべき");
+    let err = result.expect_err("width == 0 では Err が返るべき");
+    assert!(
+        err.to_string()
+            .contains("width and height must be greater than 0"),
+        "ゼロサイズの reason が返るべき: {}",
+        err
+    );
 
     let size = ImageSize::new(5, 0);
     let result = mm21_to_i420(&src, &mut dst, size);
-    assert!(result.is_err(), "height == 0 では Err が返るべき");
+    let err = result.expect_err("height == 0 では Err が返るべき");
+    assert!(
+        err.to_string()
+            .contains("width and height must be greater than 0"),
+        "ゼロサイズの reason が返るべき: {}",
+        err
+    );
 }

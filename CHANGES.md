@@ -28,6 +28,9 @@
   - @voluntas
 - [CHANGE] hash_djb2 の戻り値型を Result<u32, Error> に変更する
   - @voluntas
+- [CHANGE] Mm21ImageMut / Mt2tImageMut を削除する
+  - libyuv に MM21 / MT2T を出力する変換が存在しないため、使う手段のない公開型を削除する
+  - @voluntas
 - [ADD] libjpeg-turbo をビルド依存として組み込む
   - libjpeg-turbo 3.1.90 (tag `3.1.90`, commit `e1dbfa7be7b7e54922020051dc77781e92739700`) を build.rs から自動ビルドする
   - 静的ライブラリのシンボルに `shiguredo_jpeg_` プレフィックスを付与する

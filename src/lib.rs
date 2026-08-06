@@ -188,6 +188,27 @@ fn checked_tiled_buf_size(
         .ok_or_else(|| Error::with_reason(-1, function, "tiled buffer size overflow"))
 }
 
+/// タイル行の読み出しサイズをオーバーフロー安全に計算する。
+/// 10bit パック（MT2T）は 10/8 倍になる。padded_width は 16 の倍数のため、
+/// 10/8 倍しても切り捨ては発生しない
+fn checked_tile_row_size(
+    padded_width: usize,
+    tile_height: usize,
+    is_10bit: bool,
+    function: &'static str,
+) -> Result<usize, Error> {
+    padded_width
+        .checked_mul(tile_height)
+        .and_then(|v| {
+            if is_10bit {
+                v.checked_mul(10).map(|w| w / 8)
+            } else {
+                Some(v)
+            }
+        })
+        .ok_or_else(|| Error::with_reason(-1, function, "tile row size overflow"))
+}
+
 /// タイル形式（MM21 / MT2T）のソースバッファ検証。
 ///
 /// タイル配置では 1 タイル行の読み出し幅が、幅を 16 の倍数に切り上げた値 × タイル高になり、
@@ -214,9 +235,14 @@ fn validate_tiled_nv_src_inner(
     require_c_int(uv_stride, function, "UV stride exceeds c_int range")?;
 
     // ゼロサイズはタイル行数の計算（height.div_ceil(32) - 1）がアンダーフローするため
-    // 先に Err にする（libyuv 側も -1 を返す）
+    // 先に Err にする。MM21 は height == 0 でも libyuv が no-op 成功を返すため、
+    // この Err は検証側で一律に定める（0064 のゼロサイズ統一方針と整合）
     if size.width == 0 || size.height == 0 {
-        return Err(Error::with_reason(-1, function, "zero size input"));
+        return Err(Error::with_reason(
+            -1,
+            function,
+            "width and height must be greater than 0",
+        ));
     }
 
     // stride 下限チェック（線形検証と同じ。タイル行間隔が stride * tile_height のため、
@@ -249,36 +275,15 @@ fn validate_tiled_nv_src_inner(
         .checked_mul(16)
         .ok_or_else(|| Error::with_reason(-1, function, "padded width overflow"))?;
 
-    // 最終タイル行の読み出しサイズ（Y: タイル高 32、UV: タイル高 16。10bit は 10/8 倍）
-    let y_tile_row_size = padded_width
-        .checked_mul(32)
-        .and_then(|v| {
-            if is_10bit {
-                v.checked_mul(10).map(|w| w / 8)
-            } else {
-                Some(v)
-            }
-        })
-        .ok_or_else(|| Error::with_reason(-1, function, "Y tile row size overflow"))?;
-    let uv_tile_row_size = padded_width
-        .checked_mul(16)
-        .and_then(|v| {
-            if is_10bit {
-                v.checked_mul(10).map(|w| w / 8)
-            } else {
-                Some(v)
-            }
-        })
-        .ok_or_else(|| Error::with_reason(-1, function, "UV tile row size overflow"))?;
+    // タイル行数（Y / UV で共通。UV のタイル高 16 と Y の 32 で ceil が一致する）
+    let tile_rows = size.height.div_ceil(32);
+
+    // 最終タイル行の読み出しサイズ（Y: タイル高 32、UV: タイル高 16）
+    let y_tile_row_size = checked_tile_row_size(padded_width, 32, is_10bit, function)?;
+    let uv_tile_row_size = checked_tile_row_size(padded_width, 16, is_10bit, function)?;
 
     // 必要サイズの検証
-    let y_size = checked_tiled_buf_size(
-        size.height.div_ceil(32),
-        y_stride,
-        32,
-        y_tile_row_size,
-        function,
-    )?;
+    let y_size = checked_tiled_buf_size(tile_rows, y_stride, 32, y_tile_row_size, function)?;
     if y.len() < y_size {
         return Err(Error::with_reason(
             -1,
@@ -286,13 +291,7 @@ fn validate_tiled_nv_src_inner(
             "source Y buffer too small",
         ));
     }
-    let uv_size = checked_tiled_buf_size(
-        size.height.div_ceil(32),
-        uv_stride,
-        16,
-        uv_tile_row_size,
-        function,
-    )?;
+    let uv_size = checked_tiled_buf_size(tile_rows, uv_stride, 16, uv_tile_row_size, function)?;
     if uv.len() < uv_size {
         return Err(Error::with_reason(
             -1,
@@ -1409,47 +1408,6 @@ impl Mm21Image<'_> {
     }
 }
 
-/// MM21 画像 (可変)
-#[derive(Debug)]
-pub struct Mm21ImageMut<'a> {
-    /// Y プレーンデータ
-    pub y: &'a mut [u8],
-    /// Y プレーンのストライド（行あたりのバイト数）
-    pub y_stride: usize,
-    /// UV プレーンデータ（インターリーブ）
-    pub uv: &'a mut [u8],
-    /// UV プレーンのストライド
-    pub uv_stride: usize,
-}
-
-impl Mm21ImageMut<'_> {
-    /// 不変参照への変換
-    pub fn as_ref(&self) -> Mm21Image<'_> {
-        Mm21Image {
-            y: self.y,
-            y_stride: self.y_stride,
-            uv: self.uv,
-            uv_stride: self.uv_stride,
-        }
-    }
-
-    /// デスティネーションバッファのバリデーション
-    /// （MM21 を出力する変換は存在しないが、型の整合性のため線形検証を提供する）
-    #[allow(dead_code)]
-    pub(crate) fn validate(&self, size: ImageSize, function: &'static str) -> Result<(), Error> {
-        validate_nv_dst_inner(
-            self.y,
-            self.y_stride,
-            self.uv,
-            self.uv_stride,
-            size,
-            2,
-            2,
-            function,
-        )
-    }
-}
-
 /// MT2T 画像 (MediaTek 10bit タイル形式, 4:2:0)
 ///
 /// `y_stride` / `uv_stride` は**バイト単位**で指定する。MT2T は 10bit パックのため、
@@ -1479,47 +1437,6 @@ impl Mt2tImage<'_> {
             size,
             function,
             true,
-        )
-    }
-}
-
-/// MT2T 画像 (可変)
-#[derive(Debug)]
-pub struct Mt2tImageMut<'a> {
-    /// Y プレーンデータ
-    pub y: &'a mut [u8],
-    /// Y プレーンのストライド（行あたりのバイト数）
-    pub y_stride: usize,
-    /// UV プレーンデータ（インターリーブ）
-    pub uv: &'a mut [u8],
-    /// UV プレーンのストライド
-    pub uv_stride: usize,
-}
-
-impl Mt2tImageMut<'_> {
-    /// 不変参照への変換
-    pub fn as_ref(&self) -> Mt2tImage<'_> {
-        Mt2tImage {
-            y: self.y,
-            y_stride: self.y_stride,
-            uv: self.uv,
-            uv_stride: self.uv_stride,
-        }
-    }
-
-    /// デスティネーションバッファのバリデーション
-    /// （MT2T を出力する変換は存在しないが、型の整合性のため線形検証を提供する）
-    #[allow(dead_code)]
-    pub(crate) fn validate(&self, size: ImageSize, function: &'static str) -> Result<(), Error> {
-        validate_nv_dst_inner(
-            self.y,
-            self.y_stride,
-            self.uv,
-            self.uv_stride,
-            size,
-            2,
-            2,
-            function,
         )
     }
 }
