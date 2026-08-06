@@ -2,7 +2,7 @@
 
 - Priority: High
 - Created: 2026-08-04
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-08-06
 - Model: DeepSeek V4 Flash
 - Branch: feature/fix-yuy2-uyvy-to-y-dst-validation
 - Polished: 2026-08-04
@@ -57,6 +57,12 @@ libyuv の `YUY2ToY` / `UYVYToY`（`planar_functions.cc`）は各行 `width` バ
 
 ## 解決方法
 
-1. `yuy2_to_y` / `uyvy_to_y` の dst 検証を標準パターン（`require_c_int` / `stride >= width` / `checked_buf_size`）に置き換える
-2. `tests/test_convert.rs` に境界値テスト（stride 不足・c_int 超過・バッファ不足・ゼロサイズ・正常系）を追加する
-3. `CHANGES.md` に `[FIX]` エントリを追加する
+実装済み（2026-08-06）。以下のとおり対応した。
+
+- `src/convert/packed.rs` の `yuy2_to_y` / `uyvy_to_y` のデスティネーション検証を標準パターン（`require_c_int` → `stride >= width` → `checked_buf_size` → `len` 比較）に置き換える。非チェック乗算 `dst_stride_y * size.height` を排除し、`dst_stride_y as c_int` の切り詰めと stride < width での行重なり書き込みによる領域外書き込みを防ぐ
+- 新設チェックのエラーメッセージは参照実装 `detile_plane` の語句（"destination stride exceeds c_int range" / "destination stride smaller than width"）に合わせ、既存語句（"destination Y buffer too small"）は維持する
+- docstring に `dst_stride_y` が `size.width` 以上である必要がある旨を明記する
+- `tests/test_convert.rs` にテスト 14 件を追加する:
+  - 正常系: Y 成分の抽出（偶数 / 奇数インデックス）、パディング付き行配置、奇数幅（coalesce を無効化して余り処理経路を実行）
+  - 異常系: stride 不足、c_int 範囲超過、バッファ不足、ゼロサイズ（Err は libyuv 側のガードによることをコメントに記録）
+- `CHANGES.md` の `## develop` セクションに `[FIX]` エントリを追加する
