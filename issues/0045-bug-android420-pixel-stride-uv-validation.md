@@ -2,7 +2,7 @@
 
 - Priority: High
 - Created: 2026-08-04
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-08-06
 - Model: DeepSeek V4 Flash
 - Branch: feature/fix-android420-pixel-stride-uv-validation
 - Polished: 2026-08-04
@@ -50,8 +50,10 @@ libyuv の `Android420ToARGBMatrix`（`convert_argb.cc`）と `Android420ToI420R
 
 ## 解決方法
 
-1. `pixel_stride_uv` の値検証（1 / 2 以外は `Err`）を hardware.rs の 3 関数に追加する（rotate.rs は既存検証を維持）
-2. `pixel_stride_uv == 2` の場合の U/V ストライド・バッファサイズ検証をインターリーブ前提（最小行幅 `2 * ceil(width / 2)`）に強化する
-3. 4 関数の docstring に前提条件（`pixel_stride_uv == 2` は同一バッファの連続領域必須・末尾パディング要）を明記する
-4. `tests/test_convert.rs` / `tests/test_rotate.rs` にテスト（値検証・u/v 両側のストライド・バッファ境界・正常系）を追加する
-5. `CHANGES.md` に `[FIX]` エントリを追加する
+実装済み（2026-08-06）。以下のとおり対応した。
+
+- `src/convert/hardware.rs` の `android420_to_argb` / `android420_to_abgr` / `android420_to_i420` と `src/rotate.rs` の `android420_to_i420_rotate` に `pixel_stride_uv` の値検証（1 / 2 以外は Err）を追加する
+- `pixel_stride_uv == 2` のとき、U/V のストライドをインターリーブ前提（最小行幅 `2 * ceil(width / 2)`）で検証する。バッファ長は `src.validate` が同一式で検査済みのため関数内では検証しない（1 周目に追加したデッドコードのバッファ検証はレビューで判明し削除した）
+- docstring に前提条件を明記する: `pixel_stride_uv == 2` は同一バッファの連続領域必須（C 側のポインタ減算 `src_v - src_u` のため）、共有バッファ末尾に 1 バイトのパディング確保（NV12 では v 側、NV21 では u 側のバッファ長が要求を満たす）、ストライド不一致時の回転制約（0 度のみフォールバック有効）
+- `tests/test_convert.rs` / `tests/test_rotate.rs` にテスト 13 件を追加する: 値検証（4 関数）、インターリーブストライド境界（奇数幅: halfwidth / width / 2*halfwidth、偶数幅）、V 側ストライド不足、NV12 変換との一致（正常系）、ストライド不一致のフォールバック（正常系）
+- `CHANGES.md` の `## develop` セクションに `[FIX]` エントリを追加する
