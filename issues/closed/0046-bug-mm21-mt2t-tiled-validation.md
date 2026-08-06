@@ -2,7 +2,7 @@
 
 - Priority: High
 - Created: 2026-08-04
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-08-06
 - Model: DeepSeek V4 Flash
 - Branch: feature/fix-mm21-mt2t-tiled-validation
 - Polished: 2026-08-04
@@ -63,7 +63,9 @@ High。
 
 ## 解決方法
 
-1. `Mm21Image` / `Mt2tImage` 用の検証（タイル配置・10bit パック）を `src/lib.rs` に実装する
-2. `Mm21Image` / `Mt2tImage` の定義を専用検証に切り替える（呼び出し側 `mm21_to_*` / `mt2t_to_p010` は `src.validate` のみで変更不要。`Mm21ImageMut` / `Mt2tImageMut` は MM21/MT2T を出力する変換関数が存在せず未使用のため、dst 検証は現行の線形検証のままとする）
-3. `tests/test_convert.rs` にテストを追加する
-4. `CHANGES.md` に `[FIX]` エントリを追加する
+1. タイル配置の必要サイズ計算（`checked_tiled_buf_size` / `checked_tile_row_size`）と専用検証（`validate_tiled_nv_src_inner`）を `src/lib.rs` に実装した。タイル行幅・タイル高は定数（`TILE_WIDTH = 16` / `Y_TILE_HEIGHT = 32` / `UV_TILE_HEIGHT = 16`）で管理する
+2. `Mm21Image` / `Mt2tImage` を `define_nv_image` マクロから外して手書きの定義に変更し、`validate` を専用検証に切り替えた（呼び出し側 `mm21_to_*` / `mt2t_to_p010` は `src.validate` のみで変更不要）
+3. `Mm21ImageMut` / `Mt2tImageMut` は MM21/MT2T を出力する変換関数が存在せず使う手段がないため削除した（CHANGES.md に `[CHANGE]` として記載）
+4. ゼロサイズ入力（width == 0 / height == 0）は `"width and height must be greater than 0"` で `Err` を返す（0064 のゼロサイズ統一方針と整合）
+5. `tests/test_convert.rs` に MM21 / MT2T の境界値テスト（タイル高倍数・非倍数 × 幅 16 倍数・非倍数、パディング付きストライド、10bit パック境界）を追加し、`src/lib.rs` にヘルパーの単体テストを追加した
+6. `CHANGES.md` の `## develop` セクションに `[FIX]` エントリ（および `[CHANGE]` エントリ）を追加した
