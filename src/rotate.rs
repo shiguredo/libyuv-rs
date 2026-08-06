@@ -343,7 +343,9 @@ pub fn i410_rotate(
 /// `pixel_stride_uv == 2` のとき、`u` / `v` は同一バッファの連続領域（インターリーブ）で
 /// なければならない（libyuv が `src_v - src_u` のポインタ減算を行うため。別スライスは
 /// C 標準上は未定義動作になる。一般的な実装では整数減算に落ちるため実害はない）。
-/// また検証は `len() >= stride * ceil(height / 2)` を要求するため、`v` 側のバッファ長が
+/// `u` / `v` のストライドは `2 * ceil(width / 2)` 以上、バッファ長は
+/// `stride * ceil(height / 2)` 以上である必要がある。検証はバッファ長に
+/// `len() >= stride * ceil(height / 2)` を要求するため、`v` 側のバッファ長が
 /// 要求を満たすよう末尾にパディングを確保すること。
 pub fn android420_to_i420_rotate(
     src: &Android420Image<'_>,
@@ -371,7 +373,9 @@ pub fn android420_to_i420_rotate(
     match pixel_stride_uv {
         1 => {}
         2 => {
-            let uv_stride = src_size.width.div_ceil(2) * 2;
+            let uv_stride = src_size.width.div_ceil(2).checked_mul(2).ok_or_else(|| {
+                Error::with_reason(-1, "Android420ToI420Rotate", "UV minimum stride overflow")
+            })?;
             if src.u_stride < uv_stride {
                 return Err(Error::with_reason(
                     -1,

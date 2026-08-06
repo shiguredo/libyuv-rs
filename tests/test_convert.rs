@@ -809,6 +809,45 @@ fn android420_to_i420_interleaved_matches_nv12() {
     assert_eq!(and_v, nv12_v, "V プレーンが NV12 変換と一致すること");
 }
 
+// 正常系: android420_to_i420 が pixel_stride_uv == 2 でストライド不一致でも変換できること
+#[test]
+fn android420_to_i420_interleaved_unequal_strides_ok() {
+    // 高速パスは u_stride == v_stride を要求する。不一致の場合は libyuv のフォールバック
+    // （SplitPixels）に入るが、U/V の実効行幅は 2 * halfwidth のままであるため、
+    // 検証は u / v それぞれのストライドに対して要求される。
+    // u / v は同一バッファの連続領域で渡し、v 側のストライドを 1 バイト大きくする
+    let width = 5;
+    let height = 3;
+    let halfwidth = 3;
+    let uv_height = 2;
+    let y = vec![0u8; width * height];
+    let buf = vec![0u8; halfwidth * 2 * uv_height + 1 + uv_height];
+    let u = &buf[..halfwidth * 2 * uv_height + 1];
+    let v = &buf[1..];
+    let src = Android420Image {
+        y: &y,
+        y_stride: width,
+        u,
+        u_stride: halfwidth * 2,
+        v,
+        v_stride: halfwidth * 2 + 1,
+    };
+    let mut y_dst = vec![0u8; width * height];
+    let mut u_dst = vec![0u8; halfwidth * uv_height];
+    let mut v_dst = vec![0u8; halfwidth * uv_height];
+    let mut dst = I420ImageMut {
+        y: &mut y_dst,
+        y_stride: width,
+        u: &mut u_dst,
+        u_stride: halfwidth,
+        v: &mut v_dst,
+        v_stride: halfwidth,
+    };
+    let size = ImageSize::new(width, height);
+
+    android420_to_i420(&src, 2, &mut dst, size).expect("ストライド不一致でも変換が成功すること");
+}
+
 // 異常系: android420_to_argb が pixel_stride_uv の 1 / 2 以外を Err にすること
 #[test]
 fn android420_to_argb_pixel_stride_uv_invalid() {
@@ -871,6 +910,26 @@ fn android420_to_argb_interleaved_stride_boundary() {
         err.to_string()
             .contains("U stride smaller than interleaved chroma width"),
         "U 側のインターリーブ stride 不足の reason が返るべき: {}",
+        err
+    );
+
+    // V 側のストライドが不足する場合も Err になる
+    let u_interleaved = vec![0u8; halfwidth * 2 * uv_height];
+    let v_small = vec![0u8; halfwidth * uv_height];
+    let src = Android420Image {
+        y: &y,
+        y_stride: width,
+        u: &u_interleaved,
+        u_stride: halfwidth * 2,
+        v: &v_small,
+        v_stride: halfwidth,
+    };
+    let result = android420_to_argb(&src, 2, &mut dst, size);
+    let err = result.expect_err("インターリーブ幅未満の V ストライドでは Err が返るべき");
+    assert!(
+        err.to_string()
+            .contains("V stride smaller than interleaved chroma width"),
+        "V 側のインターリーブ stride 不足の reason が返るべき: {}",
         err
     );
 
@@ -950,6 +1009,26 @@ fn android420_to_abgr_interleaved_stride_boundary() {
         err.to_string()
             .contains("U stride smaller than interleaved chroma width"),
         "U 側のインターリーブ stride 不足の reason が返るべき: {}",
+        err
+    );
+
+    // V 側のストライドが不足する場合も Err になる
+    let u_interleaved = vec![0u8; halfwidth * 2 * uv_height];
+    let v_small = vec![0u8; halfwidth * uv_height];
+    let src = Android420Image {
+        y: &y,
+        y_stride: width,
+        u: &u_interleaved,
+        u_stride: halfwidth * 2,
+        v: &v_small,
+        v_stride: halfwidth,
+    };
+    let result = android420_to_abgr(&src, 2, &mut dst, size);
+    let err = result.expect_err("インターリーブ幅未満の V ストライドでは Err が返るべき");
+    assert!(
+        err.to_string()
+            .contains("V stride smaller than interleaved chroma width"),
+        "V 側のインターリーブ stride 不足の reason が返るべき: {}",
         err
     );
 
