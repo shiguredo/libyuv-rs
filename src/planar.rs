@@ -4120,7 +4120,7 @@ pub fn convert_to_msb_plane_16(
 ///
 /// `src_stride` / `dst_stride` は u16 要素数で指定する。libyuv の `HalfFloatPlane` は
 /// stride をバイト単位で受け取る仕様のため（`planar_functions.h` の注記 "the src_stride_y and
-/// dst_stride_y parameters of HalfFloatPlane() are in bytes, not in units of uint16_t"）、
+/// dst_stride_y parameters of HalfFloatPlane() are in bytes, not in units of uint16_t."）、
 /// 内部で 2 倍してから渡す。libyuv 側は冒頭で `src_stride_y >>= 1; dst_stride_y >>= 1;` するため、
 /// 結果的に要素数単位の stride で行送りされる。
 pub fn half_float_plane(
