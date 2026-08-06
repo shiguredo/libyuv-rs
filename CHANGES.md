@@ -69,6 +69,7 @@
 - [FIX] detile_plane / detile_plane_16 / detile_to_yuy2 のソースバッファ検証が線形サイズのままで領域外読み出しが発生する問題を修正する
   - ソースの必要サイズをタイル配置（src_stride * ceil(height / tile_height) * tile_height）で検証し、ストライドに round_up(width, 16) の下限を要求する
   - detile_to_yuy2 は Y / UV それぞれのタイル配置サイズ（UV はタイル高 tile_height / 2）で検証し、tile_height の検証（2 以上かつ 2 累乗）と c_int 範囲チェックを追加する
+  - ゼロサイズ入力（width / height == 0）は no-op で Ok を返す（detile 系の既存セマンティクスを維持する）
   - @voluntas
 
 ### misc

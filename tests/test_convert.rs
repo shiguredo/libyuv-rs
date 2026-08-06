@@ -1630,6 +1630,35 @@ fn detile_plane_16_tiled_buffer_boundary() {
         .expect("必要サイズちょうどで成功するべき");
 }
 
+// 異常系: detile_plane_16 がパディング付きストライドのタイル配置サイズを検証すること
+#[test]
+fn detile_plane_16_padded_stride_boundary() {
+    // detile_plane と同じく、src_stride=32（round_up(width, 16) = 16 より大きい）で
+    // タイル行間隔が src_stride 基準であることを検証する。
+    // ソース必要サイズ = 32 * ceil(3 / 2) * 2 = 128 要素
+    let width = 5;
+    let height = 3;
+    let tile_height = 2;
+    let src_stride = 32;
+    let dst_stride = 5;
+    let mut dst = vec![0u16; dst_stride * height];
+    let size = ImageSize::new(width, height);
+
+    let src = vec![0u16; 127]; // 1 要素不足
+    let result = detile_plane_16(&src, src_stride, &mut dst, dst_stride, size, tile_height);
+    let err = result.expect_err("タイル配置の必要サイズ未満では Err が返るべき");
+    assert!(
+        err.to_string().contains("source buffer too small"),
+        "ソース不足の reason が返るべき: {}",
+        err
+    );
+
+    // 必要サイズちょうどでは成功する
+    let src = vec![0u16; 128];
+    detile_plane_16(&src, src_stride, &mut dst, dst_stride, size, tile_height)
+        .expect("必要サイズちょうどで成功するべき");
+}
+
 // 異常系: detile_to_yuy2 がタイル配置の必要サイズを検証すること
 #[test]
 fn detile_to_yuy2_tiled_buffer_boundary() {

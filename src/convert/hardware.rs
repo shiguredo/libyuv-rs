@@ -429,7 +429,9 @@ pub fn ayuv_to_nv21(
 /// `src_stride * ceil(height / tile_height) * tile_height` で検証する
 /// （libyuv の DetilePlane は 1 タイル行を 16 バイトチャンクの列として読み、タイル高
 /// ごとに `src_stride * tile_height` で次のタイル行へジャンプする。planar_functions.cc を
-/// 参照。全タイル段を一括で要求する安全側の過大要求である）
+/// 参照。全タイル段を一括で要求する安全側の過大要求である）。
+///
+/// ゼロサイズ入力（width == 0 / height == 0）は no-op で Ok を返す。
 pub fn detile_plane(
     src: &[u8],
     src_stride: usize,
@@ -458,8 +460,8 @@ pub fn detile_plane(
     )?;
 
     // width == 0 || height == 0 は no-op で Ok を返す
-    // （libyuv の DetilePlane は -1 を返すが、このクレートではゼロサイズ入力を
-    //  no-op に統一する方針）
+    // （libyuv の DetilePlane は -1 を返すが、detile 系は C 実装の呼び出しを省略して
+    //  ゼロサイズ入力を no-op とする。0064 の方針に従い docstring に明記する）
     if size.width == 0 || size.height == 0 {
         return Ok(());
     }
@@ -495,8 +497,7 @@ pub fn detile_plane(
     }
 
     // バッファサイズ検証（オーバーフロー安全）
-    // src はタイル配置: src_stride * ceil(height / tile_height) * tile_height
-    // （1 タイル行は 16 バイト間隔のチャンク列のため、線形サイズより大きくなりうる）
+    // src はタイル配置の必要サイズで検証する（式の根拠は docstring を参照）
     let tile_groups = size.height.div_ceil(tile_height);
     let src_size = src_stride
         .checked_mul(tile_groups)
@@ -548,7 +549,9 @@ pub fn detile_plane(
 /// `src_stride * ceil(height / tile_height) * tile_height` で検証する
 /// （libyuv の DetilePlane_16 は 1 タイル行を 16 要素チャンクの列として読み、タイル高
 /// ごとに `src_stride * tile_height` で次のタイル行へジャンプする。planar_functions.cc を
-/// 参照。全タイル段を一括で要求する安全側の過大要求である。要素数ベース）
+/// 参照。全タイル段を一括で要求する安全側の過大要求である。要素数ベース）。
+///
+/// ゼロサイズ入力（width == 0 / height == 0）は no-op で Ok を返す。
 pub fn detile_plane_16(
     src: &[u16],
     src_stride: usize,
@@ -577,8 +580,8 @@ pub fn detile_plane_16(
     )?;
 
     // width == 0 || height == 0 は no-op で Ok を返す
-    // （libyuv の DetilePlane_16 は -1 を返すが、このクレートではゼロサイズ入力を
-    //  no-op に統一する方針）
+    // （libyuv の DetilePlane_16 は -1 を返すが、detile 系は C 実装の呼び出しを省略して
+    //  ゼロサイズ入力を no-op とする。0064 の方針に従い docstring に明記する）
     if size.width == 0 || size.height == 0 {
         return Ok(());
     }
@@ -613,8 +616,7 @@ pub fn detile_plane_16(
     }
 
     // バッファサイズ検証（オーバーフロー安全。要素数ベース）
-    // src はタイル配置: src_stride * ceil(height / tile_height) * tile_height
-    // （1 タイル行は 16 要素間隔のチャンク列のため、線形サイズより大きくなりうる）
+    // src はタイル配置の必要サイズで検証する（式の根拠は docstring を参照）
     let tile_groups = size.height.div_ceil(tile_height);
     let src_size = src_stride
         .checked_mul(tile_groups)
@@ -816,26 +818,27 @@ pub fn detile_split_uv_plane(
 /// 1 タイル行を 16 バイトチャンクの列として読み、タイル高ごとに Y は
 /// `y_stride * tile_height`、UV は `uv_stride * (tile_height / 2)` で次のタイル行へ
 /// ジャンプする。planar_functions.cc を参照。全タイル段を一括で要求する安全側の
-/// 過大要求である）
+/// 過大要求である）。
+///
+/// ゼロサイズ入力（width == 0 / height == 0）は no-op で Ok を返す。
 pub fn detile_to_yuy2(
     src: &Nv12Image<'_>,
     dst: &mut Yuy2ImageMut<'_>,
     size: ImageSize,
     tile_height: usize,
 ) -> Result<(), Error> {
-    // width == 0 || height == 0 は C 実装（DetileToYUY2 は width <= 0 で return する）
-    // と同一セマンティクスで no-op。ゼロサイズ入力は tile_height の検証を含め
-    // すべての検証を省略して Ok を返す
-    if size.width == 0 || size.height == 0 {
-        return Ok(());
-    }
-
     // c_int 範囲チェック
     require_c_int(
         tile_height,
         "DetileToYUY2",
         "tile_height exceeds c_int range",
     )?;
+
+    // width == 0 || height == 0 は C 実装と同一の no-op で Ok を返す。
+    // ゼロサイズ入力は tile_height の 2 累乗・2 以上チェックを省略する
+    if size.width == 0 || size.height == 0 {
+        return Ok(());
+    }
 
     // tile_height は 2 以上かつ 2 の累乗でなければならない
     if !tile_height.is_power_of_two() {
@@ -877,7 +880,7 @@ pub fn detile_to_yuy2(
     }
 
     // バッファサイズ検証（オーバーフロー安全）
-    // Y はタイル配置: y_stride * ceil(height / tile_height) * tile_height
+    // Y はタイル配置の必要サイズで検証する（式の根拠は docstring を参照）
     let tile_groups = size.height.div_ceil(tile_height);
     let y_size = src
         .y_stride
@@ -891,8 +894,8 @@ pub fn detile_to_yuy2(
             "source Y buffer too small",
         ));
     }
-    // UV はタイル配置（タイル高は tile_height / 2）:
-    // uv_stride * ceil(height / tile_height) * (tile_height / 2)
+    // UV はタイル配置の必要サイズで検証する（UV タイル高は tile_height / 2。
+    // 式の根拠は docstring を参照）
     let uv_size = src
         .uv_stride
         .checked_mul(tile_groups)
