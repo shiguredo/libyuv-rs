@@ -339,6 +339,14 @@ pub fn i410_rotate(
 ///
 /// `pixel_stride_uv` は UV ピクセルストライド（1: planar、2: interleaved）。
 /// 90 度 / 270 度回転の場合、出力画像の幅と高さは入力と逆になる。
+///
+/// `pixel_stride_uv == 2` のとき、`u` / `v` は同一バッファの連続領域（インターリーブ）で
+/// なければならない。libyuv は `src_v - src_u` のポインタ減算（`vu_off`）を行い、
+/// `vu_off` が ±1 かつ両ストライドが等しい場合に高速パス（SplitRotateUV）に入るため、
+/// 別スライスを渡すと C 標準上は未定義動作になる（`pixel_stride_uv == 1` でも減算式自体は
+/// 評価されるが、結果は使用されないため実害はない）。また検証は安全側に
+/// `len() >= stride * ceil(height / 2)` を要求するため、同一バッファの連続領域で渡す場合、
+/// `v` 側のバッファ長が要求を満たすよう末尾にパディングを確保すること。
 pub fn android420_to_i420_rotate(
     src: &Android420Image<'_>,
     src_size: ImageSize,
@@ -367,7 +375,56 @@ pub fn android420_to_i420_rotate(
         ));
     }
 
-    // SAFETY: .validate() が全前提条件を検査済み。
+    // pixel_stride_uv == 2 では libyuv は U/V をインターリーブデータとして 1 行
+    // 2 * halfwidth バイト読み進める（高速パス SplitRotateUV とフォールバックの
+    // SplitPixels の読み出し規則。rotate.cc の Android420ToI420Rotate）。
+    // そのためストライドとバッファサイズをインターリーブ前提で検証する
+    if pixel_stride_uv == 2 {
+        let uv_stride = src_size.width.div_ceil(2) * 2;
+        if src.u_stride < uv_stride {
+            return Err(Error::with_reason(
+                -1,
+                "Android420ToI420Rotate",
+                "U stride smaller than interleaved chroma width",
+            ));
+        }
+        if src.v_stride < uv_stride {
+            return Err(Error::with_reason(
+                -1,
+                "Android420ToI420Rotate",
+                "V stride smaller than interleaved chroma width",
+            ));
+        }
+        let uv_height = src_size.height.div_ceil(2);
+        let u_size = checked_buf_size(
+            src.u_stride,
+            uv_height,
+            "Android420ToI420Rotate",
+            "U buffer size overflow",
+        )?;
+        if src.u.len() < u_size {
+            return Err(Error::with_reason(
+                -1,
+                "Android420ToI420Rotate",
+                "source U buffer too small",
+            ));
+        }
+        let v_size = checked_buf_size(
+            src.v_stride,
+            uv_height,
+            "Android420ToI420Rotate",
+            "V buffer size overflow",
+        )?;
+        if src.v.len() < v_size {
+            return Err(Error::with_reason(
+                -1,
+                "Android420ToI420Rotate",
+                "source V buffer too small",
+            ));
+        }
+    }
+
+    // SAFETY: src は .validate() と上記のインライン検証で全前提条件を検査済み。
     let result = unsafe {
         sys::Android420ToI420Rotate(
             src.y.as_ptr(),

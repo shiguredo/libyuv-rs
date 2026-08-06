@@ -5,8 +5,9 @@
 use std::ffi::c_int;
 
 use shiguredo_libyuv::{
-    ArgbImageMut, I420Image, I420ImageMut, ImageSize, Nv12Image, UyvyImage, Yuy2Image,
-    i420_to_argb, nv12_to_i420, uyvy_to_y, yuy2_to_y,
+    AbgrImageMut, Android420Image, ArgbImageMut, I420Image, I420ImageMut, ImageSize, Nv12Image,
+    UyvyImage, Yuy2Image, android420_to_abgr, android420_to_argb, android420_to_i420, i420_to_argb,
+    nv12_to_i420, uyvy_to_y, yuy2_to_y,
 };
 
 // 異常系: i420_to_argb のバッファ不足で Err が返ること
@@ -513,4 +514,375 @@ fn uyvy_to_y_zero_size() {
     let size = ImageSize::new(1, 0);
     let result = uyvy_to_y(&src, &mut dst_y, 8, size);
     assert!(result.is_err(), "height == 0 では Err が返るべき");
+}
+
+// 異常系: android420_to_i420 が pixel_stride_uv の 1 / 2 以外を Err にすること
+#[test]
+fn android420_to_i420_pixel_stride_uv_invalid() {
+    let y = vec![0u8; 8 * 4];
+    let u = vec![0u8; 4 * 2];
+    let v = vec![0u8; 4 * 2];
+    let src = Android420Image {
+        y: &y,
+        y_stride: 8,
+        u: &u,
+        u_stride: 4,
+        v: &v,
+        v_stride: 4,
+    };
+    let mut y_dst = vec![0u8; 8 * 4];
+    let mut u_dst = vec![0u8; 4 * 2];
+    let mut v_dst = vec![0u8; 4 * 2];
+    let mut dst = I420ImageMut {
+        y: &mut y_dst,
+        y_stride: 8,
+        u: &mut u_dst,
+        u_stride: 4,
+        v: &mut v_dst,
+        v_stride: 4,
+    };
+    let size = ImageSize::new(8, 4);
+
+    let result = android420_to_i420(&src, 3, &mut dst, size);
+    let err = result.expect_err("pixel_stride_uv が 1 / 2 以外では Err が返るべき");
+    assert!(
+        err.to_string().contains("pixel_stride_uv must be 1 or 2"),
+        "pixel_stride_uv の値検証の reason が返るべき: {}",
+        err
+    );
+}
+
+// 正常系: android420_to_i420 が pixel_stride_uv == 1 で平面データを変換できること
+#[test]
+fn android420_to_i420_pixel_stride_uv_one_ok() {
+    let y = vec![0u8; 8 * 4];
+    let u = vec![0u8; 4 * 2];
+    let v = vec![0u8; 4 * 2];
+    let src = Android420Image {
+        y: &y,
+        y_stride: 8,
+        u: &u,
+        u_stride: 4,
+        v: &v,
+        v_stride: 4,
+    };
+    let mut y_dst = vec![0u8; 8 * 4];
+    let mut u_dst = vec![0u8; 4 * 2];
+    let mut v_dst = vec![0u8; 4 * 2];
+    let mut dst = I420ImageMut {
+        y: &mut y_dst,
+        y_stride: 8,
+        u: &mut u_dst,
+        u_stride: 4,
+        v: &mut v_dst,
+        v_stride: 4,
+    };
+    let size = ImageSize::new(8, 4);
+
+    android420_to_i420(&src, 1, &mut dst, size).expect("pixel_stride_uv == 1 の変換が成功すること");
+}
+
+// 異常系: android420_to_i420 が pixel_stride_uv == 2 でインターリーブ幅未満の U ストライドを Err にすること
+#[test]
+fn android420_to_i420_interleaved_stride_boundary() {
+    // 奇数幅（width = 5）ではインターリーブの行幅は 2 * ceil(width / 2) = 6 バイト。
+    // stride == ceil(width / 2) = 3 は平面の最小幅であり、インターリーブには不足する
+    let width = 5;
+    let height = 3;
+    let halfwidth = 3;
+    let uv_height = 2;
+    let y = vec![0u8; width * height];
+    let u = vec![0u8; halfwidth * uv_height];
+    let v = vec![0u8; halfwidth * uv_height];
+    let mut y_dst = vec![0u8; width * height];
+    let mut u_dst = vec![0u8; halfwidth * uv_height];
+    let mut v_dst = vec![0u8; halfwidth * uv_height];
+    let size = ImageSize::new(width, height);
+
+    let mut dst = I420ImageMut {
+        y: &mut y_dst,
+        y_stride: width,
+        u: &mut u_dst,
+        u_stride: halfwidth,
+        v: &mut v_dst,
+        v_stride: halfwidth,
+    };
+    let src = Android420Image {
+        y: &y,
+        y_stride: width,
+        u: &u,
+        u_stride: halfwidth,
+        v: &v,
+        v_stride: halfwidth,
+    };
+    let result = android420_to_i420(&src, 2, &mut dst, size);
+    let err = result.expect_err("インターリーブ幅未満の U ストライドでは Err が返るべき");
+    assert!(
+        err.to_string()
+            .contains("U stride smaller than interleaved chroma width"),
+        "U 側のインターリーブ stride 不足の reason が返るべき: {}",
+        err
+    );
+
+    // バッファをインターリーブ幅に合わせれば成功する
+    let u_interleaved = vec![0u8; halfwidth * 2 * uv_height];
+    let v_interleaved = vec![0u8; halfwidth * 2 * uv_height];
+    let src = Android420Image {
+        y: &y,
+        y_stride: width,
+        u: &u_interleaved,
+        u_stride: halfwidth * 2,
+        v: &v_interleaved,
+        v_stride: halfwidth * 2,
+    };
+    android420_to_i420(&src, 2, &mut dst, size)
+        .expect("インターリーブ幅の U ストライドでは成功するべき");
+}
+
+// 異常系: android420_to_i420 が pixel_stride_uv == 2 でインターリーブ幅未満の V ストライドを Err にすること
+#[test]
+fn android420_to_i420_interleaved_v_stride_too_small() {
+    let width = 5;
+    let height = 3;
+    let halfwidth = 3;
+    let uv_height = 2;
+    let y = vec![0u8; width * height];
+    let u = vec![0u8; halfwidth * 2 * uv_height];
+    let v = vec![0u8; halfwidth * uv_height];
+    let mut y_dst = vec![0u8; width * height];
+    let mut u_dst = vec![0u8; halfwidth * uv_height];
+    let mut v_dst = vec![0u8; halfwidth * uv_height];
+    let src = Android420Image {
+        y: &y,
+        y_stride: width,
+        u: &u,
+        u_stride: halfwidth * 2,
+        v: &v,
+        v_stride: halfwidth,
+    };
+    let mut dst = I420ImageMut {
+        y: &mut y_dst,
+        y_stride: width,
+        u: &mut u_dst,
+        u_stride: halfwidth,
+        v: &mut v_dst,
+        v_stride: halfwidth,
+    };
+    let size = ImageSize::new(width, height);
+
+    let result = android420_to_i420(&src, 2, &mut dst, size);
+    let err = result.expect_err("インターリーブ幅未満の V ストライドでは Err が返るべき");
+    assert!(
+        err.to_string()
+            .contains("V stride smaller than interleaved chroma width"),
+        "V 側のインターリーブ stride 不足の reason が返るべき: {}",
+        err
+    );
+}
+
+// 異常系: android420_to_i420 が pixel_stride_uv == 2 でインターリーブのバッファ不足を Err にすること
+#[test]
+fn android420_to_i420_interleaved_buffer_too_small() {
+    let width = 5;
+    let height = 3;
+    let halfwidth = 3;
+    let uv_height = 2;
+    let y = vec![0u8; width * height];
+    let u = vec![0u8; halfwidth * 2 * uv_height - 1]; // 1 バイト不足
+    let v = vec![0u8; halfwidth * 2 * uv_height];
+    let mut y_dst = vec![0u8; width * height];
+    let mut u_dst = vec![0u8; halfwidth * uv_height];
+    let mut v_dst = vec![0u8; halfwidth * uv_height];
+    let src = Android420Image {
+        y: &y,
+        y_stride: width,
+        u: &u,
+        u_stride: halfwidth * 2,
+        v: &v,
+        v_stride: halfwidth * 2,
+    };
+    let mut dst = I420ImageMut {
+        y: &mut y_dst,
+        y_stride: width,
+        u: &mut u_dst,
+        u_stride: halfwidth,
+        v: &mut v_dst,
+        v_stride: halfwidth,
+    };
+    let size = ImageSize::new(width, height);
+
+    let result = android420_to_i420(&src, 2, &mut dst, size);
+    let err = result.expect_err("インターリーブのバッファ不足では Err が返るべき");
+    assert!(
+        err.to_string().contains("source U buffer too small"),
+        "U 側のバッファ不足の reason が返るべき: {}",
+        err
+    );
+}
+
+// 正常系: android420_to_i420 が pixel_stride_uv == 2 で NV12 と同等の変換を行うこと
+#[test]
+fn android420_to_i420_interleaved_matches_nv12() {
+    // pixel_stride_uv == 2 では libyuv は高速パス（NV12 変換）に入るため、
+    // 同じデータを NV12 として変換した結果と一致する。
+    // u / v は同一バッファの連続領域（vu_off == 1）で渡す。末尾 1 バイトは
+    // v 側の検証（len >= stride * ceil(height / 2)）を満たすためのパディング
+    let width: usize = 5;
+    let height: usize = 3;
+    let halfwidth = width.div_ceil(2); // 3
+    let uv_height = height.div_ceil(2); // 2
+    let uv_stride = halfwidth * 2; // 6
+
+    let y: Vec<u8> = (0..(width * height)).map(|i| i as u8).collect();
+    let mut buf = vec![0u8; uv_stride * uv_height + 1];
+    for (i, b) in buf.iter_mut().enumerate() {
+        *b = i as u8;
+    }
+    let u = &buf[..buf.len() - 1];
+    let v = &buf[1..];
+    let src = Android420Image {
+        y: &y,
+        y_stride: width,
+        u,
+        u_stride: uv_stride,
+        v,
+        v_stride: uv_stride,
+    };
+    let size = ImageSize::new(width, height);
+
+    let mut nv12_y = vec![0u8; width * height];
+    let mut nv12_u = vec![0u8; halfwidth * uv_height];
+    let mut nv12_v = vec![0u8; halfwidth * uv_height];
+    {
+        let nv12_src = Nv12Image {
+            y: &y,
+            y_stride: width,
+            uv: &buf[..uv_stride * uv_height],
+            uv_stride,
+        };
+        let mut nv12_dst = I420ImageMut {
+            y: &mut nv12_y,
+            y_stride: width,
+            u: &mut nv12_u,
+            u_stride: halfwidth,
+            v: &mut nv12_v,
+            v_stride: halfwidth,
+        };
+        nv12_to_i420(&nv12_src, &mut nv12_dst, size).expect("NV12 変換が成功すること");
+    }
+
+    let mut and_y = vec![0u8; width * height];
+    let mut and_u = vec![0u8; halfwidth * uv_height];
+    let mut and_v = vec![0u8; halfwidth * uv_height];
+    {
+        let mut and_dst = I420ImageMut {
+            y: &mut and_y,
+            y_stride: width,
+            u: &mut and_u,
+            u_stride: halfwidth,
+            v: &mut and_v,
+            v_stride: halfwidth,
+        };
+        android420_to_i420(&src, 2, &mut and_dst, size)
+            .expect("pixel_stride_uv == 2 の変換が成功すること");
+    }
+
+    assert_eq!(and_y, nv12_y, "Y プレーンが NV12 変換と一致すること");
+    assert_eq!(and_u, nv12_u, "U プレーンが NV12 変換と一致すること");
+    assert_eq!(and_v, nv12_v, "V プレーンが NV12 変換と一致すること");
+}
+
+// 異常系: android420_to_argb が pixel_stride_uv の 1 / 2 以外を Err にすること
+#[test]
+fn android420_to_argb_pixel_stride_uv_invalid() {
+    let y = vec![0u8; 8 * 4];
+    let u = vec![0u8; 4 * 2];
+    let v = vec![0u8; 4 * 2];
+    let src = Android420Image {
+        y: &y,
+        y_stride: 8,
+        u: &u,
+        u_stride: 4,
+        v: &v,
+        v_stride: 4,
+    };
+    let mut data = vec![0u8; 8 * 4 * 4];
+    let mut dst = ArgbImageMut {
+        data: &mut data,
+        stride: 8 * 4,
+    };
+    let size = ImageSize::new(8, 4);
+
+    let result = android420_to_argb(&src, 3, &mut dst, size);
+    let err = result.expect_err("pixel_stride_uv が 1 / 2 以外では Err が返るべき");
+    assert!(
+        err.to_string().contains("pixel_stride_uv must be 1 or 2"),
+        "pixel_stride_uv の値検証の reason が返るべき: {}",
+        err
+    );
+}
+
+// 異常系: android420_to_argb が pixel_stride_uv == 2 でインターリーブ幅未満の U ストライドを Err にすること
+#[test]
+fn android420_to_argb_interleaved_stride_too_small() {
+    let width = 5;
+    let height = 3;
+    let halfwidth = 3;
+    let uv_height = 2;
+    let y = vec![0u8; width * height];
+    let u = vec![0u8; halfwidth * uv_height];
+    let v = vec![0u8; halfwidth * uv_height];
+    let src = Android420Image {
+        y: &y,
+        y_stride: width,
+        u: &u,
+        u_stride: halfwidth,
+        v: &v,
+        v_stride: halfwidth,
+    };
+    let mut data = vec![0u8; width * height * 4];
+    let mut dst = ArgbImageMut {
+        data: &mut data,
+        stride: width * 4,
+    };
+    let size = ImageSize::new(width, height);
+
+    let result = android420_to_argb(&src, 2, &mut dst, size);
+    let err = result.expect_err("インターリーブ幅未満の U ストライドでは Err が返るべき");
+    assert!(
+        err.to_string()
+            .contains("U stride smaller than interleaved chroma width"),
+        "U 側のインターリーブ stride 不足の reason が返るべき: {}",
+        err
+    );
+}
+
+// 異常系: android420_to_abgr が pixel_stride_uv の 1 / 2 以外を Err にすること
+#[test]
+fn android420_to_abgr_pixel_stride_uv_invalid() {
+    let y = vec![0u8; 8 * 4];
+    let u = vec![0u8; 4 * 2];
+    let v = vec![0u8; 4 * 2];
+    let src = Android420Image {
+        y: &y,
+        y_stride: 8,
+        u: &u,
+        u_stride: 4,
+        v: &v,
+        v_stride: 4,
+    };
+    let mut data = vec![0u8; 8 * 4 * 4];
+    let mut dst = AbgrImageMut {
+        data: &mut data,
+        stride: 8 * 4,
+    };
+    let size = ImageSize::new(8, 4);
+
+    let result = android420_to_abgr(&src, 3, &mut dst, size);
+    let err = result.expect_err("pixel_stride_uv が 1 / 2 以外では Err が返るべき");
+    assert!(
+        err.to_string().contains("pixel_stride_uv must be 1 or 2"),
+        "pixel_stride_uv の値検証の reason が返るべき: {}",
+        err
+    );
 }
