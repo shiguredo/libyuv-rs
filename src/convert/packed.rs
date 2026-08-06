@@ -100,27 +100,16 @@ pub fn p010_to_p410(
 }
 
 /// P210 から P410 (4:4:4) への変換
+///
+/// P210 は 4:2:2 サブサンプリングのため、src の UV 高さは luma と同じになる。
+/// P410 は 4:4:4 サブサンプリングのため、dst の UV 高さも luma と同じになる。
+/// `P210Image::validate` は UV を height で検証し、`P410ImageMut::validate` も UV を height で検証する。
 pub fn p210_to_p410(
     src: &P210Image<'_>,
     dst: &mut P410ImageMut<'_>,
     size: ImageSize,
 ) -> Result<(), Error> {
-    // P210 はクロマの高さ = 輝度の高さ（4:2:2）
-    // ソースのバリデーションもクロマ高さ = height を使う
-    if src.y.len() < src.y_stride * size.height {
-        return Err(Error::with_reason(
-            -1,
-            "P210ToP410",
-            "source Y buffer too small",
-        ));
-    }
-    if src.uv.len() < src.uv_stride * size.height {
-        return Err(Error::with_reason(
-            -1,
-            "P210ToP410",
-            "source UV buffer too small",
-        ));
-    }
+    src.validate(size, "P210ToP410")?;
     dst.validate(size, "P210ToP410")?;
 
     // SAFETY: .validate() が全前提条件を検査済み。

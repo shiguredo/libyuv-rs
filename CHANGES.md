@@ -71,6 +71,10 @@
   - detile_to_yuy2 は Y / UV それぞれのタイル配置サイズ（UV はタイル高 tile_height / 2）で検証し、tile_height の検証（2 以上かつ 2 累乗）と c_int 範囲チェックを追加する
   - ゼロサイズ入力（width / height == 0）は no-op で Ok を返す（detile 系の既存セマンティクスを維持する）
   - @voluntas
+- [FIX] p210_to_p410 / nv12_to_nv24 / nv16_to_nv24 の手書き検証が不十分で領域外アクセスのリスクがある問題を修正する
+  - 手書き検証を生成済みの validate に置き換え、require_c_int チェック・最小ストライドチェック・オーバーフロー安全なサイズ計算を追加する
+  - stride 不足（Y は width 未満、UV は chroma 幅未満）と stride の c_int 範囲超過は従来通過していたが Err を返すようになる（p210_to_p410 は src 側、nv12_to_nv24 は dst 側、nv16_to_nv24 は src / dst 側）
+  - @voluntas
 
 ### misc
 
