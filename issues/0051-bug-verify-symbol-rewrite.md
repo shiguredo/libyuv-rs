@@ -2,7 +2,7 @@
 
 - Priority: Medium
 - Created: 2026-08-04
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-08-12
 - Model: DeepSeek V4 Flash
 - Branch: feature/fix-verify-symbol-rewrite
 - Polished: 2026-08-12
@@ -53,7 +53,10 @@ Medium。
 
 ## 解決方法
 
-1. `scripts/verify_symbol_rewrite.sh` の `llvm-nm -u` に `--format=just-symbols` を追加し、出力に `tr -d '\r'` を通す（Windows の CR 対策）
-2. コメントに `--format=just-symbols` の導入理由（プラットフォーム間の出力形式統一）と `tr -d '\r'` の理由（Windows の CR 混入対策。理由を知らないと不要な防御として削除され得る）を追記する。`grep -v shiguredo_` のコメントは、書き換え済みシンボルの除外が 1 段目の行頭アンカーで行われる実態に合わせて書き直す（既存の誤検出防止説明は修正後も有効なため維持する）
-3. 上記の完了条件の手順（`llvm-ar` 使用）でローカル検証する
-4. `CHANGES.md` の `## develop` の `### misc` に `[FIX]` エントリを追加する
+`scripts/verify_symbol_rewrite.sh` を次のとおり修正した:
+
+1. `llvm-nm -u` に `--format=just-symbols` を追加した。既定形式では macOS（darwin）が裸のシンボル名（先頭に `_`）だけを出力するのに対し、Linux（ELF）/ Windows（COFF）は bsd 形式で行頭空白 + 型列（U）が付くため、行頭アンカーの `^_?` がマッチせず検査が不発になっていた。just-symbols で出力形式を統一し、macOS の `_` プレフィックス維持も確認した
+2. 出力に `tr -d '\r'` を通した（Windows の CR 混入対策。行末アンカー `$` が `\r` にマッチしないため）
+3. コメントを書き直した（`--format=just-symbols` の導入理由、`tr -d '\r'` の理由、`grep -v shiguredo_` が 1 段目の行頭アンカーで除外済みの実態に合わせた説明、llvm-nm の失敗が set -e で検出されるためのコマンド置換と改行復元の説明）
+4. 完了条件の手順でローカル検証した: `clang --target=x86_64-unknown-linux-gnu` / `--target=x86_64-pc-windows-msvc` のクロスコンパイルで ELF / COFF オブジェクトを作成し、rustup 同梱の `llvm-ar` でアーカイブ化して実行した。未解決参照入りで exit 1（検出）、正常で exit 0（偽陽性なし）、macOS 実物で exit 0（既存動作維持）、`\r` 混入時は `tr -d '\r'` なしで検出漏れ・ありで検出、破損アーカイブで exit 1 を確認した
+5. `CHANGES.md` の `## develop` の `### misc` に `[FIX]` エントリを追加した
