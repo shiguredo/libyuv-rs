@@ -2,7 +2,7 @@
 
 - Priority: High
 - Created: 2026-08-04
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-08-12
 - Model: DeepSeek V4 Flash
 - Branch: feature/fix-alpha-stride-validation
 - Polished: 2026-08-12
@@ -62,6 +62,9 @@ if src_a.len() < required { ... }
 
 ## 解決方法
 
-1. `validate_alpha_src` / `validate_alpha_dst` に `require_c_int` と `stride >= width` チェックを追加する
-2. `tests/test_convert.rs` にテストを追加する
-3. `CHANGES.md` の `## develop` セクションに `[FIX]` エントリを追加する
+`src/convert/i420.rs` を次のとおり修正した:
+
+1. `validate_alpha_src` / `validate_alpha_dst` に `require_c_int(src_stride_a / dst_stride_a)` と `stride >= width` チェックを追加した（サイズ計算より前に配置。i420_blend と同じパターン）。エラーメッセージは `i420_blend` の前例に合わせて "alpha stride exceeds c_int range" / "alpha stride smaller than width" とした
+2. docstring に height == 0 の既知の制約（デバッグビルドのアンダーフローパニック・リリースビルドの wrap）を明記した（0026 のスコープ）
+3. `tests/test_convert.rs` に 7 関数の境界値テストを追加した（stride == width / c_int::MAX で Ok、width - 1 / c_int::MAX + 1 で Err。c_int::MAX の Ok は height=1 で検証。共通ヘルパー `check_alpha_stride_boundaries` を使用）
+4. `CHANGES.md` の `## develop` セクションに `[FIX]` エントリを追加した（p210_to_p410 の前例に倣い、c_int 範囲超過・stride 不足が従来通過していたが Err を返すようになる挙動変更を併記）
