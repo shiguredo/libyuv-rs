@@ -75,6 +75,10 @@
   - 手書き検証を生成済みの validate に置き換え、require_c_int チェック・最小ストライドチェック・オーバーフロー安全なサイズ計算を追加する
   - stride 不足（Y は width 未満、UV は chroma 幅未満）と stride の c_int 範囲超過は従来通過していたが Err を返すようになる（p210_to_p410 は src 側、nv12_to_nv24 は dst 側、nv16_to_nv24 は src / dst 側）
   - @voluntas
+- [FIX] argb_blur の cumsum 検証が C の循環バッファ契約と不一致で省メモリ利用を拒否する問題を修正する
+  - cumsum の必要行数を min(height, 有効 radius * 2 + 2) に緩和し、radius の clamp 規則（min(radius, height)、min(radius, width / 2 - 1)）を C と一致させる
+  - radius <= 0 / height <= 1 / width <= 3 は従来 C 経由で Err になっていたが、Rust 側の検証として明示的に Err を返すようになる
+  - @voluntas
 
 ### misc
 

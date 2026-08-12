@@ -4,7 +4,10 @@
 
 use std::ffi::c_int;
 
-use shiguredo_libyuv::{ImageSize, copy_plane, half_float_plane, split_uv_plane};
+use shiguredo_libyuv::{
+    ArgbImage, ArgbImageMut, Error, ImageSize, argb_blur, copy_plane, half_float_plane,
+    split_uv_plane,
+};
 
 // scale = 1.0 で 2 の冪 2^k（k は 0..=15）の入力を変換したときの f16 出力のビットパターンを返す。
 // 2 の冪は仮数が 0 のため、truncation（C / NEON / AVX2）でも RNE 丸め（F16C / SVE2）でも
@@ -206,6 +209,229 @@ fn half_float_plane_buffer_too_small() {
     assert!(
         err.to_string().contains("source buffer too small"),
         "src バッファ不足の reason が返るべき: {}",
+        err
+    );
+}
+
+// ============================================================
+// argb_blur
+// ============================================================
+
+// argb_blur テスト用のヘルパー。src / dst は width * height * 4 バイト、cumsum は
+// cumsum_rows 行分（stride32_cumsum = width * 4）を確保して radius で呼び出す。
+// stride32_cumsum を width * 4 以外にするテストは直接 argb_blur を呼ぶこと
+fn call_argb_blur(size: ImageSize, cumsum_rows: usize, radius: i32) -> Result<(), Error> {
+    let src = vec![0u8; size.width * size.height * 4];
+    let mut dst = vec![0u8; size.width * size.height * 4];
+    let mut cumsum = vec![0i32; size.width * 4 * cumsum_rows];
+    argb_blur(
+        &ArgbImage {
+            data: &src,
+            stride: size.width * 4,
+        },
+        &mut ArgbImageMut {
+            data: &mut dst,
+            stride: size.width * 4,
+        },
+        size,
+        &mut cumsum,
+        size.width * 4,
+        radius,
+    )
+}
+
+// 正常系: argb_blur が C の循環バッファ契約どおり min(height, 有効 radius * 2 + 2) 行の
+// cumsum バッファで成功すること（radius が小さいときは height 行より少ない行で足りる）
+#[test]
+fn argb_blur_cumsum_rows_less_than_height() {
+    // width=10, height=10, radius=1: 有効 radius = min(1, 10, 10 / 2 - 1 = 4) = 1
+    // 必要行数 = min(10, 1 * 2 + 2) = 4 行（height 行ではない）
+    call_argb_blur(ImageSize::new(10, 10), 4, 1)
+        .expect("必要行数ちょうどの cumsum では Ok が返るべき");
+    // 従来の契約（height 行確保）のままでも成功すること（回帰防止）
+    call_argb_blur(ImageSize::new(10, 10), 10, 1).expect("height 行の cumsum でも Ok が返るべき");
+}
+
+// 異常系: argb_blur が cumsum の必要行数から 1 行不足で Err を返すこと
+#[test]
+fn argb_blur_cumsum_one_row_short() {
+    // 必要行数 4 行に対し 3 行しか用意しない（1 行不足で Err になること）
+    let err =
+        call_argb_blur(ImageSize::new(10, 10), 3, 1).expect_err("1 行不足では Err が返るべき");
+    assert!(
+        err.to_string().contains("cumsum buffer too small"),
+        "cumsum バッファ不足の reason が返るべき: {}",
+        err
+    );
+}
+
+// 正常系: argb_blur の cumsum 必要行数が width / 2 - 1 >= height では height 行のまま
+// になること（従来と同じ要求）
+#[test]
+fn argb_blur_cumsum_rows_equals_height_when_radius_equals_height() {
+    // width=20, height=8, radius=8: 有効 radius = min(8, 8, 20 / 2 - 1 = 9) = 8
+    // 必要行数 = min(8, 8 * 2 + 2 = 18) = 8 行 = height 行
+    call_argb_blur(ImageSize::new(20, 8), 8, 8)
+        .expect("radius == height では height 行の cumsum で Ok が返るべき");
+    let err = call_argb_blur(ImageSize::new(20, 8), 7, 8)
+        .expect_err("height 行から 1 行不足では Err が返るべき");
+    assert!(
+        err.to_string().contains("cumsum buffer too small"),
+        "cumsum バッファ不足の reason が返るべき: {}",
+        err
+    );
+}
+
+// 正常系: argb_blur の radius > height が clamp 後に radius == height と同じ必要行数
+// になること。1 行不足で Err になること
+// なお必要行数は半径が height を超えると常に height 行になるため、このテストは
+// radius == height と同じ Ok / Err 境界を検証するものであり、clamp の有無は必要行数に
+// 影響しない（C 側も同じ規則で clamp するため、C に渡る radius が clamp 前の値でも安全）
+#[test]
+fn argb_blur_radius_greater_than_height() {
+    // radius=100 > height=8: 有効 radius = min(100, 8, 9) = 8 → 必要行数 8 行
+    call_argb_blur(ImageSize::new(20, 8), 8, 100)
+        .expect("radius > height では height 行の cumsum で Ok が返るべき");
+    let err = call_argb_blur(ImageSize::new(20, 8), 7, 100)
+        .expect_err("height 行から 1 行不足では Err が返るべき");
+    assert!(
+        err.to_string().contains("cumsum buffer too small"),
+        "cumsum バッファ不足の reason が返るべき: {}",
+        err
+    );
+}
+
+// 正常系: argb_blur の radius が width / 2 - 1 で clamp される場合の必要行数で成功
+// すること。1 行不足で Err になること
+#[test]
+fn argb_blur_radius_clamped_to_width() {
+    // width=10, height=20, radius=10: 有効 radius = min(10, 20, 10 / 2 - 1 = 4) = 4
+    // 必要行数 = min(20, 4 * 2 + 2 = 10) = 10 行（width clamp が効くケース。
+    // clamp が機能しないと必要行数が min(20, 10 * 2 + 2 = 22) = 20 行になるため、
+    // 10 行で Ok / 9 行で Err が clamp の正しさを検証する）
+    call_argb_blur(ImageSize::new(10, 20), 10, 10)
+        .expect("width clamp 後の必要行数の cumsum で Ok が返るべき");
+    let err = call_argb_blur(ImageSize::new(10, 20), 9, 10)
+        .expect_err("width clamp 後の必要行数から 1 行不足では Err が返るべき");
+    assert!(
+        err.to_string().contains("cumsum buffer too small"),
+        "cumsum バッファ不足の reason が返るべき: {}",
+        err
+    );
+}
+
+// 正常系: argb_blur が height == 有効 radius * 2 + 2 の等号境界で必要行数どおりに
+// 成功すること。1 行不足で Err になること
+#[test]
+fn argb_blur_cumsum_rows_equals_radius_times_2_plus_2() {
+    // width=10, height=4, radius=1: 有効 radius = min(1, 4, 4) = 1
+    // 必要行数 = min(4, 1 * 2 + 2 = 4) = 4 行 = height（等号境界）
+    call_argb_blur(ImageSize::new(10, 4), 4, 1)
+        .expect("height == 有効 radius * 2 + 2 では height 行の cumsum で Ok が返るべき");
+    let err = call_argb_blur(ImageSize::new(10, 4), 3, 1)
+        .expect_err("等号境界から 1 行不足では Err が返るべき");
+    assert!(
+        err.to_string().contains("cumsum buffer too small"),
+        "cumsum バッファ不足の reason が返るべき: {}",
+        err
+    );
+}
+
+// 正常系: argb_blur が最小の有効 height（height=2）で成功すること
+#[test]
+fn argb_blur_minimum_height() {
+    // width=10, height=2, radius=1: 有効 radius = min(1, 2, 4) = 1
+    // 必要行数 = min(2, 4) = 2 行（height <= 1 の Err との境界）
+    call_argb_blur(ImageSize::new(10, 2), 2, 1)
+        .expect("height=2 では 2 行の cumsum で Ok が返るべき");
+}
+
+// 異常系: argb_blur が空の cumsum バッファで Err を返すこと
+#[test]
+fn argb_blur_cumsum_empty_buffer() {
+    let err =
+        call_argb_blur(ImageSize::new(10, 10), 0, 1).expect_err("空の cumsum では Err が返るべき");
+    assert!(
+        err.to_string().contains("cumsum buffer too small"),
+        "cumsum バッファ不足の reason が返るべき: {}",
+        err
+    );
+}
+
+// 異常系: argb_blur の radius <= 0 で Err が返ること
+#[test]
+fn argb_blur_radius_non_positive() {
+    // radius=0 と負値は C の clamp 後に radius <= 0 の -1 返却条件と一致し Err になる
+    for radius in [0, -1] {
+        let err = call_argb_blur(ImageSize::new(8, 8), 8, radius)
+            .expect_err("radius <= 0 では Err が返るべき");
+        assert!(
+            err.to_string().contains("radius must be greater than 0"),
+            "radius 検証の reason が返るべき: {}",
+            err
+        );
+    }
+}
+
+// 異常系: argb_blur の height <= 1 で Err が返ること
+#[test]
+fn argb_blur_height_too_small() {
+    // height=1 と height=0 は C の -1 返却条件と一致し Err になる
+    for height in [1, 0] {
+        let err = call_argb_blur(ImageSize::new(8, height), 8, 1)
+            .expect_err("height <= 1 では Err が返るべき");
+        assert!(
+            err.to_string().contains("height must be greater than 1"),
+            "height 検証の reason が返るべき: {}",
+            err
+        );
+    }
+}
+
+// 異常系: argb_blur の width <= 3 で Err が返ること
+#[test]
+fn argb_blur_width_too_small() {
+    // width <= 3 では C の clamp 後も有効 radius が 0 以下になり Err になる。
+    // width=0 も同様に Err になる
+    for width in [3, 2, 1, 0] {
+        let err = call_argb_blur(ImageSize::new(width, 8), 8, 1)
+            .expect_err("width <= 3 では Err が返るべき");
+        assert!(
+            err.to_string().contains("width must be greater than 3"),
+            "width 検証の reason が返るべき: {}",
+            err
+        );
+    }
+}
+
+// 異常系: argb_blur の stride32_cumsum が width * 4 未満で Err が返ること
+#[test]
+fn argb_blur_cumsum_stride_too_small() {
+    // stride32_cumsum を 1 要素不足させて、既存の stride 下限チェックが効くことを確認する
+    let size = ImageSize::new(10, 10);
+    let src = vec![0u8; 10 * 10 * 4];
+    let mut dst = vec![0u8; 10 * 10 * 4];
+    let mut cumsum = vec![0i32; 10 * 4 * 10];
+
+    let result = argb_blur(
+        &ArgbImage {
+            data: &src,
+            stride: 10 * 4,
+        },
+        &mut ArgbImageMut {
+            data: &mut dst,
+            stride: 10 * 4,
+        },
+        size,
+        &mut cumsum,
+        10 * 4 - 1, // stride32_cumsum が width * 4 より 1 要素不足
+        1,
+    );
+    let err = result.expect_err("cumsum stride 不足では Err が返るべき");
+    assert!(
+        err.to_string()
+            .contains("cumsum stride smaller than width * 4"),
+        "cumsum stride 不足の reason が返るべき: {}",
         err
     );
 }
