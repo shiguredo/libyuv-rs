@@ -6,7 +6,7 @@ use crate::{
     Ab30ImageMut, AbgrImage, AbgrImageMut, Ar30ImageMut, ArgbImage, ArgbImageMut, Error,
     I010ImageMut, I400Image, I400ImageMut, I420Image, I420ImageMut, I422Image, I422ImageMut,
     I444Image, I444ImageMut, ImageSize, Nv12Image, Nv12ImageMut, Nv21Image, Nv21ImageMut,
-    Rgb24Image, Rgb24ImageMut, sys,
+    Rgb24Image, Rgb24ImageMut, require_c_int, sys,
 };
 
 // ============================================================
@@ -866,12 +866,29 @@ pub fn argb_to_i400(
 // ============================================================
 
 /// アルファプレーン（入力）のバッファサイズを検証する
+///
+/// stride の c_int 範囲と stride >= width も検証する。height == 0 のサイズ計算
+/// （stride * (height - 1)）はデバッグビルドでアンダーフローパニック、リリース
+/// ビルドでは wrap して検証をすり抜けうる（既知の制約）
 fn validate_alpha_src(
     src_a: &[u8],
     src_stride_a: usize,
     size: ImageSize,
     function: &'static str,
 ) -> Result<(), Error> {
+    // c_int 範囲チェック。巨大な stride が負値に切り詰められると C 側の行ポインタ
+    // 加算（src_a += src_stride_a）がアルファプレーンのみ逆進し、スライス先頭より
+    // 手前の領域外読み出しになる
+    require_c_int(src_stride_a, function, "alpha stride exceeds c_int range")?;
+    // stride >= width チェック（i420_blend と同じ仕様。安全性より検証パターンの統一が
+    // 目的。C は stride < width でも行が重なるだけで OOB にはならない）
+    if src_stride_a < size.width {
+        return Err(Error::with_reason(
+            -1,
+            function,
+            "alpha stride smaller than width",
+        ));
+    }
     let required = src_stride_a * (size.height - 1) + size.width;
     if src_a.len() < required {
         return Err(Error::with_reason(
@@ -884,12 +901,29 @@ fn validate_alpha_src(
 }
 
 /// アルファプレーン（出力）のバッファサイズを検証する
+///
+/// stride の c_int 範囲と stride >= width も検証する。height == 0 のサイズ計算
+/// （stride * (height - 1)）はデバッグビルドでアンダーフローパニック、リリース
+/// ビルドでは wrap して検証をすり抜けうる（既知の制約）
 fn validate_alpha_dst(
     dst_a: &[u8],
     dst_stride_a: usize,
     size: ImageSize,
     function: &'static str,
 ) -> Result<(), Error> {
+    // c_int 範囲チェック。巨大な stride が負値に切り詰められると C 側の行ポインタ
+    // 加算（dst_a += dst_stride_a * 2）がアルファプレーンのみ逆進し、領域外書き込み
+    // （メモリ破壊）になる
+    require_c_int(dst_stride_a, function, "alpha stride exceeds c_int range")?;
+    // stride >= width チェック（i420_blend と同じ仕様。安全性より検証パターンの統一が
+    // 目的。C は stride < width でも行が重なるだけで OOB にはならない）
+    if dst_stride_a < size.width {
+        return Err(Error::with_reason(
+            -1,
+            function,
+            "alpha stride smaller than width",
+        ));
+    }
     let required = dst_stride_a * (size.height - 1) + size.width;
     if dst_a.len() < required {
         return Err(Error::with_reason(

@@ -5,10 +5,12 @@
 use std::ffi::c_int;
 
 use shiguredo_libyuv::{
-    AbgrImageMut, Android420Image, ArgbImageMut, I420Image, I420ImageMut, ImageSize, Mm21Image,
-    Mt2tImage, Nv12Image, Nv16Image, Nv24ImageMut, P010ImageMut, P210Image, P410ImageMut,
-    UyvyImage, Yuy2Image, Yuy2ImageMut, android420_to_abgr, android420_to_argb, android420_to_i420,
-    detile_plane, detile_plane_16, detile_to_yuy2, i420_to_argb, mm21_to_i420, mt2t_to_p010,
+    AbgrImageMut, Android420Image, ArgbImage, ArgbImageMut, Error, I420Image, I420ImageMut,
+    I422Image, I444Image, ImageSize, Mm21Image, Mt2tImage, Nv12Image, Nv16Image, Nv24ImageMut,
+    P010ImageMut, P210Image, P410ImageMut, UyvyImage, Yuy2Image, Yuy2ImageMut, android420_to_abgr,
+    android420_to_argb, android420_to_i420, argb_to_i420_alpha, detile_plane, detile_plane_16,
+    detile_to_yuy2, i420_alpha_to_abgr, i420_alpha_to_argb, i420_to_argb, i422_alpha_to_abgr,
+    i422_alpha_to_argb, i444_alpha_to_abgr, i444_alpha_to_argb, mm21_to_i420, mt2t_to_p010,
     nv12_to_i420, nv12_to_nv24, nv16_to_nv24, p210_to_p410, uyvy_to_y, yuy2_to_y,
 };
 
@@ -2415,4 +2417,226 @@ fn nv16_to_nv24_success() {
         uv_stride: 16,
     };
     nv16_to_nv24(&src, &mut dst, size).expect("必要サイズちょうどで成功するべき");
+}
+
+// ============================================================
+// アルファ付き変換のアルファプレーン stride 検証
+// ============================================================
+
+// アルファ stride 検証の境界値テスト用ヘルパー。変換関数をクロージャで受け取り、
+// stride == width / c_int::MAX の Ok と width - 1 / c_int::MAX + 1 の Err を検証する。
+// 呼び出し側は height=1 に固定すること（アルファの必要サイズが width になり、
+// バッファ width バイトで検証を通過する）。alpha は読み出し系なら src_a、書き込み系
+// なら dst_a として使う。
+// なお c_int::MAX の stride は C 側で範囲外ポインタの形成（読み出し系は処理後の
+// src_a += src_stride_a、書き込み系は USE_EXTRACTALPHA 有効時の dst_a += dst_stride_a）
+// を伴うが deref されないため、UBSan なしの通常ビルドでは実害がない
+fn check_alpha_stride_boundaries(
+    size: ImageSize,
+    mut convert: impl FnMut(&mut [u8], usize) -> Result<(), Error>,
+) {
+    let max_stride = c_int::MAX as usize;
+    let mut alpha = vec![0u8; size.width];
+
+    convert(&mut alpha, size.width).expect("stride == width では Ok が返るべき");
+    convert(&mut alpha, max_stride).expect("c_int::MAX の stride でも Ok が返るべき");
+    let err = convert(&mut alpha, size.width - 1).expect_err("stride < width では Err が返るべき");
+    assert!(
+        err.to_string().contains("alpha stride smaller than width"),
+        "stride 不足の reason が返るべき: {}",
+        err
+    );
+    let err = convert(&mut alpha, max_stride + 1)
+        .expect_err("c_int 範囲超過の stride では Err が返るべき");
+    assert!(
+        err.to_string().contains("alpha stride exceeds c_int range"),
+        "c_int 範囲超過の reason が返るべき: {}",
+        err
+    );
+}
+
+// 境界値: i420_alpha_to_argb の src_stride_a 検証（c_int 範囲・stride >= width）
+#[test]
+fn i420_alpha_to_argb_alpha_stride_boundaries() {
+    let size = ImageSize::new(4, 1);
+    let y = vec![0u8; 4];
+    let u = vec![0u8; 2];
+    let v = vec![0u8; 2];
+    let src = I420Image {
+        y: &y,
+        y_stride: 4,
+        u: &u,
+        u_stride: 2,
+        v: &v,
+        v_stride: 2,
+    };
+    let mut data = vec![0u8; 16];
+    let mut dst = ArgbImageMut {
+        data: &mut data,
+        stride: 16,
+    };
+
+    check_alpha_stride_boundaries(size, |alpha, stride| {
+        i420_alpha_to_argb(&src, alpha, stride, &mut dst, size, false)
+    });
+}
+
+// 境界値: i420_alpha_to_abgr の src_stride_a 検証（c_int 範囲・stride >= width）
+#[test]
+fn i420_alpha_to_abgr_alpha_stride_boundaries() {
+    let size = ImageSize::new(4, 1);
+    let y = vec![0u8; 4];
+    let u = vec![0u8; 2];
+    let v = vec![0u8; 2];
+    let src = I420Image {
+        y: &y,
+        y_stride: 4,
+        u: &u,
+        u_stride: 2,
+        v: &v,
+        v_stride: 2,
+    };
+    let mut data = vec![0u8; 16];
+    let mut dst = AbgrImageMut {
+        data: &mut data,
+        stride: 16,
+    };
+
+    check_alpha_stride_boundaries(size, |alpha, stride| {
+        i420_alpha_to_abgr(&src, alpha, stride, &mut dst, size, false)
+    });
+}
+
+// 境界値: i422_alpha_to_argb の src_stride_a 検証（c_int 範囲・stride >= width）
+#[test]
+fn i422_alpha_to_argb_alpha_stride_boundaries() {
+    let size = ImageSize::new(4, 1);
+    let y = vec![0u8; 4];
+    let u = vec![0u8; 2];
+    let v = vec![0u8; 2];
+    let src = I422Image {
+        y: &y,
+        y_stride: 4,
+        u: &u,
+        u_stride: 2,
+        v: &v,
+        v_stride: 2,
+    };
+    let mut data = vec![0u8; 16];
+    let mut dst = ArgbImageMut {
+        data: &mut data,
+        stride: 16,
+    };
+
+    check_alpha_stride_boundaries(size, |alpha, stride| {
+        i422_alpha_to_argb(&src, alpha, stride, &mut dst, size, false)
+    });
+}
+
+// 境界値: i422_alpha_to_abgr の src_stride_a 検証（c_int 範囲・stride >= width）
+#[test]
+fn i422_alpha_to_abgr_alpha_stride_boundaries() {
+    let size = ImageSize::new(4, 1);
+    let y = vec![0u8; 4];
+    let u = vec![0u8; 2];
+    let v = vec![0u8; 2];
+    let src = I422Image {
+        y: &y,
+        y_stride: 4,
+        u: &u,
+        u_stride: 2,
+        v: &v,
+        v_stride: 2,
+    };
+    let mut data = vec![0u8; 16];
+    let mut dst = AbgrImageMut {
+        data: &mut data,
+        stride: 16,
+    };
+
+    check_alpha_stride_boundaries(size, |alpha, stride| {
+        i422_alpha_to_abgr(&src, alpha, stride, &mut dst, size, false)
+    });
+}
+
+// 境界値: i444_alpha_to_argb の src_stride_a 検証（c_int 範囲・stride >= width）
+#[test]
+fn i444_alpha_to_argb_alpha_stride_boundaries() {
+    let size = ImageSize::new(4, 1);
+    let y = vec![0u8; 4];
+    let u = vec![0u8; 4];
+    let v = vec![0u8; 4];
+    let src = I444Image {
+        y: &y,
+        y_stride: 4,
+        u: &u,
+        u_stride: 4,
+        v: &v,
+        v_stride: 4,
+    };
+    let mut data = vec![0u8; 16];
+    let mut dst = ArgbImageMut {
+        data: &mut data,
+        stride: 16,
+    };
+
+    check_alpha_stride_boundaries(size, |alpha, stride| {
+        i444_alpha_to_argb(&src, alpha, stride, &mut dst, size, false)
+    });
+}
+
+// 境界値: i444_alpha_to_abgr の src_stride_a 検証（c_int 範囲・stride >= width）
+#[test]
+fn i444_alpha_to_abgr_alpha_stride_boundaries() {
+    let size = ImageSize::new(4, 1);
+    let y = vec![0u8; 4];
+    let u = vec![0u8; 4];
+    let v = vec![0u8; 4];
+    let src = I444Image {
+        y: &y,
+        y_stride: 4,
+        u: &u,
+        u_stride: 4,
+        v: &v,
+        v_stride: 4,
+    };
+    let mut data = vec![0u8; 16];
+    let mut dst = AbgrImageMut {
+        data: &mut data,
+        stride: 16,
+    };
+
+    check_alpha_stride_boundaries(size, |alpha, stride| {
+        i444_alpha_to_abgr(&src, alpha, stride, &mut dst, size, false)
+    });
+}
+
+// 境界値: argb_to_i420_alpha の dst_stride_a 検証（c_int 範囲・stride >= width）
+#[test]
+fn argb_to_i420_alpha_alpha_stride_boundaries() {
+    // 書き込み系は height=1 では C 側の 2 行単位ループが走らず、行ポインタ加算が
+    // 発生しないため、c_int::MAX の stride でも安全に Ok が返ること（現ビルドは
+    // USE_EXTRACTALPHA 未定義の 2 行単位版。USE_EXTRACTALPHA 有効時は
+    // ARGBExtractAlpha 経由で dst_a += dst_stride_a が 1 回実行されるが deref されない）
+    let size = ImageSize::new(4, 1);
+    let src_data = vec![0u8; 16];
+    let src = ArgbImage {
+        data: &src_data,
+        stride: 16,
+    };
+    let mut y = vec![0u8; 4];
+    let mut u = vec![0u8; 2];
+    let mut v = vec![0u8; 2];
+    let mut dst = I420ImageMut {
+        y: &mut y,
+        y_stride: 4,
+        u: &mut u,
+        u_stride: 2,
+        v: &mut v,
+        v_stride: 2,
+    };
+
+    check_alpha_stride_boundaries(size, |alpha, stride| {
+        argb_to_i420_alpha(&src, &mut dst, alpha, stride, size)
+    });
 }
