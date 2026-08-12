@@ -5,8 +5,10 @@
 use std::ffi::c_int;
 
 use shiguredo_libyuv::{
-    ArgbImage, ArgbImageMut, Error, ImageSize, argb_blur, copy_plane, half_float_plane,
-    split_uv_plane,
+    ArgbImage, ArgbImageMut, Error, ImageSize, argb_blur, convert_to_lsb_plane_16,
+    convert_to_msb_plane_16, copy_plane, half_float_plane, merge_ar64_plane,
+    merge_argb16_to_8_plane, merge_uv_plane_16, merge_xr30_plane, split_uv_plane,
+    split_uv_plane_16,
 };
 
 // scale = 1.0 で 2 の冪 2^k（k は 0..=15）の入力を変換したときの f16 出力のビットパターンを返す。
@@ -434,4 +436,336 @@ fn argb_blur_cumsum_stride_too_small() {
         "cumsum stride 不足の reason が返るべき: {}",
         err
     );
+}
+
+// ============================================================
+// 16bit 変換関数の depth 検証
+// ============================================================
+
+// merge_uv_plane_16 を正しいバッファ構成で呼び出すヘルパー。
+// バッファサイズは size から導出する (u/v は width * height、uv は width * 2 * height)
+fn call_merge_uv_plane_16(size: ImageSize, depth: i32) -> Result<(), Error> {
+    let src_u = vec![0u16; size.width * size.height];
+    let src_v = vec![0u16; size.width * size.height];
+    let mut dst_uv = vec![0u16; size.width * size.height * 2];
+    merge_uv_plane_16(
+        &src_u,
+        size.width,
+        &src_v,
+        size.width,
+        &mut dst_uv,
+        size.width * 2,
+        size,
+        depth,
+    )
+}
+
+// split_uv_plane_16 を正しいバッファ構成で呼び出すヘルパー
+fn call_split_uv_plane_16(size: ImageSize, depth: i32) -> Result<(), Error> {
+    let src_uv = vec![0u16; size.width * size.height * 2];
+    let mut dst_u = vec![0u16; size.width * size.height];
+    let mut dst_v = vec![0u16; size.width * size.height];
+    split_uv_plane_16(
+        &src_uv,
+        size.width * 2,
+        &mut dst_u,
+        size.width,
+        &mut dst_v,
+        size.width,
+        size,
+        depth,
+    )
+}
+
+// merge_ar64_plane を正しいバッファ構成で呼び出すヘルパー
+fn call_merge_ar64_plane(size: ImageSize, depth: i32) -> Result<(), Error> {
+    let src_r = vec![0u16; size.width * size.height];
+    let src_g = vec![0u16; size.width * size.height];
+    let src_b = vec![0u16; size.width * size.height];
+    let src_a = vec![0u16; size.width * size.height];
+    let mut dst_ar64 = vec![0u16; size.width * size.height * 4];
+    merge_ar64_plane(
+        &src_r,
+        size.width,
+        &src_g,
+        size.width,
+        &src_b,
+        size.width,
+        &src_a,
+        size.width,
+        &mut dst_ar64,
+        size.width * 4,
+        size,
+        depth,
+    )
+}
+
+// merge_xr30_plane を正しいバッファ構成で呼び出すヘルパー
+fn call_merge_xr30_plane(size: ImageSize, depth: i32) -> Result<(), Error> {
+    let src_r = vec![0u16; size.width * size.height];
+    let src_g = vec![0u16; size.width * size.height];
+    let src_b = vec![0u16; size.width * size.height];
+    let mut dst_ar30 = vec![0u8; size.width * size.height * 4];
+    merge_xr30_plane(
+        &src_r,
+        size.width,
+        &src_g,
+        size.width,
+        &src_b,
+        size.width,
+        &mut dst_ar30,
+        size.width * 4,
+        size,
+        depth,
+    )
+}
+
+// merge_argb16_to_8_plane を正しいバッファ構成で呼び出すヘルパー
+fn call_merge_argb16_to_8_plane(size: ImageSize, depth: i32) -> Result<(), Error> {
+    let src_r = vec![0u16; size.width * size.height];
+    let src_g = vec![0u16; size.width * size.height];
+    let src_b = vec![0u16; size.width * size.height];
+    let src_a = vec![0u16; size.width * size.height];
+    let mut dst_argb = vec![0u8; size.width * size.height * 4];
+    merge_argb16_to_8_plane(
+        &src_r,
+        size.width,
+        &src_g,
+        size.width,
+        &src_b,
+        size.width,
+        &src_a,
+        size.width,
+        &mut dst_argb,
+        size.width * 4,
+        size,
+        depth,
+    )
+}
+
+// convert_to_lsb_plane_16 / convert_to_msb_plane_16 を正しいバッファ構成で呼び出す
+// ヘルパー (変換関数を引数で切り替える)
+fn call_convert_plane_16(lsb: bool, size: ImageSize, depth: i32) -> Result<(), Error> {
+    let src = vec![0u16; size.width * size.height];
+    let mut dst = vec![0u16; size.width * size.height];
+    if lsb {
+        convert_to_lsb_plane_16(&src, size.width, &mut dst, size.width, size, depth)
+    } else {
+        convert_to_msb_plane_16(&src, size.width, &mut dst, size.width, size, depth)
+    }
+}
+
+// 正常系: merge_uv_plane_16 の depth が有効範囲 (8..=16) の境界値で成功すること
+#[test]
+fn merge_uv_plane_16_depth_valid_boundaries() {
+    let size = ImageSize::new(4, 4);
+    for depth in [8, 16] {
+        call_merge_uv_plane_16(size, depth).expect("有効範囲の depth では Ok が返るべき");
+    }
+}
+
+// 異常系: merge_uv_plane_16 の depth が有効範囲 (8..=16) 外で Err が返ること
+#[test]
+fn merge_uv_plane_16_depth_out_of_range() {
+    let size = ImageSize::new(4, 4);
+    for depth in [7, 17, -1, i32::MIN, i32::MAX] {
+        let err =
+            call_merge_uv_plane_16(size, depth).expect_err("範囲外の depth では Err が返るべき");
+        assert!(
+            err.to_string().contains("depth must be between 8 and 16"),
+            "depth 検証の reason が返るべき: {}",
+            err
+        );
+    }
+    // ゼロサイズ入力でも仕様として Err になること
+    let err = call_merge_uv_plane_16(ImageSize::new(0, 0), 7)
+        .expect_err("ゼロサイズ + 範囲外 depth では Err が返るべき");
+    assert!(
+        err.to_string().contains("depth must be between 8 and 16"),
+        "depth 検証の reason が返るべき: {}",
+        err
+    );
+}
+
+// 正常系: split_uv_plane_16 の depth が有効範囲 (8..=16) の境界値で成功すること
+#[test]
+fn split_uv_plane_16_depth_valid_boundaries() {
+    let size = ImageSize::new(4, 4);
+    for depth in [8, 16] {
+        call_split_uv_plane_16(size, depth).expect("有効範囲の depth では Ok が返るべき");
+    }
+}
+
+// 異常系: split_uv_plane_16 の depth が有効範囲 (8..=16) 外で Err が返ること
+#[test]
+fn split_uv_plane_16_depth_out_of_range() {
+    let size = ImageSize::new(4, 4);
+    for depth in [7, 17, -1, i32::MIN, i32::MAX] {
+        let err =
+            call_split_uv_plane_16(size, depth).expect_err("範囲外の depth では Err が返るべき");
+        assert!(
+            err.to_string().contains("depth must be between 8 and 16"),
+            "depth 検証の reason が返るべき: {}",
+            err
+        );
+    }
+    // ゼロサイズ入力でも仕様として Err になること
+    let err = call_split_uv_plane_16(ImageSize::new(0, 0), 7)
+        .expect_err("ゼロサイズ + 範囲外 depth では Err が返るべき");
+    assert!(
+        err.to_string().contains("depth must be between 8 and 16"),
+        "depth 検証の reason が返るべき: {}",
+        err
+    );
+}
+
+// 正常系: merge_ar64_plane の depth が有効範囲 (1..=16) の境界値で成功すること
+#[test]
+fn merge_ar64_plane_depth_valid_boundaries() {
+    let size = ImageSize::new(4, 4);
+    for depth in [1, 16] {
+        call_merge_ar64_plane(size, depth).expect("有効範囲の depth では Ok が返るべき");
+    }
+}
+
+// 異常系: merge_ar64_plane の depth が有効範囲 (1..=16) 外で Err が返ること
+#[test]
+fn merge_ar64_plane_depth_out_of_range() {
+    let size = ImageSize::new(4, 4);
+    for depth in [0, 17, -1, i32::MIN, i32::MAX] {
+        let err =
+            call_merge_ar64_plane(size, depth).expect_err("範囲外の depth では Err が返るべき");
+        assert!(
+            err.to_string().contains("depth must be between 1 and 16"),
+            "depth 検証の reason が返るべき: {}",
+            err
+        );
+    }
+    // ゼロサイズ入力でも仕様として Err になること
+    let err = call_merge_ar64_plane(ImageSize::new(0, 0), 0)
+        .expect_err("ゼロサイズ + 範囲外 depth では Err が返るべき");
+    assert!(
+        err.to_string().contains("depth must be between 1 and 16"),
+        "depth 検証の reason が返るべき: {}",
+        err
+    );
+}
+
+// 正常系: merge_xr30_plane の depth が有効範囲 (10..=16) の境界値で成功すること
+#[test]
+fn merge_xr30_plane_depth_valid_boundaries() {
+    let size = ImageSize::new(4, 4);
+    for depth in [10, 16] {
+        call_merge_xr30_plane(size, depth).expect("有効範囲の depth では Ok が返るべき");
+    }
+}
+
+// 異常系: merge_xr30_plane の depth が有効範囲 (10..=16) 外で Err が返ること
+#[test]
+fn merge_xr30_plane_depth_out_of_range() {
+    let size = ImageSize::new(4, 4);
+    for depth in [9, 17, -1, i32::MIN, i32::MAX] {
+        let err =
+            call_merge_xr30_plane(size, depth).expect_err("範囲外の depth では Err が返るべき");
+        assert!(
+            err.to_string().contains("depth must be between 10 and 16"),
+            "depth 検証の reason が返るべき: {}",
+            err
+        );
+    }
+    // ゼロサイズ入力でも仕様として Err になること
+    let err = call_merge_xr30_plane(ImageSize::new(0, 0), 9)
+        .expect_err("ゼロサイズ + 範囲外 depth では Err が返るべき");
+    assert!(
+        err.to_string().contains("depth must be between 10 and 16"),
+        "depth 検証の reason が返るべき: {}",
+        err
+    );
+}
+
+// 正常系: merge_argb16_to_8_plane の depth が有効範囲 (8..=16) の境界値で成功すること
+#[test]
+fn merge_argb16_to_8_plane_depth_valid_boundaries() {
+    let size = ImageSize::new(4, 4);
+    for depth in [8, 16] {
+        call_merge_argb16_to_8_plane(size, depth).expect("有効範囲の depth では Ok が返るべき");
+    }
+}
+
+// 異常系: merge_argb16_to_8_plane の depth が有効範囲 (8..=16) 外で Err が返ること
+#[test]
+fn merge_argb16_to_8_plane_depth_out_of_range() {
+    let size = ImageSize::new(4, 4);
+    for depth in [7, 17, -1, i32::MIN, i32::MAX] {
+        let err = call_merge_argb16_to_8_plane(size, depth)
+            .expect_err("範囲外の depth では Err が返るべき");
+        assert!(
+            err.to_string().contains("depth must be between 8 and 16"),
+            "depth 検証の reason が返るべき: {}",
+            err
+        );
+    }
+    // ゼロサイズ入力でも仕様として Err になること
+    let err = call_merge_argb16_to_8_plane(ImageSize::new(0, 0), 7)
+        .expect_err("ゼロサイズ + 範囲外 depth では Err が返るべき");
+    assert!(
+        err.to_string().contains("depth must be between 8 and 16"),
+        "depth 検証の reason が返るべき: {}",
+        err
+    );
+}
+
+// 正常系: convert_to_lsb_plane_16 / convert_to_msb_plane_16 の depth が有効範囲
+// (8..=16) の境界値で成功すること
+#[test]
+fn convert_to_lsb_msb_plane_16_depth_valid_boundaries() {
+    let size = ImageSize::new(4, 4);
+    for lsb in [true, false] {
+        for depth in [8, 16] {
+            call_convert_plane_16(lsb, size, depth).expect("有効範囲の depth では Ok が返るべき");
+        }
+    }
+}
+
+// 異常系: convert_to_lsb_plane_16 / convert_to_msb_plane_16 の depth が有効範囲
+// (8..=16) 外で Err が返ること
+#[test]
+fn convert_to_lsb_msb_plane_16_depth_out_of_range() {
+    let size = ImageSize::new(4, 4);
+    // 境界値 (下限 7 / 上限 17) と負値・極端な値を LSB / MSB 両方で検証する
+    for lsb in [true, false] {
+        for depth in [7, 17, -1, i32::MIN, i32::MAX] {
+            let err = call_convert_plane_16(lsb, size, depth).expect_err(&format!(
+                "範囲外の depth では Err が返るべき (lsb={lsb}, depth={depth})"
+            ));
+            assert!(
+                err.to_string().contains("depth must be between 8 and 16"),
+                "depth 検証の reason が返るべき: {}",
+                err
+            );
+        }
+    }
+    // C 側のシフト式が特に危険な代表値 (LSB は 31: 1 << 31 が int 表現不能、
+    // MSB は -15: 1 << (16 - (-15)) = 1 << 31 が int 表現不能) でも、C に渡る前に
+    // Rust 側の検証で Err になること
+    for (lsb, depth) in [(true, 31), (false, -15)] {
+        let err = call_convert_plane_16(lsb, size, depth).expect_err(&format!(
+            "範囲外の depth では Err が返るべき (lsb={lsb}, depth={depth})"
+        ));
+        assert!(
+            err.to_string().contains("depth must be between 8 and 16"),
+            "depth 検証の reason が返るべき: {}",
+            err
+        );
+    }
+    // ゼロサイズ入力でも仕様として Err になること (LSB / MSB 両方)
+    for lsb in [true, false] {
+        let err = call_convert_plane_16(lsb, ImageSize::new(0, 0), 7)
+            .expect_err("ゼロサイズ + 範囲外 depth では Err が返るべき");
+        assert!(
+            err.to_string().contains("depth must be between 8 and 16"),
+            "depth 検証の reason が返るべき: {}",
+            err
+        );
+    }
 }
