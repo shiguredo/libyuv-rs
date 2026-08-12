@@ -55,16 +55,29 @@ if [ ! -f "$jpeg_lib" ]; then
 fi
 
 # Assertion 1 / 2: 未解決の jpeg_/jsimd_ 参照が残っていないこと。
-# プレフィックス (`shiguredo_`) 付きのシンボルは正常に書き換え済みなので
-# grep -v shiguredo_ で除外する。
 # シンボル名は C 識別子のため `[A-Za-z0-9_]+` 末尾で受ける。`jpeg_nbits.c.o:` のような
 # llvm-nm が間に挟むオブジェクトファイル名行 (末尾が `:`) を誤検出しないようにする。
 check_unresolved() {
   local lib="$1"
   local label="$2"
   echo "checking $label for unresolved jpeg_/jsimd_ symbols..."
-  # llvm-nm -u は未定義シンボルだけを列挙する。
-  if "$LLVM_NM" -u "$lib" | grep -E '^_?(jpeg_|jsimd_)[A-Za-z0-9_]+$' | grep -v shiguredo_; then
+  # llvm-nm -u は未定義シンボルだけを列挙し、-u 指定時の macOS (darwin) は裸の
+  # シンボル名 (先頭に `_`) だけを出力する。既定形式では Linux (ELF) / Windows (COFF)
+  # が bsd 形式で行頭空白 + 型列 (U) を付けるため、行頭アンカーの `^_?` がマッチせず
+  # 検査が不発になる。--format=just-symbols で出力をシンボル名のみに統一する
+  # (just-symbols でも macOS の `_` プレフィックスは維持されるため `^_?` はそのまま
+  # 機能する)。Windows では出力に \r が混入することがあり、行末アンカー `$` が
+  # \r にマッチしないため、grep の前に tr -d '\r' で除去する (スクリプト冒頭の
+  # host 行の CR 除去と同じ対策。理由を知らないと不要な防御として削除され得る)。
+  # 書き換え済みシンボル (shiguredo_jpeg_jpeg_* 等) は 1 段目の行頭アンカーで
+  # 原理的にマッチしないため、2 段目の grep -v shiguredo_ は発火しない防御的記述
+  # である (grep パターン変更時の保険として残す)。
+  # コマンド置換は末尾の改行を除去するため、printf で改行を復元してから grep する。
+  # llvm-nm の失敗 (破損アーカイブ等) は set -e によりここでスクリプトが失敗する
+  # (パイプラインの中に置くと grep 不発で検査が黙って通ってしまうため)。
+  local nm_output
+  nm_output=$("$LLVM_NM" -u --format=just-symbols "$lib")
+  if printf '%s\n' "$nm_output" | tr -d '\r' | grep -E '^_?(jpeg_|jsimd_)[A-Za-z0-9_]+$' | grep -v shiguredo_; then
     echo "ERROR: $label has unrewritten jpeg_/jsimd_ undefined references"
     exit 1
   fi
@@ -74,7 +87,9 @@ check_unresolved "$yuv_lib" "shiguredo_yuv"
 check_unresolved "$jpeg_lib" "shiguredo_jpeg"
 
 # Assertion 3: yuv 側に shiguredo_yuv_MJPG* シンボルが定義されている。
-# macOS の Mach-O では先頭に `_` が付くため、`_?` で受ける。
+# macOS の Mach-O では先頭に `_` が付くため、`_?` で受ける。なお Assertion 1 / 2 とは
+# 違い形式統一や \r 除去が不要なのは、両端の文字クラス ([^[:alnum:]_]) が bsd 形式の
+# 型列と Windows の \r 混入を吸収するためである。
 echo "checking $yuv_lib for defined shiguredo_yuv_MJPG* symbols..."
 defined=$("$LLVM_NM" --defined-only --extern-only "$yuv_lib")
 expected_symbols=(MJPGSize MJPGToI420 MJPGToNV12 MJPGToNV21 MJPGToARGB)
