@@ -79,6 +79,10 @@
   - cumsum の必要行数を min(height, 有効 radius * 2 + 2) に緩和し、radius の clamp 規則（min(radius, height)、min(radius, width / 2 - 1)）を C と一致させる
   - radius <= 0 / height <= 1 / width <= 3 は従来 C 経由で Err になっていたが、Rust 側の検証として明示的に Err を返すようになる
   - @voluntas
+- [FIX] planar の 16bit 変換関数群で depth パラメータが未検証のまま libyuv に渡される問題を修正する
+  - 関数ごとの有効範囲（merge_uv_plane_16 / split_uv_plane_16 / merge_argb16_to_8_plane / convert_to_lsb_plane_16 / convert_to_msb_plane_16 は 8..=16、merge_ar64_plane は 1..=16、merge_xr30_plane は 10..=16）を検証し、範囲外は Err を返す
+  - 範囲外の depth は従来 C 側のシフト演算で未定義動作になる可能性があった
+  - @voluntas
 
 ### misc
 

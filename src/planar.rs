@@ -2510,6 +2510,9 @@ pub fn copy_plane_16(
 }
 
 /// 16bit U/V プレーンをインターリーブ UV に結合する
+///
+/// `depth` は有効範囲 8〜16（C 側 `MergeUVRow_16_C` の assert と一致）。範囲外の
+/// `depth` は `Err` を返す（ゼロサイズ入力でも同様）。
 pub fn merge_uv_plane_16(
     src_u: &[u16],
     src_stride_u: usize,
@@ -2538,6 +2541,17 @@ pub fn merge_uv_plane_16(
         "MergeUVPlane_16",
         "destination UV stride exceeds c_int range",
     )?;
+
+    // assert はリリースビルドで除去されるため Rust 側で検証する。範囲外は C 側の
+    // シフト量 (16 - depth) を使うシフト演算が未定義動作になりうる。ゼロサイズ +
+    // 範囲外 depth も仕様として一律 Err にする
+    if !(8..=16).contains(&depth) {
+        return Err(Error::with_reason(
+            -1,
+            "MergeUVPlane_16",
+            "depth must be between 8 and 16",
+        ));
+    }
 
     // stride >= 最小幅チェック（要素単位）
     // src_u/v は 1 行あたり width 要素必要
@@ -2629,6 +2643,9 @@ pub fn merge_uv_plane_16(
 }
 
 /// 16bit インターリーブ UV プレーンを U と V に分割する
+///
+/// `depth` は有効範囲 8〜16（C 側 `SplitUVRow_16_C` の assert と一致）。範囲外の
+/// `depth` は `Err` を返す（ゼロサイズ入力でも同様）。
 pub fn split_uv_plane_16(
     src_uv: &[u16],
     src_stride_uv: usize,
@@ -2657,6 +2674,17 @@ pub fn split_uv_plane_16(
         "SplitUVPlane_16",
         "destination V stride exceeds c_int range",
     )?;
+
+    // assert はリリースビルドで除去されるため Rust 側で検証する。範囲外は C 側の
+    // シフト量 (16 - depth) を使うシフト演算が未定義動作になりうる。ゼロサイズ +
+    // 範囲外 depth も仕様として一律 Err にする
+    if !(8..=16).contains(&depth) {
+        return Err(Error::with_reason(
+            -1,
+            "SplitUVPlane_16",
+            "depth must be between 8 and 16",
+        ));
+    }
 
     // stride >= 最小幅チェック（要素単位）
     // src_uv はインターリーブなので 1 行あたり width * 2 要素必要
@@ -3102,6 +3130,9 @@ pub fn split_argb_plane(
 }
 
 /// 16bit R, G, B, A プレーンを AR64 に結合する
+///
+/// `depth` は有効範囲 1〜16（C 側 `MergeAR64Row_C` の assert と一致）。範囲外の
+/// `depth` は `Err` を返す（ゼロサイズ入力でも同様）。
 pub fn merge_ar64_plane(
     src_r: &[u16],
     src_stride_r: usize,
@@ -3144,6 +3175,17 @@ pub fn merge_ar64_plane(
         "MergeAR64Plane",
         "destination AR64 stride exceeds c_int range",
     )?;
+
+    // assert はリリースビルドで除去されるため Rust 側で検証する。範囲外は C 側の
+    // シフト量 (16 - depth) や (1 << depth) を使うシフト演算が未定義動作になりうる。
+    // ゼロサイズ + 範囲外 depth も仕様として一律 Err にする
+    if !(1..=16).contains(&depth) {
+        return Err(Error::with_reason(
+            -1,
+            "MergeAR64Plane",
+            "depth must be between 1 and 16",
+        ));
+    }
 
     // stride >= 最小幅チェック（要素単位）
     // src_r/g/b/a は 1 行あたり width 要素必要
@@ -3279,6 +3321,9 @@ pub fn merge_ar64_plane(
 }
 
 /// 16bit R, G, B プレーンから XR30 に結合する
+///
+/// `depth` は有効範囲 10〜16（C 側 `MergeXR30Row_C` の assert と一致）。範囲外の
+/// `depth` は `Err` を返す（ゼロサイズ入力でも同様）。
 pub fn merge_xr30_plane(
     src_r: &[u16],
     src_stride_r: usize,
@@ -3314,6 +3359,17 @@ pub fn merge_xr30_plane(
         "MergeXR30Plane",
         "destination AR30 stride exceeds c_int range",
     )?;
+
+    // assert はリリースビルドで除去されるため Rust 側で検証する。範囲外は C 側の
+    // シフト量 (depth - 10) を使うシフト演算が未定義動作になりうる。ゼロサイズ +
+    // 範囲外 depth も仕様として一律 Err にする
+    if !(10..=16).contains(&depth) {
+        return Err(Error::with_reason(
+            -1,
+            "MergeXR30Plane",
+            "depth must be between 10 and 16",
+        ));
+    }
 
     // stride >= 最小幅チェック
     // src_r/g/b は 1 行あたり width 要素（u16）必要
@@ -3427,6 +3483,9 @@ pub fn merge_xr30_plane(
 }
 
 /// 16bit R, G, B, A プレーンから 8bit ARGB に結合する
+///
+/// `depth` は有効範囲 8〜16（C 側 `MergeARGB16To8Row_C` の assert と一致）。範囲外の
+/// `depth` は `Err` を返す（ゼロサイズ入力でも同様）。
 pub fn merge_argb16_to_8_plane(
     src_r: &[u16],
     src_stride_r: usize,
@@ -3477,6 +3536,17 @@ pub fn merge_argb16_to_8_plane(
         "MergeARGB16To8Plane",
         "destination ARGB stride exceeds c_int range",
     )?;
+
+    // assert はリリースビルドで除去されるため Rust 側で検証する。範囲外は C 側の
+    // シフト量 (depth - 8) を使うシフト演算が未定義動作になりうる。ゼロサイズ +
+    // 範囲外 depth も仕様として一律 Err にする
+    if !(8..=16).contains(&depth) {
+        return Err(Error::with_reason(
+            -1,
+            "MergeARGB16To8Plane",
+            "depth must be between 8 and 16",
+        ));
+    }
 
     // stride >= 最小幅チェック
     // src_r/g/b/a は 1 行あたり width 要素（u16）必要
@@ -3977,6 +4047,10 @@ pub fn convert_8_to_8_plane(
 }
 
 /// 16bit プレーンの LSB 変換
+///
+/// `depth` は有効範囲 8〜16（crate の他の 16bit 変換関数と統一した仕様。C 側には
+/// assert がなく、`1 << depth` のシフトは負値や 31 以上の depth で未定義動作になる）。
+/// 範囲外の `depth` は `Err` を返す（ゼロサイズ入力でも同様）。
 pub fn convert_to_lsb_plane_16(
     src: &[u16],
     src_stride: usize,
@@ -4006,6 +4080,16 @@ pub fn convert_to_lsb_plane_16(
         "ConvertToLSBPlane_16",
         "destination stride exceeds c_int range",
     )?;
+
+    // C 側はシフト式 (1 << depth) が早期 return より先に評価され、負値や 31 以上の
+    // depth で未定義動作になる。ゼロサイズ + 範囲外 depth でも C に渡す前に必ず検証する
+    if !(8..=16).contains(&depth) {
+        return Err(Error::with_reason(
+            -1,
+            "ConvertToLSBPlane_16",
+            "depth must be between 8 and 16",
+        ));
+    }
 
     // stride >= width チェック（要素単位）
     if src_stride < size.width {
@@ -4069,6 +4153,11 @@ pub fn convert_to_lsb_plane_16(
 }
 
 /// 16bit プレーンの MSB 変換
+///
+/// `depth` は有効範囲 8〜16（crate の他の 16bit 変換関数と統一した仕様。C 側には
+/// assert がなく、`1 << (16 - depth)` のシフトは 16 を超える depth で負シフト、
+/// -15 以下で int 溢れになり未定義動作になる）。範囲外の `depth` は `Err` を返す
+/// （ゼロサイズ入力でも同様）。
 pub fn convert_to_msb_plane_16(
     src: &[u16],
     src_stride: usize,
@@ -4098,6 +4187,17 @@ pub fn convert_to_msb_plane_16(
         "ConvertToMSBPlane_16",
         "destination stride exceeds c_int range",
     )?;
+
+    // C 側はシフト式 (1 << (16 - depth)) が早期 return より先に評価され、16 を超える
+    // depth では負シフト、-15 以下では int 溢れで未定義動作になる。ゼロサイズ +
+    // 範囲外 depth でも C に渡す前に必ず検証する
+    if !(8..=16).contains(&depth) {
+        return Err(Error::with_reason(
+            -1,
+            "ConvertToMSBPlane_16",
+            "depth must be between 8 and 16",
+        ));
+    }
 
     // stride >= width チェック（要素単位）
     if src_stride < size.width {
