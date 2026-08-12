@@ -112,6 +112,10 @@
   - `Find OUT_DIR` で BSD `wc -l` の先頭空白による文字列比較が常に失敗していたのを数値比較に修正する
   - `Verify archive contents` で `tar tzf | grep -q` の SIGPIPE が `pipefail` 下でジョブ失敗となるのを変数経由の検査に変更して回避する
   - @voluntas
+- [FIX] verify_symbol_rewrite.sh の未解決シンボル検査が Linux / Windows で常に成功してしまう問題を修正する
+  - `llvm-nm -u` に `--format=just-symbols` を追加し、プラットフォーム間の出力形式を統一する（macOS と Linux ELF / Windows COFF の bsd 形式の差で行頭アンカーがマッチせず検査が不発になっていた）
+  - Windows の \r 混入対策として `tr -d '\r'` を追加する
+  - @voluntas
 
 ## 2026.1.0
 
