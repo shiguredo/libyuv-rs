@@ -2,7 +2,7 @@
 
 - Priority: High
 - Created: 2026-08-04
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-08-12
 - Model: DeepSeek V4 Flash
 - Branch: feature/fix-validate-depth-parameter
 - Polished: 2026-08-12
@@ -70,7 +70,12 @@ C 側の assert は `build.rs` の CMake Release プロファイル（NDEBUG）�
 
 ## 解決方法
 
-1. 7 関数に `depth` の範囲検証（関数ごとの有効範囲: 8..=16 / 1..=16 / 10..=16）を追加する（ゼロサイズ + 範囲外 `depth` も `Err` になる先頭配置）
-2. docstring に関数ごとの有効範囲を明記する
-3. `tests/test_planar.rs` に境界値テスト（関数ごとの範囲境界、ゼロサイズ + 範囲外 `depth` を含む）を追加する
-4. `CHANGES.md` に `[FIX]` エントリを追加する
+`src/planar.rs` の 7 関数（`merge_uv_plane_16` / `split_uv_plane_16` / `merge_ar64_plane` / `merge_xr30_plane` / `merge_argb16_to_8_plane` / `convert_to_lsb_plane_16` / `convert_to_msb_plane_16`）を次のとおり修正した:
+
+1. 各関数の `require_c_int` 検証の直後に `depth` の範囲検証を追加した（`!(範囲).contains(&depth)` で範囲外は `Err`）。有効範囲は C 側の assert と一致させた（8..=16 / 1..=16 / 10..=16。convert 系は assert がないため crate の他の 16bit 変換関数と統一した 8..=16）
+2. ゼロサイズ + 範囲外 `depth` も仕様として一律 `Err` になる（merge 系は仕様の統一判断、convert 系は C 側のシフト式が早期 return より先に評価されるため C に渡す前の検証が必須）
+3. 7 関数の docstring に有効範囲とゼロサイズ時の挙動を明記した
+4. `tests/test_planar.rs` に境界値テスト 12 本を追加した（関数ごとの Err / Ok 境界、負値・`i32::MIN`・`i32::MAX`・convert 系の代表点 LSB 31 / MSB -15、ゼロサイズ + 範囲外 `depth`）
+5. `CHANGES.md` の `## develop` セクションに `[FIX]` エントリを追加した
+
+なお、LSB の depth == 16 で `src_y[x] * scale`（scale == 65536）が int 範囲を超えうる C 側の乗算 UB は、設計方針どおり本 issue のスコープ外とした。
