@@ -2,7 +2,7 @@
 
 - Priority: Medium
 - Created: 2026-08-04
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-08-12
 - Model: DeepSeek V4 Flash
 - Branch: feature/fix-argb-blur-cumsum-validation
 - Polished: 2026-08-12
@@ -57,8 +57,10 @@ C 実装では `radius` は `min(radius, height)` と `min(radius, width / 2 - 1
 
 ## 解決方法
 
-1. `argb_blur` に C と同じ radius clamp 規則を実装し、radius <= 0、height <= 1、width <= 3（いずれも有効 radius が 0 以下、または C が `-1` を返す条件）の場合は `Err` を返す
-2. 有効 radius から cumsum の必要行数（`min(height, radius * 2 + 2)` 行）を計算し `checked_buf_size` で検証する
-3. docstring に cumsum の必要行数（`min(height, radius * 2 + 2)` 行）と radius の clamp 規則を明記する
-4. `tests/test_planar.rs` に境界値テストを追加する
-5. `CHANGES.md` の `## develop` セクションに `[FIX]` エントリを追加する
+`src/planar.rs` の `argb_blur` を次のとおり修正した:
+
+1. `width <= 3`、`radius <= 0`、`height <= 1` の入力を Rust 側で明示的に `Err` にする（C の clamp 後に radius <= 0、または height <= 1 の `-1` 返却条件と一致。width == 0 / height == 0 のゼロサイズ入力も同様に `Err` になる）。設計方針の「新規チェックは追加せず現行どおり C 経由の Err を維持」からは実装を変更し、負の有効 radius を usize にキャストする際のデバッグビルドのオーバーフローパニックを防ぐ目的を兼ねて Rust 側チェックを採用した
+2. 有効 radius を C と同じ規則（`min(radius, height)`、`min(radius, width / 2 - 1)`）で計算し、cumsum の必要行数（`min(height, 有効 radius * 2 + 2)` 行）を `checked_buf_size` で検証する。検証式が C の最大書き込み行数と一致する根拠（循環バッファのラップ境界 `max_cumsum_bot_row`）は実装コメントに明記した
+3. docstring に cumsum の必要行数（`min(height, 有効 radius * 2 + 2)` 行）、`stride32_cumsum >= width * 4` の要件、radius の clamp 規則、Err 条件を明記した
+4. `tests/test_planar.rs` に境界値テスト 12 本を追加した（必要行数ちょうど / 1 行不足 / 等号境界 / height == radius / radius > height / width clamp / 最小 height / 空バッファ / radius <= 0 / height <= 1 / width <= 3 / stride 不足）
+5. `CHANGES.md` の `## develop` セクションに `[FIX]` エントリを追加した
