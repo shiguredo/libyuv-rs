@@ -1924,8 +1924,13 @@ pub fn argb_multiply(
 
 /// ARGB 画像にボックスブラーを適用する
 ///
-/// `cumsum` は累積和計算用のバッファ。`stride32_cumsum` は i32 単位のストライド。
-/// `radius` はブラーの半径。
+/// `cumsum` は累積和計算用のバッファ。`stride32_cumsum` は i32 単位のストライドで、
+/// `width * 4` 以上必要。cumsum の必要行数は `min(height, 有効 radius * 2 + 2)` 行
+/// （有効 radius は後述の clamp 後の値）で、バッファサイズは
+/// `stride32_cumsum * 必要行数` 要素必要。必要行数を超えて確保された行は使用されない。
+/// `radius` はブラーの半径で、C と同じ規則（`min(radius, height)`、
+/// `min(radius, width / 2 - 1)`）で clamp される。`radius <= 0`、`height <= 1`、
+/// `width <= 3` の入力は `Err` を返す（C の `ARGBBlur` が -1 を返す条件と一致する）。
 pub fn argb_blur(
     src: &ArgbImage<'_>,
     dst: &mut ArgbImageMut<'_>,
@@ -1941,6 +1946,35 @@ pub fn argb_blur(
         "ARGBBlur",
         "cumsum stride exceeds c_int range",
     )?;
+    // width <= 3 は有効 radius の計算より先に Err にする。width / 2 - 1 が 0 以下に
+    // なると C の clamp 後に radius <= 0 になり -1 を返す条件と一致する（width <= 1 では
+    // width / 2 - 1 が負になり、負のまま usize にキャストするとデバッグビルドで
+    // オーバーフローパニックになるため、計算より先に判定する）。
+    if size.width <= 3 {
+        return Err(Error::with_reason(
+            -1,
+            "ARGBBlur",
+            "width must be greater than 3",
+        ));
+    }
+    // C の ARGBBlur は clamp 後に radius <= 0 または height <= 1 のとき -1 を返す。
+    // あわせて、負の radius を clamp 後の有効 radius として usize にキャストすると
+    // デバッグビルドでオーバーフローパニックになるため、この判定は実装の安全性にも
+    // 必須である。
+    if radius <= 0 {
+        return Err(Error::with_reason(
+            -1,
+            "ARGBBlur",
+            "radius must be greater than 0",
+        ));
+    }
+    if size.height <= 1 {
+        return Err(Error::with_reason(
+            -1,
+            "ARGBBlur",
+            "height must be greater than 1",
+        ));
+    }
     // cumsum は i32 要素で 1 行あたり width * 4 要素必要 (ARGB の各チャンネル分)
     let min_cumsum_stride = size
         .width
@@ -1953,9 +1987,23 @@ pub fn argb_blur(
             "cumsum stride smaller than width * 4",
         ));
     }
+    // 有効 radius を 2 段の min で clamp する。width <= 3 は上で Err にしているため
+    // width / 2 - 1 は 1 以上になり、有効 radius は常に 1 以上になる。
+    let effective_radius = radius
+        .min(size.height as i32)
+        .min(size.width as i32 / 2 - 1);
+    // cumsum の必要行数は C の ARGBBlur が循環バッファとして書き込む最大行数
+    // min(height, radius * 2 + 2) に一致する。書き込みは初期の累積和計算（radius 行）と
+    // メインループで合計 height 回行われ、max_cumsum_bot_row =
+    // &dst_cumsum[(radius * 2 + 2) * dst_stride32_cumsum] をラップ境界（>= で判定）とする
+    // ため、書き込み先の行インデックスは 0 〜 min(height - 1, radius * 2 + 1) に収まる
+    // （libyuv 更新時に見直すべき箇所）。effective_radius * 2 + 2 は width 以下に収まり、
+    // 有効 radius は width / 2 - 1 以下であるため usize ではオーバーフローしない
+    // （width が c_int の範囲内であることは src / dst の validate が保証している）。
+    let cumsum_rows = size.height.min(effective_radius as usize * 2 + 2);
     let cumsum_size = checked_buf_size(
         stride32_cumsum,
-        size.height,
+        cumsum_rows,
         "ARGBBlur",
         "cumsum buffer size overflow",
     )?;
