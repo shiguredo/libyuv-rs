@@ -1,51 +1,61 @@
-# convert_to_lsb_plane_16 の有効範囲内（depth=16）で C 側の乗算が int オーバーフロー UB になる
+# convert_to_lsb_plane_16 が depth=16 で SIMD 経路では全 0 を出力し、C 経路では符号付き乗算が UB になる
 
-- Priority: Medium
+- Priority: High
 - Created: 2026-08-12
 - Completed: {YYYY-MM-DD}
 - Model: DeepSeek V4 Flash
 - Branch: feature/fix-lsb-plane-16-multiply-overflow
-- Polished: {YYYY-MM-DD}
+- Polished: 2026-08-13
 - Reporter: @voluntas
 
 ## 目的
 
-`src/planar.rs` の `convert_to_lsb_plane_16` は crate 仕様の有効範囲 8..=16 の `depth` を許可しているが、`depth == 16` のとき C 側の `DivideRow_16_C` が符号付き乗算オーバーフロー（C 標準上は未定義動作）を起こしうる。有効範囲内の入力で UB が発生する経路をなくす。
+`src/planar.rs` の `convert_to_lsb_plane_16` は crate 仕様の有効範囲 8..=16 の `depth` を許可している。`depth == 16` のとき libyuv の `ConvertToLSBPlane_16` は、SIMD 経路では非ゼロ画素を全 0 にし、C 経路では符号付き乗算が未定義動作になる。有効範囲内の入力で誤出力と UB が発生する経路をなくす。
 
 ## 優先度根拠
 
-Medium。
+High。
 
-- 実害は限定的（2 の補数表現では乗算が wrap し、`(x * 65536) >> 16` は x に戻るため出力は正しい。ただし C 標準上は UB であり、UBSan 等で検出される）
-- 有効範囲内（depth == 16）かつ src 値が 32768 以上（最上位ビットが立っている）のときのみ発生する
+- `depth == 16` は 16bit データの標準的な使い方である。Linux / macOS では SIMD（AVX2 / NEON / SVE2）が選ばれ、非ゼロ入力が無言で全 0 になる（データ破壊）。Windows MSVC は `DivideRow_16_C` に落ち、`src >= 32768` で符号付き乗算が UB になる
+- 既存テスト `call_convert_plane_16` は src が全 0 で、戻り値の Ok しか見ていないため、この誤出力を検出できない
 
 ## 現状
 
-C 側の `ConvertToLSBPlane_16`（`planar_functions.cc`、commit `d23308a2a7442be8e559b1b471862fd7588d6a57` 時点）は `int scale = 1 << depth;` を計算し、行関数 `DivideRow_16_C`（`row_common.cc`）が以下を実行する:
+C 側の `ConvertToLSBPlane_16`（`planar_functions.cc`、commit `d23308a2a7442be8e559b1b471862fd7588d6a57` 時点）は `int scale = 1 << depth;` を計算し、既定は `DivideRow_16_C`、CPU フラグがあれば SIMD 行関数（`DivideRow_16_AVX2` / `DivideRow_16_NEON` / `DivideRow_16_SVE2`）へディスパッチする。AVX2 / NEON の余り処理 `ANY11C` は C に落とさず同じ SIMD 関数を呼ぶ。SVE2 は Any ラッパーを使わず、余りも `umulh` で処理する（結論は同じで C に落ちない）。
+
+C 経路 `DivideRow_16_C`（`row_common.cc`）:
 
 ```c
 dst_y[x] = (src_y[x] * scale) >> 16;
 ```
 
-`src_y[x]` は `uint16_t` が `int` に昇格し、`depth == 16` では `scale == 65536` になる。`src_y[x] >= 32768` のとき `src_y[x] * 65536` は `INT_MAX`（2^31 - 1）を超え、符号付きオーバーフロー（未定義動作）になる。
+`src_y[x]` は `uint16_t` が `int` に昇格し、`depth == 16` では `scale == 65536` になる。`src_y[x] >= 32768` のとき `src_y[x] * 65536` は `INT_MAX`（2^31 - 1）を超え、符号付きオーバーフロー（未定義動作）になる。`32767 * 65536 = 2147418112` は `INT_MAX` 未満、`32768 * 65536 = 2147483648` は超過。`depth == 15` の最大積 `65535 * 32768 = 2147450880` は `INT_MAX` 以下のため、C の符号付き溢れは有効範囲内では `depth == 16` だけである。2 の補数 wrap と算術右シフトでは `(x * 65536) >> 16 == x` が成り立つが、これは C 経路に限る。
 
-0049 の対応で `convert_to_lsb_plane_16` は `depth` を 8..=16 に検証したが、この検証はシフト演算（`1 << depth`）の UB を防ぐものであり、`DivideRow_16_C` 内の乗算 UB は防げない（0049 の設計方針でスコープ外と明記済み）。
+SIMD 経路では `scale` を 16bit レーンへ放送する（AVX2 の `vpbroadcastw`、NEON の `dup v4.8h` / `vdup.16`、SVE2 の `dup z0.h`）。`65536 = 0x00010000` の下位 16 bit は 0 なので、乗数は 0 になり **src が 0 でなくても出力は全 0** になる。32767 は C では溢れないが、SIMD では 0 になる。
+
+0049 の対応で `convert_to_lsb_plane_16` は `depth` を 8..=16 に検証したが、この検証はシフト演算（`1 << depth`）の UB を防ぐものであり、乗算 UB と SIMD 誤出力は防げない（0049 の設計方針でスコープ外と明記済み）。`convert_to_lsb_plane_16` は検証後に分岐なしで `sys::ConvertToLSBPlane_16` を呼ぶ。
 
 ## 設計方針
 
-対応方法は次の選択肢が考えられる（本 issue で確定する）:
+`depth == 16` では `sys::ConvertToLSBPlane_16` を呼ばない。既存の検証（エラーの `function` は `"ConvertToLSBPlane_16"`、必要サイズは `checked_buf_size` による `stride * height`）は維持し、検証通過後に `sys::CopyPlane_16` で 16bit 行コピーする。`sys::CopyPlane_16` には現行の `ConvertToLSBPlane_16` と同じ要素単位の stride / width をそのまま渡す。呼び出し側で `* 2` しない（内部が `CopyPlane` 向けに倍にする。`HalfFloatPlane` とは違う）。
 
-- `depth == 16` のときは `(x * 65536) >> 16 == x` が恒等式であるため、Rust 側で行コピー（`copy_plane` 相当）に置き換える（乗算を回避する）
-- `depth == 16` を `Err` にする（16bit フルレンジの LSB 変換が使えなくなる機能退行）
-- C 側の修正を上流に依頼し、libyuv 更新まで docstring に UB の注意書きを残す（UB は残る）
+採用しない:
 
-`depth == 16` は 16bit データの標準的な使い方であり、機能退行を伴わない選択肢（1 番目）が望ましい。実装時に C 側の `DivideRow_16_C` と `ConvertToLSBPlane_16` の動作を確認して確定する（libyuv 更新時に見直すべき箇所としてコメントに明記する）。
+- `depth == 16` を `Err` にする。0049 が `depth == 16` で Ok と確定した契約の機能退行になる
+- docstring に注意書きを残して C を呼び続ける。SIMD 誤出力と C の UB が残る
+- `copy_plane`（`&[u8]`）を使う。型と stride の単位が合わない
+- 検証前に `copy_plane_16` へ委譲する。必要サイズが `(height - 1) * stride + width` に緩み、エラーの `function` が `"CopyPlane_16"` に変わる
+
+`copy_plane` / `copy_plane_16` の本体は変更しない。有効範囲内のゼロサイズ（`width == 0` / `height == 0`）は現行どおり no-op（`Ok`）とする。ゼロサイズを `Err` に統一するのは 0064 のスコープ。`depth != 16` は現行どおり `sys::ConvertToLSBPlane_16` を呼ぶ。`convert_to_msb_plane_16` と、C 側が `ConvertToLSBPlane_16` を内部利用する変換（`p010_to_i010` は `depth = 10`、`p012_to_i012` は `depth = 12`）は `depth != 16` のため対象外。0053 が depth=16 の正常系を書く場合は本 issue の恒等（入力一致）に合わせ、libyuv 出力をオラクルにしない。
+
+根拠は libyuv commit `d23308a2a7442be8e559b1b471862fd7588d6a57` の `ConvertToLSBPlane_16` / `DivideRow_16_C` / SIMD 行関数であり、libyuv 更新時に見直すべき箇所としてコメントに明記する。
 
 ## 完了条件
 
-- `depth == 16` の入力で UB が発生しないこと（src 値に 32768 以上の値を含むテストを追加し、出力が入力と一致すること）
-- `depth != 16` の既存の挙動が変わらないこと
-- 境界値テスト（32767 / 32768 / 65535 の src 値）が `tests/test_planar.rs` に追加されていること
+- `depth == 16` で `sys::ConvertToLSBPlane_16` を呼ばないこと
+- `depth == 16` かつ src 値が 32767 / 32768 / 65535 のとき、出力が入力と一致すること。期待値は入力そのものであり、現行 `ConvertToLSBPlane_16` の出力（SIMD では 0）をオラクルにしない。テストは height >= 2 とする（stride 送りの誤りを検出するため）
+- `depth != 16` の既存の挙動が変わらないこと（他 depth の変換正しさ・エラーパス網羅は 0053 のスコープ。本 issue のテストは depth=16 の恒等のみ）
+- 境界値テスト（32767 / 32768 / 65535、height >= 2）が `tests/test_planar.rs` に追加されていること（0053 で分割された場合は `tests/test_planar/` 配下）
 - `cargo fmt --all --check` が成功すること
 - `cargo clippy --workspace --features source-build -- -D warnings` が成功すること
 - `cargo test --workspace --features source-build` が成功すること
@@ -53,7 +63,7 @@ dst_y[x] = (src_y[x] * scale) >> 16;
 
 ## 解決方法
 
-1. `convert_to_lsb_plane_16` の `depth == 16` の分岐を実装する（乗算を回避する行コピー、または設計方針で確定した方法）
-2. 根拠（`DivideRow_16_C` の乗算オーバーフローと恒等式）をコメントで明記する
-3. `tests/test_planar.rs` に境界値テスト（32767 / 32768 / 65535）を追加する
+1. `convert_to_lsb_plane_16` の既存検証のあと、`depth == 16` なら `sys::CopyPlane_16`、それ以外は `sys::ConvertToLSBPlane_16` を呼ぶ
+2. 根拠（SIMD が `scale = 65536` の下位 16 bit を 0 として放送すること、C の `DivideRow_16_C` の符号付き乗算オーバーフロー）をコメントで明記する
+3. `tests/test_planar.rs` に画素値 32767 / 32768 / 65535 の恒等テスト（height >= 2）を追加する
 4. `CHANGES.md` の `## develop` セクションに `[FIX]` エントリを追加する
