@@ -53,6 +53,13 @@
 - [FIX] i420_ssim が 17x17 未満（width または height が 16 以下）の画像で NaN を返す問題を修正する
   - U/V プレーンの縮小（(width + 1) / 2 × (height + 1) / 2）を考慮し、Y プレーンが 9x9 以上でも U/V が 8 以下になるサイズは Err を返す
   - @voluntas
+- [FIX] 奇数幅の変換で libyuv の SIMD 余り処理がバッファ行終端を読み書き越す問題を修正する
+  - YUY2 / UYVY 系の変換 16 関数に、width 奇数時の最終行の読み書き量（width * 2 + 2 バイト）を考慮したバッファ検証を追加する
+  - ソース読み越し: yuy2_to_y / uyvy_to_y / yuy2_to_argb / uyvy_to_argb / yuy2_to_i420 / uyvy_to_i420 / yuy2_to_i422 / uyvy_to_i422 / yuy2_to_nv12 / uyvy_to_nv12
+  - デスティネーション書き込み越え: i420_to_yuy2 / i420_to_uyvy / i422_to_yuy2 / i422_to_uyvy / argb_to_yuy2 / argb_to_uyvy
+  - 行合体 (Coalesce) が発動する関数は、合体後の幅 × 高さが奇数のときのみ +2 バイトを要求する
+  - width 奇数で従来通過していた stride * height ちょうどのバッファは Err を返すようになる（2 バイト不足）
+  - @voluntas
 - [FIX] detile_plane と detile_plane_16 の入力検証をプロジェクト標準パターンに統一する
   - @voluntas
 - [FIX] half_float_plane の stride 単位が libyuv 仕様（バイト）と不一致で出力が壊れる問題を修正する

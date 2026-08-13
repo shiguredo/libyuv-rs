@@ -6,12 +6,15 @@ use std::ffi::c_int;
 
 use shiguredo_libyuv::{
     AbgrImageMut, Android420Image, ArgbImage, ArgbImageMut, Error, I420Image, I420ImageMut,
-    I422Image, I444Image, ImageSize, Mm21Image, Mt2tImage, Nv12Image, Nv16Image, Nv24ImageMut,
-    P010ImageMut, P210Image, P410ImageMut, UyvyImage, Yuy2Image, Yuy2ImageMut, android420_to_abgr,
-    android420_to_argb, android420_to_i420, argb_to_i420_alpha, detile_plane, detile_plane_16,
-    detile_to_yuy2, i420_alpha_to_abgr, i420_alpha_to_argb, i420_to_argb, i422_alpha_to_abgr,
-    i422_alpha_to_argb, i444_alpha_to_abgr, i444_alpha_to_argb, mm21_to_i420, mt2t_to_p010,
-    nv12_to_i420, nv12_to_nv24, nv16_to_nv24, p210_to_p410, uyvy_to_y, yuy2_to_y,
+    I422Image, I422ImageMut, I444Image, ImageSize, Mm21Image, Mt2tImage, Nv12Image, Nv12ImageMut,
+    Nv16Image, Nv24ImageMut, P010ImageMut, P210Image, P410ImageMut, UyvyImage, UyvyImageMut,
+    Yuy2Image, Yuy2ImageMut, android420_to_abgr, android420_to_argb, android420_to_i420,
+    argb_to_i420_alpha, argb_to_uyvy, argb_to_yuy2, detile_plane, detile_plane_16, detile_to_yuy2,
+    i420_alpha_to_abgr, i420_alpha_to_argb, i420_to_argb, i420_to_uyvy, i420_to_yuy2,
+    i422_alpha_to_abgr, i422_alpha_to_argb, i422_to_uyvy, i422_to_yuy2, i444_alpha_to_abgr,
+    i444_alpha_to_argb, mm21_to_i420, mt2t_to_p010, nv12_to_i420, nv12_to_nv24, nv16_to_nv24,
+    p210_to_p410, uyvy_to_argb, uyvy_to_i420, uyvy_to_i422, uyvy_to_nv12, uyvy_to_y, yuy2_to_argb,
+    yuy2_to_i420, yuy2_to_i422, yuy2_to_nv12, yuy2_to_y,
 };
 
 // 異常系: i420_to_argb のバッファ不足で Err が返ること
@@ -2638,5 +2641,930 @@ fn argb_to_i420_alpha_alpha_stride_boundaries() {
 
     check_alpha_stride_boundaries(size, |alpha, stride| {
         argb_to_i420_alpha(&src, &mut dst, alpha, stride, size)
+    });
+}
+
+// ============================================================
+// YUY2 / UYVY 変換の奇数幅読み書き越え検証
+// ============================================================
+
+// 奇数幅 (width=5, height=2, stride=10) の読み書き越え検証の境界値テスト用ヘルパー。
+// libyuv の行関数ラッパー (ANY11 / ANY31) は width 奇数で最終行を width * 2 + 2 = 12
+// バイト読み書きするため、必要サイズは stride * (height - 1) + 12 = 22 バイトになる。
+// stride * height = 20 バイトちょうどでは Err になることを検証する。
+// call はバッファ長 (バイト) を受け取って変換関数を呼ぶクロージャ
+fn check_odd_width_boundaries(
+    mut call: impl FnMut(usize) -> Result<(), Error>,
+    too_small_reason: &str,
+) {
+    let err = call(20).expect_err("奇数幅では stride*height ちょうどは Err が返るべき");
+    assert!(
+        err.to_string().contains(too_small_reason),
+        "{} の reason が返るべき: {}",
+        too_small_reason,
+        err
+    );
+    call(22).expect("必要サイズ (stride * (height - 1) + width * 2 + 2) で Ok が返るべき");
+}
+
+// 偶数幅 (width=4, height=2, stride=8) で従来どおり stride*height ちょうどが Ok に
+// なることを検証するヘルパー
+fn check_even_width_ok(mut call: impl FnMut(usize) -> Result<(), Error>) {
+    call(16).expect("偶数幅では stride*height ちょうどで Ok が返るべき");
+}
+
+// 異常系・正常系: yuy2_to_y の奇数幅ソース読み越し検証の境界値テスト
+#[test]
+fn yuy2_to_y_odd_width_src_overread() {
+    // dst_stride_y=6 (> width=5) で Coalesce を非発動にした場合、width 奇数 (5) のため
+    // 最終行を width*2+2=12 バイト読み、必要サイズは 10*(2-1)+12 = 22 バイトになる
+    let mut dst_y = vec![0u8; 6 * 2];
+    check_odd_width_boundaries(
+        |src_len| {
+            let src_data = vec![0u8; src_len];
+            let src = Yuy2Image {
+                data: &src_data,
+                stride: 10,
+            };
+            yuy2_to_y(&src, &mut dst_y, 6, ImageSize::new(5, 2))
+        },
+        "source buffer too small",
+    );
+    // dst_stride_y=5 (== width) で Coalesce 発動: 5x2 は合体後の width*height=10 (偶数)
+    // のため読み越えなし → 20 バイトちょうどで Ok
+    let mut dst_y = vec![0u8; 5 * 2];
+    yuy2_to_y(
+        &Yuy2Image {
+            data: &[0u8; 20],
+            stride: 10,
+        },
+        &mut dst_y,
+        5,
+        ImageSize::new(5, 2),
+    )
+    .expect("Coalesce 発動 + width*height 偶数では 20 バイトちょうどで Ok が返るべき");
+    // 5x3 は合体後の width*height=15 (奇数) のため +2 必要 → 30 バイトちょうどは Err、
+    // 32 バイトで Ok
+    let mut dst_y = vec![0u8; 5 * 3];
+    let err = yuy2_to_y(
+        &Yuy2Image {
+            data: &[0u8; 30],
+            stride: 10,
+        },
+        &mut dst_y,
+        5,
+        ImageSize::new(5, 3),
+    )
+    .expect_err("Coalesce 発動 + width*height 奇数では 30 バイトちょうどは Err が返るべき");
+    assert!(
+        err.to_string().contains("source buffer too small"),
+        "ソースバッファ不足の reason が返るべき: {}",
+        err
+    );
+    yuy2_to_y(
+        &Yuy2Image {
+            data: &[0u8; 32],
+            stride: 10,
+        },
+        &mut dst_y,
+        5,
+        ImageSize::new(5, 3),
+    )
+    .expect("Coalesce 発動 + width*height 奇数では 32 バイトで Ok が返るべき");
+    // height=1 の境界: head_size = stride * 0 になり、必要サイズは width*2+2 = 12 バイト
+    // (Coalesce 非発動: dst_stride_y=6 != width=5)
+    let mut dst_y = vec![0u8; 6];
+    let err = yuy2_to_y(
+        &Yuy2Image {
+            data: &[0u8; 10],
+            stride: 10,
+        },
+        &mut dst_y,
+        6,
+        ImageSize::new(5, 1),
+    )
+    .expect_err("height=1 + 奇数幅では stride*height ちょうどは Err が返るべき");
+    assert!(
+        err.to_string().contains("source buffer too small"),
+        "ソースバッファ不足の reason が返るべき: {}",
+        err
+    );
+    yuy2_to_y(
+        &Yuy2Image {
+            data: &[0u8; 12],
+            stride: 10,
+        },
+        &mut dst_y,
+        6,
+        ImageSize::new(5, 1),
+    )
+    .expect("height=1 + 奇数幅では 12 バイトで Ok が返るべき");
+}
+
+// 異常系・正常系: uyvy_to_y の奇数幅ソース読み越し検証の境界値テスト
+#[test]
+fn uyvy_to_y_odd_width_src_overread() {
+    let mut dst_y = vec![0u8; 6 * 2];
+    check_odd_width_boundaries(
+        |src_len| {
+            let src_data = vec![0u8; src_len];
+            let src = UyvyImage {
+                data: &src_data,
+                stride: 10,
+            };
+            uyvy_to_y(&src, &mut dst_y, 6, ImageSize::new(5, 2))
+        },
+        "source buffer too small",
+    );
+    // Coalesce 発動 + 5x2 (偶数): 20 バイトちょうどで Ok
+    let mut dst_y = vec![0u8; 5 * 2];
+    uyvy_to_y(
+        &UyvyImage {
+            data: &[0u8; 20],
+            stride: 10,
+        },
+        &mut dst_y,
+        5,
+        ImageSize::new(5, 2),
+    )
+    .expect("Coalesce 発動 + width*height 偶数では 20 バイトちょうどで Ok が返るべき");
+    // Coalesce 発動 + 5x3 (奇数): 30 バイトちょうどは Err、32 バイトで Ok
+    let mut dst_y = vec![0u8; 5 * 3];
+    let err = uyvy_to_y(
+        &UyvyImage {
+            data: &[0u8; 30],
+            stride: 10,
+        },
+        &mut dst_y,
+        5,
+        ImageSize::new(5, 3),
+    )
+    .expect_err("Coalesce 発動 + width*height 奇数では 30 バイトちょうどは Err が返るべき");
+    assert!(
+        err.to_string().contains("source buffer too small"),
+        "ソースバッファ不足の reason が返るべき: {}",
+        err
+    );
+    uyvy_to_y(
+        &UyvyImage {
+            data: &[0u8; 32],
+            stride: 10,
+        },
+        &mut dst_y,
+        5,
+        ImageSize::new(5, 3),
+    )
+    .expect("Coalesce 発動 + width*height 奇数では 32 バイトで Ok が返るべき");
+    // height=1 の境界: head_size = stride * 0 になり、必要サイズは width*2+2 = 12 バイト
+    // (Coalesce 非発動: dst_stride_y=6 != width=5)
+    let mut dst_y = vec![0u8; 6];
+    let err = uyvy_to_y(
+        &UyvyImage {
+            data: &[0u8; 10],
+            stride: 10,
+        },
+        &mut dst_y,
+        6,
+        ImageSize::new(5, 1),
+    )
+    .expect_err("height=1 + 奇数幅では stride*height ちょうどは Err が返るべき");
+    assert!(
+        err.to_string().contains("source buffer too small"),
+        "ソースバッファ不足の reason が返るべき: {}",
+        err
+    );
+    uyvy_to_y(
+        &UyvyImage {
+            data: &[0u8; 12],
+            stride: 10,
+        },
+        &mut dst_y,
+        6,
+        ImageSize::new(5, 1),
+    )
+    .expect("height=1 + 奇数幅では 12 バイトで Ok が返るべき");
+}
+
+// 異常系・正常系: yuy2_to_argb の奇数幅ソース読み越し検証の境界値テスト
+#[test]
+fn yuy2_to_argb_odd_width_src_overread() {
+    // dst_stride=24 (> width*4=20) で Coalesce を非発動にした場合、width 奇数 (5) の
+    // ため最終行を 12 バイト読み、必要サイズは 22 バイトになる
+    let mut dst_data = vec![0u8; 24 * 2];
+    let mut dst = ArgbImageMut {
+        data: &mut dst_data,
+        stride: 24,
+    };
+    check_odd_width_boundaries(
+        |src_len| {
+            let src_data = vec![0u8; src_len];
+            let src = Yuy2Image {
+                data: &src_data,
+                stride: 10,
+            };
+            yuy2_to_argb(&src, &mut dst, ImageSize::new(5, 2))
+        },
+        "source buffer too small",
+    );
+    // dst_stride=20 (== width*4) で Coalesce 発動 + 5x2 (偶数): 20 バイトちょうどで Ok
+    let mut dst_data = vec![0u8; 20 * 2];
+    let mut dst = ArgbImageMut {
+        data: &mut dst_data,
+        stride: 20,
+    };
+    yuy2_to_argb(
+        &Yuy2Image {
+            data: &[0u8; 20],
+            stride: 10,
+        },
+        &mut dst,
+        ImageSize::new(5, 2),
+    )
+    .expect("Coalesce 発動 + width*height 偶数では 20 バイトちょうどで Ok が返るべき");
+    // Coalesce 発動 + 5x3 (奇数): 30 バイトちょうどは Err、32 バイトで Ok
+    let mut dst_data = vec![0u8; 20 * 3];
+    let mut dst = ArgbImageMut {
+        data: &mut dst_data,
+        stride: 20,
+    };
+    let err = yuy2_to_argb(
+        &Yuy2Image {
+            data: &[0u8; 30],
+            stride: 10,
+        },
+        &mut dst,
+        ImageSize::new(5, 3),
+    )
+    .expect_err("Coalesce 発動 + width*height 奇数では 30 バイトちょうどは Err が返るべき");
+    assert!(
+        err.to_string().contains("source buffer too small"),
+        "ソースバッファ不足の reason が返るべき: {}",
+        err
+    );
+    yuy2_to_argb(
+        &Yuy2Image {
+            data: &[0u8; 32],
+            stride: 10,
+        },
+        &mut dst,
+        ImageSize::new(5, 3),
+    )
+    .expect("Coalesce 発動 + width*height 奇数では 32 バイトで Ok が返るべき");
+}
+
+// 異常系・正常系: uyvy_to_argb の奇数幅ソース読み越し検証の境界値テスト
+#[test]
+fn uyvy_to_argb_odd_width_src_overread() {
+    let mut dst_data = vec![0u8; 24 * 2];
+    let mut dst = ArgbImageMut {
+        data: &mut dst_data,
+        stride: 24,
+    };
+    check_odd_width_boundaries(
+        |src_len| {
+            let src_data = vec![0u8; src_len];
+            let src = UyvyImage {
+                data: &src_data,
+                stride: 10,
+            };
+            uyvy_to_argb(&src, &mut dst, ImageSize::new(5, 2))
+        },
+        "source buffer too small",
+    );
+    // Coalesce 発動 + 5x2 (偶数): 20 バイトちょうどで Ok
+    let mut dst_data = vec![0u8; 20 * 2];
+    let mut dst = ArgbImageMut {
+        data: &mut dst_data,
+        stride: 20,
+    };
+    uyvy_to_argb(
+        &UyvyImage {
+            data: &[0u8; 20],
+            stride: 10,
+        },
+        &mut dst,
+        ImageSize::new(5, 2),
+    )
+    .expect("Coalesce 発動 + width*height 偶数では 20 バイトちょうどで Ok が返るべき");
+    // Coalesce 発動 + 5x3 (奇数): 30 バイトちょうどは Err、32 バイトで Ok
+    let mut dst_data = vec![0u8; 20 * 3];
+    let mut dst = ArgbImageMut {
+        data: &mut dst_data,
+        stride: 20,
+    };
+    let err = uyvy_to_argb(
+        &UyvyImage {
+            data: &[0u8; 30],
+            stride: 10,
+        },
+        &mut dst,
+        ImageSize::new(5, 3),
+    )
+    .expect_err("Coalesce 発動 + width*height 奇数では 30 バイトちょうどは Err が返るべき");
+    assert!(
+        err.to_string().contains("source buffer too small"),
+        "ソースバッファ不足の reason が返るべき: {}",
+        err
+    );
+    uyvy_to_argb(
+        &UyvyImage {
+            data: &[0u8; 32],
+            stride: 10,
+        },
+        &mut dst,
+        ImageSize::new(5, 3),
+    )
+    .expect("Coalesce 発動 + width*height 奇数では 32 バイトで Ok が返るべき");
+}
+
+// 異常系・正常系: yuy2_to_i420 の奇数幅ソース読み越し検証の境界値テスト
+// YUY2ToI420 は Coalesce を持たないため、width 奇数で常に +2 を要求する
+#[test]
+fn yuy2_to_i420_odd_width_src_overread() {
+    check_odd_width_boundaries(
+        |src_len| {
+            let src_data = vec![0u8; src_len];
+            let src = Yuy2Image {
+                data: &src_data,
+                stride: 10,
+            };
+            let mut dst_y = vec![0u8; 5 * 2];
+            let mut dst_u = vec![0u8; 3];
+            let mut dst_v = vec![0u8; 3];
+            let mut dst = I420ImageMut {
+                y: &mut dst_y,
+                y_stride: 5,
+                u: &mut dst_u,
+                u_stride: 3,
+                v: &mut dst_v,
+                v_stride: 3,
+            };
+            yuy2_to_i420(&src, &mut dst, ImageSize::new(5, 2))
+        },
+        "source buffer too small",
+    );
+    // 奇数 height (5x3): 2 行単位ループ + 最終行処理 (if (height & 1)) のパス。
+    // 必要サイズは 10*(3-1) + 12 = 32 バイトで、30 バイトちょうどは Err、32 で Ok
+    let mut dst_y = vec![0u8; 5 * 3];
+    let mut dst_u = vec![0u8; 3 * 2];
+    let mut dst_v = vec![0u8; 3 * 2];
+    let mut dst = I420ImageMut {
+        y: &mut dst_y,
+        y_stride: 5,
+        u: &mut dst_u,
+        u_stride: 3,
+        v: &mut dst_v,
+        v_stride: 3,
+    };
+    let err = yuy2_to_i420(
+        &Yuy2Image {
+            data: &[0u8; 30],
+            stride: 10,
+        },
+        &mut dst,
+        ImageSize::new(5, 3),
+    )
+    .expect_err("奇数 height + 奇数幅では stride*height ちょうどは Err が返るべき");
+    assert!(
+        err.to_string().contains("source buffer too small"),
+        "ソースバッファ不足の reason が返るべき: {}",
+        err
+    );
+    yuy2_to_i420(
+        &Yuy2Image {
+            data: &[0u8; 32],
+            stride: 10,
+        },
+        &mut dst,
+        ImageSize::new(5, 3),
+    )
+    .expect("奇数 height + 奇数幅では 32 バイトで Ok が返るべき");
+    // width=17 (SSE2 の MASK=15 を超え n>0 の SIMD チャンクパス):
+    // 必要サイズは 34*(2-1) + 17*2+2 = 70 バイトで、68 バイトちょうどは Err、70 で Ok
+    let mut dst_y = vec![0u8; 17 * 2];
+    let mut dst_u = vec![0u8; 9];
+    let mut dst_v = vec![0u8; 9];
+    let mut dst = I420ImageMut {
+        y: &mut dst_y,
+        y_stride: 17,
+        u: &mut dst_u,
+        u_stride: 9,
+        v: &mut dst_v,
+        v_stride: 9,
+    };
+    let err = yuy2_to_i420(
+        &Yuy2Image {
+            data: &[0u8; 68],
+            stride: 34,
+        },
+        &mut dst,
+        ImageSize::new(17, 2),
+    )
+    .expect_err("width=17 では stride*height ちょうどは Err が返るべき");
+    assert!(
+        err.to_string().contains("source buffer too small"),
+        "ソースバッファ不足の reason が返るべき: {}",
+        err
+    );
+    yuy2_to_i420(
+        &Yuy2Image {
+            data: &[0u8; 70],
+            stride: 34,
+        },
+        &mut dst,
+        ImageSize::new(17, 2),
+    )
+    .expect("width=17 では 70 バイトで Ok が返るべき");
+    check_even_width_ok(|src_len| {
+        let src_data = vec![0u8; src_len];
+        let src = Yuy2Image {
+            data: &src_data,
+            stride: 8,
+        };
+        let mut dst_y = vec![0u8; 4 * 2];
+        let mut dst_u = vec![0u8; 2];
+        let mut dst_v = vec![0u8; 2];
+        let mut dst = I420ImageMut {
+            y: &mut dst_y,
+            y_stride: 4,
+            u: &mut dst_u,
+            u_stride: 2,
+            v: &mut dst_v,
+            v_stride: 2,
+        };
+        yuy2_to_i420(&src, &mut dst, ImageSize::new(4, 2))
+    });
+}
+
+// 異常系・正常系: uyvy_to_i420 の奇数幅ソース読み越し検証の境界値テスト
+#[test]
+fn uyvy_to_i420_odd_width_src_overread() {
+    check_odd_width_boundaries(
+        |src_len| {
+            let src_data = vec![0u8; src_len];
+            let src = UyvyImage {
+                data: &src_data,
+                stride: 10,
+            };
+            let mut dst_y = vec![0u8; 5 * 2];
+            let mut dst_u = vec![0u8; 3];
+            let mut dst_v = vec![0u8; 3];
+            let mut dst = I420ImageMut {
+                y: &mut dst_y,
+                y_stride: 5,
+                u: &mut dst_u,
+                u_stride: 3,
+                v: &mut dst_v,
+                v_stride: 3,
+            };
+            uyvy_to_i420(&src, &mut dst, ImageSize::new(5, 2))
+        },
+        "source buffer too small",
+    );
+    check_even_width_ok(|src_len| {
+        let src_data = vec![0u8; src_len];
+        let src = UyvyImage {
+            data: &src_data,
+            stride: 8,
+        };
+        let mut dst_y = vec![0u8; 4 * 2];
+        let mut dst_u = vec![0u8; 2];
+        let mut dst_v = vec![0u8; 2];
+        let mut dst = I420ImageMut {
+            y: &mut dst_y,
+            y_stride: 4,
+            u: &mut dst_u,
+            u_stride: 2,
+            v: &mut dst_v,
+            v_stride: 2,
+        };
+        uyvy_to_i420(&src, &mut dst, ImageSize::new(4, 2))
+    });
+}
+
+// 異常系・正常系: yuy2_to_i422 の奇数幅ソース読み越し検証の境界値テスト
+// YUY2ToI422 の Coalesce は dst_stride_u * 2 == width により偶数幅でのみ発動するため、
+// width 奇数で常に +2 を要求する
+#[test]
+fn yuy2_to_i422_odd_width_src_overread() {
+    check_odd_width_boundaries(
+        |src_len| {
+            let src_data = vec![0u8; src_len];
+            let src = Yuy2Image {
+                data: &src_data,
+                stride: 10,
+            };
+            let mut dst_y = vec![0u8; 5 * 2];
+            let mut dst_u = vec![0u8; 3 * 2];
+            let mut dst_v = vec![0u8; 3 * 2];
+            let mut dst = I422ImageMut {
+                y: &mut dst_y,
+                y_stride: 5,
+                u: &mut dst_u,
+                u_stride: 3,
+                v: &mut dst_v,
+                v_stride: 3,
+            };
+            yuy2_to_i422(&src, &mut dst, ImageSize::new(5, 2))
+        },
+        "source buffer too small",
+    );
+    check_even_width_ok(|src_len| {
+        let src_data = vec![0u8; src_len];
+        let src = Yuy2Image {
+            data: &src_data,
+            stride: 8,
+        };
+        let mut dst_y = vec![0u8; 4 * 2];
+        let mut dst_u = vec![0u8; 2 * 2];
+        let mut dst_v = vec![0u8; 2 * 2];
+        let mut dst = I422ImageMut {
+            y: &mut dst_y,
+            y_stride: 4,
+            u: &mut dst_u,
+            u_stride: 2,
+            v: &mut dst_v,
+            v_stride: 2,
+        };
+        yuy2_to_i422(&src, &mut dst, ImageSize::new(4, 2))
+    });
+}
+
+// 異常系・正常系: uyvy_to_i422 の奇数幅ソース読み越し検証の境界値テスト
+#[test]
+fn uyvy_to_i422_odd_width_src_overread() {
+    check_odd_width_boundaries(
+        |src_len| {
+            let src_data = vec![0u8; src_len];
+            let src = UyvyImage {
+                data: &src_data,
+                stride: 10,
+            };
+            let mut dst_y = vec![0u8; 5 * 2];
+            let mut dst_u = vec![0u8; 3 * 2];
+            let mut dst_v = vec![0u8; 3 * 2];
+            let mut dst = I422ImageMut {
+                y: &mut dst_y,
+                y_stride: 5,
+                u: &mut dst_u,
+                u_stride: 3,
+                v: &mut dst_v,
+                v_stride: 3,
+            };
+            uyvy_to_i422(&src, &mut dst, ImageSize::new(5, 2))
+        },
+        "source buffer too small",
+    );
+    check_even_width_ok(|src_len| {
+        let src_data = vec![0u8; src_len];
+        let src = UyvyImage {
+            data: &src_data,
+            stride: 8,
+        };
+        let mut dst_y = vec![0u8; 4 * 2];
+        let mut dst_u = vec![0u8; 2 * 2];
+        let mut dst_v = vec![0u8; 2 * 2];
+        let mut dst = I422ImageMut {
+            y: &mut dst_y,
+            y_stride: 4,
+            u: &mut dst_u,
+            u_stride: 2,
+            v: &mut dst_v,
+            v_stride: 2,
+        };
+        uyvy_to_i422(&src, &mut dst, ImageSize::new(4, 2))
+    });
+}
+
+// 異常系・正常系: yuy2_to_nv12 の奇数幅ソース読み越し検証の境界値テスト
+// YUY2ToNV12 は Coalesce を持たないため、width 奇数で常に +2 を要求する
+#[test]
+fn yuy2_to_nv12_odd_width_src_overread() {
+    check_odd_width_boundaries(
+        |src_len| {
+            let src_data = vec![0u8; src_len];
+            let src = Yuy2Image {
+                data: &src_data,
+                stride: 10,
+            };
+            let mut dst_y = vec![0u8; 5 * 2];
+            let mut dst_uv = vec![0u8; 6];
+            let mut dst = Nv12ImageMut {
+                y: &mut dst_y,
+                y_stride: 5,
+                uv: &mut dst_uv,
+                uv_stride: 6,
+            };
+            yuy2_to_nv12(&src, &mut dst, ImageSize::new(5, 2))
+        },
+        "source buffer too small",
+    );
+    check_even_width_ok(|src_len| {
+        let src_data = vec![0u8; src_len];
+        let src = Yuy2Image {
+            data: &src_data,
+            stride: 8,
+        };
+        let mut dst_y = vec![0u8; 4 * 2];
+        let mut dst_uv = vec![0u8; 4];
+        let mut dst = Nv12ImageMut {
+            y: &mut dst_y,
+            y_stride: 4,
+            uv: &mut dst_uv,
+            uv_stride: 4,
+        };
+        yuy2_to_nv12(&src, &mut dst, ImageSize::new(4, 2))
+    });
+}
+
+// 異常系・正常系: uyvy_to_nv12 の奇数幅ソース読み越し検証の境界値テスト
+#[test]
+fn uyvy_to_nv12_odd_width_src_overread() {
+    check_odd_width_boundaries(
+        |src_len| {
+            let src_data = vec![0u8; src_len];
+            let src = UyvyImage {
+                data: &src_data,
+                stride: 10,
+            };
+            let mut dst_y = vec![0u8; 5 * 2];
+            let mut dst_uv = vec![0u8; 6];
+            let mut dst = Nv12ImageMut {
+                y: &mut dst_y,
+                y_stride: 5,
+                uv: &mut dst_uv,
+                uv_stride: 6,
+            };
+            uyvy_to_nv12(&src, &mut dst, ImageSize::new(5, 2))
+        },
+        "source buffer too small",
+    );
+    check_even_width_ok(|src_len| {
+        let src_data = vec![0u8; src_len];
+        let src = UyvyImage {
+            data: &src_data,
+            stride: 8,
+        };
+        let mut dst_y = vec![0u8; 4 * 2];
+        let mut dst_uv = vec![0u8; 4];
+        let mut dst = Nv12ImageMut {
+            y: &mut dst_y,
+            y_stride: 4,
+            uv: &mut dst_uv,
+            uv_stride: 4,
+        };
+        uyvy_to_nv12(&src, &mut dst, ImageSize::new(4, 2))
+    });
+}
+
+// 異常系・正常系: i420_to_yuy2 の奇数幅デスティネーション書き込み越え検証の境界値テスト
+#[test]
+fn i420_to_yuy2_odd_width_dst_overwrite() {
+    check_odd_width_boundaries(
+        |dst_len| {
+            let y = vec![0u8; 5 * 2];
+            let u = vec![0u8; 3];
+            let v = vec![0u8; 3];
+            let src = I420Image {
+                y: &y,
+                y_stride: 5,
+                u: &u,
+                u_stride: 3,
+                v: &v,
+                v_stride: 3,
+            };
+            let mut dst_data = vec![0u8; dst_len];
+            let mut dst = Yuy2ImageMut {
+                data: &mut dst_data,
+                stride: 10,
+            };
+            i420_to_yuy2(&src, &mut dst, ImageSize::new(5, 2))
+        },
+        "destination buffer too small",
+    );
+    check_even_width_ok(|dst_len| {
+        let y = vec![0u8; 4 * 2];
+        let u = vec![0u8; 2];
+        let v = vec![0u8; 2];
+        let src = I420Image {
+            y: &y,
+            y_stride: 4,
+            u: &u,
+            u_stride: 2,
+            v: &v,
+            v_stride: 2,
+        };
+        let mut dst_data = vec![0u8; dst_len];
+        let mut dst = Yuy2ImageMut {
+            data: &mut dst_data,
+            stride: 8,
+        };
+        i420_to_yuy2(&src, &mut dst, ImageSize::new(4, 2))
+    });
+}
+
+// 異常系・正常系: i420_to_uyvy の奇数幅デスティネーション書き込み越え検証の境界値テスト
+#[test]
+fn i420_to_uyvy_odd_width_dst_overwrite() {
+    check_odd_width_boundaries(
+        |dst_len| {
+            let y = vec![0u8; 5 * 2];
+            let u = vec![0u8; 3];
+            let v = vec![0u8; 3];
+            let src = I420Image {
+                y: &y,
+                y_stride: 5,
+                u: &u,
+                u_stride: 3,
+                v: &v,
+                v_stride: 3,
+            };
+            let mut dst_data = vec![0u8; dst_len];
+            let mut dst = UyvyImageMut {
+                data: &mut dst_data,
+                stride: 10,
+            };
+            i420_to_uyvy(&src, &mut dst, ImageSize::new(5, 2))
+        },
+        "destination buffer too small",
+    );
+    check_even_width_ok(|dst_len| {
+        let y = vec![0u8; 4 * 2];
+        let u = vec![0u8; 2];
+        let v = vec![0u8; 2];
+        let src = I420Image {
+            y: &y,
+            y_stride: 4,
+            u: &u,
+            u_stride: 2,
+            v: &v,
+            v_stride: 2,
+        };
+        let mut dst_data = vec![0u8; dst_len];
+        let mut dst = UyvyImageMut {
+            data: &mut dst_data,
+            stride: 8,
+        };
+        i420_to_uyvy(&src, &mut dst, ImageSize::new(4, 2))
+    });
+}
+
+// 異常系・正常系: i422_to_yuy2 の奇数幅デスティネーション書き込み越え検証の境界値テスト
+#[test]
+fn i422_to_yuy2_odd_width_dst_overwrite() {
+    check_odd_width_boundaries(
+        |dst_len| {
+            let y = vec![0u8; 5 * 2];
+            let u = vec![0u8; 3 * 2];
+            let v = vec![0u8; 3 * 2];
+            let src = I422Image {
+                y: &y,
+                y_stride: 5,
+                u: &u,
+                u_stride: 3,
+                v: &v,
+                v_stride: 3,
+            };
+            let mut dst_data = vec![0u8; dst_len];
+            let mut dst = Yuy2ImageMut {
+                data: &mut dst_data,
+                stride: 10,
+            };
+            i422_to_yuy2(&src, &mut dst, ImageSize::new(5, 2))
+        },
+        "destination buffer too small",
+    );
+    check_even_width_ok(|dst_len| {
+        let y = vec![0u8; 4 * 2];
+        let u = vec![0u8; 2 * 2];
+        let v = vec![0u8; 2 * 2];
+        let src = I422Image {
+            y: &y,
+            y_stride: 4,
+            u: &u,
+            u_stride: 2,
+            v: &v,
+            v_stride: 2,
+        };
+        let mut dst_data = vec![0u8; dst_len];
+        let mut dst = Yuy2ImageMut {
+            data: &mut dst_data,
+            stride: 8,
+        };
+        i422_to_yuy2(&src, &mut dst, ImageSize::new(4, 2))
+    });
+}
+
+// 異常系・正常系: i422_to_uyvy の奇数幅デスティネーション書き込み越え検証の境界値テスト
+#[test]
+fn i422_to_uyvy_odd_width_dst_overwrite() {
+    check_odd_width_boundaries(
+        |dst_len| {
+            let y = vec![0u8; 5 * 2];
+            let u = vec![0u8; 3 * 2];
+            let v = vec![0u8; 3 * 2];
+            let src = I422Image {
+                y: &y,
+                y_stride: 5,
+                u: &u,
+                u_stride: 3,
+                v: &v,
+                v_stride: 3,
+            };
+            let mut dst_data = vec![0u8; dst_len];
+            let mut dst = UyvyImageMut {
+                data: &mut dst_data,
+                stride: 10,
+            };
+            i422_to_uyvy(&src, &mut dst, ImageSize::new(5, 2))
+        },
+        "destination buffer too small",
+    );
+    check_even_width_ok(|dst_len| {
+        let y = vec![0u8; 4 * 2];
+        let u = vec![0u8; 2 * 2];
+        let v = vec![0u8; 2 * 2];
+        let src = I422Image {
+            y: &y,
+            y_stride: 4,
+            u: &u,
+            u_stride: 2,
+            v: &v,
+            v_stride: 2,
+        };
+        let mut dst_data = vec![0u8; dst_len];
+        let mut dst = UyvyImageMut {
+            data: &mut dst_data,
+            stride: 8,
+        };
+        i422_to_uyvy(&src, &mut dst, ImageSize::new(4, 2))
+    });
+}
+
+// 異常系・正常系: argb_to_yuy2 の奇数幅デスティネーション書き込み越え検証の境界値テスト
+#[test]
+fn argb_to_yuy2_odd_width_dst_overwrite() {
+    check_odd_width_boundaries(
+        |dst_len| {
+            let src_data = vec![0u8; 5 * 2 * 4];
+            let src = ArgbImage {
+                data: &src_data,
+                stride: 20,
+            };
+            let mut dst_data = vec![0u8; dst_len];
+            let mut dst = Yuy2ImageMut {
+                data: &mut dst_data,
+                stride: 10,
+            };
+            argb_to_yuy2(&src, &mut dst, ImageSize::new(5, 2))
+        },
+        "destination buffer too small",
+    );
+    check_even_width_ok(|dst_len| {
+        let src_data = vec![0u8; 4 * 2 * 4];
+        let src = ArgbImage {
+            data: &src_data,
+            stride: 16,
+        };
+        let mut dst_data = vec![0u8; dst_len];
+        let mut dst = Yuy2ImageMut {
+            data: &mut dst_data,
+            stride: 8,
+        };
+        argb_to_yuy2(&src, &mut dst, ImageSize::new(4, 2))
+    });
+}
+
+// 異常系・正常系: argb_to_uyvy の奇数幅デスティネーション書き込み越え検証の境界値テスト
+#[test]
+fn argb_to_uyvy_odd_width_dst_overwrite() {
+    check_odd_width_boundaries(
+        |dst_len| {
+            let src_data = vec![0u8; 5 * 2 * 4];
+            let src = ArgbImage {
+                data: &src_data,
+                stride: 20,
+            };
+            let mut dst_data = vec![0u8; dst_len];
+            let mut dst = UyvyImageMut {
+                data: &mut dst_data,
+                stride: 10,
+            };
+            argb_to_uyvy(&src, &mut dst, ImageSize::new(5, 2))
+        },
+        "destination buffer too small",
+    );
+    check_even_width_ok(|dst_len| {
+        let src_data = vec![0u8; 4 * 2 * 4];
+        let src = ArgbImage {
+            data: &src_data,
+            stride: 16,
+        };
+        let mut dst_data = vec![0u8; dst_len];
+        let mut dst = UyvyImageMut {
+            data: &mut dst_data,
+            stride: 8,
+        };
+        argb_to_uyvy(&src, &mut dst, ImageSize::new(4, 2))
     });
 }
