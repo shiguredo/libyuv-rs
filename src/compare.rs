@@ -50,6 +50,8 @@ pub fn i420_psnr(
 /// I420 画像間の SSIM（構造的類似性指標）を計算する
 ///
 /// 返り値は 0.0 から 1.0 の範囲で、1.0 が完全に同一。
+/// width または height が 17 未満では `Err` を返す（U/V プレーンの幅または高さが 8 以下に
+/// なり、SSIM のサンプル数が 0 で NaN が発生するため）。
 pub fn i420_ssim(
     src_a: &I420Image<'_>,
     src_b: &I420Image<'_>,
@@ -58,13 +60,17 @@ pub fn i420_ssim(
     src_a.validate(size, "I420Ssim")?;
     src_b.validate(size, "I420Ssim")?;
 
-    // libyuv の I420Ssim は 8x8 ブロックを走査する (compare.cc)。
-    // width <= 8 または height <= 8 では samples == 0 となり除算ゼロ (NaN) が発生する。
-    if size.width <= 8 || size.height <= 8 {
+    // libyuv の I420Ssim は Y プレーンを元サイズ、U/V プレーンを
+    // `(width + 1) >> 1` × `(height + 1) >> 1` に縮小して CalcFrameSsim に渡す
+    // (compare.cc)。Y プレーンが 9x9 以上でも width <= 16 または height <= 16 では
+    // U/V プレーンの幅または高さが 8 以下になり NaN が発生するため、17x17 未満は
+    // Err にする。この前提はバンドル版 libyuv の実装に依存しており、libyuv 更新時に
+    // 見直すべき箇所である (NaN の扱いが変更される可能性がある)。
+    if size.width <= 16 || size.height <= 16 {
         return Err(Error::with_reason(
             -1,
             "I420Ssim",
-            "image must be at least 9x9 for SSIM calculation",
+            "image must be at least 17x17 for SSIM calculation (U/V planes are downsampled)",
         ));
     }
 

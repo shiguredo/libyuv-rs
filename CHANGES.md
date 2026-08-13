@@ -50,6 +50,9 @@
   - @voluntas
 - [FIX] calc_frame_ssim と i420_ssim が 9x9 未満の小さな画像で NaN を返す問題を修正する
   - @voluntas
+- [FIX] i420_ssim が 17x17 未満（width または height が 16 以下）の画像で NaN を返す問題を修正する
+  - U/V プレーンの縮小（(width + 1) / 2 × (height + 1) / 2）を考慮し、Y プレーンが 9x9 以上でも U/V が 8 以下になるサイズは Err を返す
+  - @voluntas
 - [FIX] detile_plane と detile_plane_16 の入力検証をプロジェクト標準パターンに統一する
   - @voluntas
 - [FIX] half_float_plane の stride 単位が libyuv 仕様（バイト）と不一致で出力が壊れる問題を修正する

@@ -2,7 +2,7 @@
 
 - Priority: High
 - Created: 2026-08-04
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-08-12
 - Model: DeepSeek V4 Flash
 - Branch: feature/fix-ssim-nan-size
 - Polished: 2026-08-12
@@ -44,6 +44,9 @@ High。
 
 ## 解決方法
 
-1. `src/compare.rs` の `i420_ssim` のサイズチェックを `width <= 16 || height <= 16` で `Err` を返すように修正し、エラーメッセージと関連コメント（現行の `width <= 8` の説明）を更新し、docstring に 17x17 未満で `Err` になる要件を明記する
-2. `tests/test_compare.rs` に境界値テスト（16x16 / 17x16 / 16x17 で Err、17x17 で Ok かつ NaN でない）を追加する
-3. `CHANGES.md` に `[FIX]` エントリ（例: 「i420_ssim が 9〜16 サイズで Ok(NaN) を返す問題を修正する」。0039 のエントリと同形式）を追加する
+`src/compare.rs` を次のとおり修正した:
+
+1. `i420_ssim` のサイズチェックを `width <= 16 || height <= 16` で `Err` を返すように修正した（U/V プレーンの縮小 `(width + 1) >> 1` × `(height + 1) >> 1` を考慮し、U/V の幅または高さが 8 以下になるサイズを 17x17 未満として除外）。エラーメッセージを `"image must be at least 17x17 for SSIM calculation (U/V planes are downsampled)"` に更新し、docstring に 17 未満で `Err` になる要件を明記した。`calc_frame_ssim` の 9x9 チェックは変更していない
+2. 実装コメントにバンドル版 libyuv の実装（`compare.cc` の `I420Ssim` / `CalcFrameSsim`）への依存と、libyuv 更新時に見直すべき箇所であることを明記した
+3. `tests/test_compare.rs` に境界値テストを追加した（16x16 / 17x16 / 16x17 で `Err` と 17x17 要件の reason 検証、17x17 で `Ok` かつ `is_finite()` で 1.0 に近い値）
+4. `CHANGES.md` の `## develop` セクションに `[FIX]` エントリを追加した

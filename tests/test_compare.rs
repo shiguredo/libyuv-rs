@@ -135,7 +135,10 @@ fn calc_frame_ssim_rejects_4x4() {
     assert!(result.is_err(), "4x4 では Err が返るべき");
 }
 
-// 異常系: i420_ssim の 8x8（境界値）で Err が返ること
+// 異常系: i420_ssim の 8x8 で Err が返ること
+// calc_frame_ssim 側の 8x8 / 4x4 テスト（0039 で追加）と対になる既存テスト。
+// 17x17 未満の要件（width <= 16 || height <= 16）に包含されるが、calc_frame_ssim と
+// 対の回帰テストとして残す
 #[test]
 fn i420_ssim_rejects_8x8() {
     let y = vec![128u8; 64];
@@ -156,6 +159,7 @@ fn i420_ssim_rejects_8x8() {
 }
 
 // 異常系: i420_ssim の 4x4 で Err が返ること
+// calc_frame_ssim 側の 8x8 / 4x4 テストと対になる既存テスト（8x8 テストのコメント参照）
 #[test]
 fn i420_ssim_rejects_4x4() {
     let y = vec![128u8; 16];
@@ -173,4 +177,67 @@ fn i420_ssim_rejects_4x4() {
 
     let result = i420_ssim(&src, &src, size);
     assert!(result.is_err(), "4x4 では Err が返るべき");
+}
+
+// 異常系: i420_ssim の width / height が 16 以下（17x17 未満）で Err が返ること
+// Y プレーンが 9x9 以上でも U/V プレーンが 8 以下になるケースを width / height の
+// 非対称（17x16 / 16x17）を含めて検証する
+#[test]
+fn i420_ssim_rejects_under_17x17() {
+    // 16x16: Y は 9x9 以上だが U/V が 8x8 になり NaN
+    // 17x16: U/V が 9x8 になり NaN（width だけ 17 では足りない）
+    // 16x17: U/V が 8x9 になり NaN（height だけ 17 では足りない）
+    for (width, height) in [(16usize, 16usize), (17, 16), (16, 17)] {
+        let uv_width = width.div_ceil(2);
+        let uv_height = height.div_ceil(2);
+        let y = vec![128u8; width * height];
+        let u = vec![128u8; uv_width * uv_height];
+        let v = vec![128u8; uv_width * uv_height];
+        let src = I420Image {
+            y: &y,
+            y_stride: width,
+            u: &u,
+            u_stride: uv_width,
+            v: &v,
+            v_stride: uv_width,
+        };
+        let size = ImageSize::new(width, height);
+
+        let result = i420_ssim(&src, &src, size);
+        let err = result.expect_err("17x17 未満では Err が返るべき");
+        assert!(
+            err.to_string().contains("image must be at least 17x17"),
+            "{width}x{height} では 17x17 要件の reason が返るべき: {}",
+            err
+        );
+    }
+}
+
+// 正常系: i420_ssim の 17x17 で Ok が返り、NaN でないこと
+#[test]
+fn i420_ssim_accepts_17x17() {
+    // 17x17: Y が 17x17、U/V が 9x9 になり、全プレーンで samples > 0 になる
+    let y = vec![128u8; 17 * 17];
+    let u = vec![128u8; 9 * 9];
+    let v = vec![128u8; 9 * 9];
+    let src = I420Image {
+        y: &y,
+        y_stride: 17,
+        u: &u,
+        u_stride: 9,
+        v: &v,
+        v_stride: 9,
+    };
+    let size = ImageSize::new(17, 17);
+
+    let result = i420_ssim(&src, &src, size);
+    let ssim = result.expect("17x17 では Ok が返るべき");
+    // 同一バッファで全プレーンが完全一致するため SSIM は 1.0 になる
+    // （is_finite() で NaN / ±Inf を排除し、プラットフォーム差を吸収するため
+    // prop_compare と同じ 1e-6 の許容で 1.0 を確認する）
+    assert!(
+        ssim.is_finite() && (ssim - 1.0).abs() < 1e-6,
+        "NaN でなく 1.0 が返るべき: {}",
+        ssim
+    );
 }
