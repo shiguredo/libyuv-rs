@@ -2,7 +2,7 @@
 
 - Priority: Medium
 - Created: 2026-08-06
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-08-12
 - Model: DeepSeek V4 Flash
 - Branch: feature/fix-odd-width-src-overread
 - Polished: 2026-08-12
@@ -65,9 +65,17 @@ libyuv の行関数ラッパーの余り処理は、SIMD のチャンク単位�
 
 ## 解決方法
 
-1. `src/convert/packed.rs` の `yuy2_to_y` / `uyvy_to_y` に、Coalesce を考慮したソース必要サイズのインライン検証を追加する
-2. `src/convert/packed.rs` の `i420_to_yuy2` / `i420_to_uyvy` / `i422_to_yuy2` / `i422_to_uyvy` に、奇数幅時のデスティネーション必要サイズのインライン検証を追加する
-3. 上記の検証に、`+2` の根拠（libyuv の行関数ラッパーの余り処理と Coalesce）をコメントで明記する
-4. YUY2 / UYVY をソースに持つ他の変換関数と、デスティネーション側の `argb_to_yuy2` / `argb_to_uyvy` を調査し、同構造の関数に同じ検証を適用して結果を本 issue に追記する
-5. `tests/test_convert.rs` に境界値テストを追加する
-6. `CHANGES.md` の `## develop` セクションに `[FIX]` エントリを追加する
+`src/convert/packed.rs` を次のとおり修正した（対象 16 関数。ヘルパー `check_yuy2_uyvy_src_overread` / `check_yuy2_uyvy_dst_overwrite` を追加し、Coalesce 条件は関数ごとに判定して渡す）:
+
+1. ソース読み越し検証（width 奇数で最終行が `width * 2 + 2` バイト読み出されるため、必要サイズ = `stride * (height - 1) + width * 2 + 2`）:
+   - `yuy2_to_y` / `uyvy_to_y`: Coalesce 条件 `src_stride == width * 2 && dst_stride_y == width && width * height <= INT_MAX`（planar_functions.cc）を評価。合体時は `width * height` が奇数のときのみ `+2`
+   - `yuy2_to_argb` / `uyvy_to_argb`: Coalesce 条件 `src_stride == width * 2 && dst_stride == width * 4 && width * height <= INT_MAX`（convert_argb.cc）を評価。合体時は `width * height` が奇数のときのみ `+2`
+   - `yuy2_to_i420` / `uyvy_to_i420` / `yuy2_to_nv12` / `uyvy_to_nv12`: Coalesce を持たない（convert.cc / planar_functions.cc）ため、width 奇数で常に `+2`
+   - `yuy2_to_i422` / `uyvy_to_i422`: Coalesce 条件 `dst_stride_u * 2 == width` により偶数幅でのみ発動し、合体後も `width * height` が偶数になるため `+2` は発生しない（coalesce=false 相当。条件に `width * height <= 32768` も含まれる）
+2. デスティネーション書き込み越え検証（width 奇数で最終行に `width * 2 + 2` バイト書き込まれるため、必要サイズ = `stride * (height - 1) + width * 2 + 2`）:
+   - `i420_to_yuy2` / `i420_to_uyvy` / `i422_to_yuy2` / `i422_to_uyvy`: Coalesce を持たない、または `src_stride_u * 2 == width` により偶数幅でのみ発動するため、width 奇数で常に `+2`
+   - `argb_to_yuy2` / `argb_to_uyvy`: Coalesce を持たず、デスティネーション書き込みに `I422ToYUY2Row_Any_*` / `I422ToUYVYRow_Any_*` を使う（convert_from_argb.cc）ため、width 奇数で常に `+2`
+3. 検証に `+2` の根拠（libyuv の行関数ラッパー ANY11 / ANY11C / ANY12 / ANY12S / ANY21S / ANY31 の余り処理、row_any.cc）と Coalesce 条件をコメントで明記した。libyuv 更新時に見直すべき箇所として注記した
+4. **調査結果（完了条件の調査項目）**: YUY2 / UYVY をソースに持つ他 8 関数（`yuy2_to_argb` / `yuy2_to_i420` / `yuy2_to_i422` / `yuy2_to_nv12` / `uyvy_to_argb` / `uyvy_to_i420` / `uyvy_to_i422` / `uyvy_to_nv12`）とデスティネーション側 2 関数（`argb_to_yuy2` / `argb_to_uyvy`）は、いずれも同構造の読み書き越えがあることを確認した（ANY11C / ANY12S / ANY31 の余り処理と各関数の Coalesce 条件を一次資料で照合）。同構造のため、同じ検証パターンを 10 関数すべてに適用した。`mm21_to_yuy2` / `detile_to_yuy2` は ANYDETILEMERGE が `width * 2` ちょうどに書き込むため対象外
+5. `tests/test_convert.rs` に境界値テストを追加した（16 関数 × 奇数幅の Err / Ok 境界と偶数幅の Ok、Coalesce 発動ケース（5x2 偶数 / 5x3 奇数）、height=1、width=17 の SIMD チャンクパス。テストコメントで width の奇数 / 偶数の区別と Coalesce 発動 / 非発動の条件（stride 設定）を明示）
+6. `CHANGES.md` の `## develop` セクションに `[FIX]` エントリを追加した（width 奇数で従来通過していた `stride * height` ちょうどのバッファが Err を返すようになる挙動変更を併記）
