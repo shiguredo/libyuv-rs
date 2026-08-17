@@ -2,7 +2,7 @@
 
 - Priority: Medium
 - Created: 2026-08-04
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-08-18
 - Model: DeepSeek V4 Flash
 - Branch: feature/test-add-convert-tests
 - Polished: 2026-08-04
@@ -75,3 +75,13 @@ alpha 系 7 関数（`i420_alpha_to_argb` / `i420_alpha_to_abgr` / `i422_alpha_t
 2. ground truth 方式の正常系テストと境界値のエラーパステスト（バッファ不足・stride 不足・c_int 超過）を追加する
 3. テストファイルの分割（必要に応じて `tests/test_convert/` サブモジュール化）
 4. `CHANGES.md` の `### misc` に `[ADD]` エントリを追加する
+
+### 実装内容
+
+「テスト対象の代表関数（選定一覧）」の全 23 関数 + alpha 系 7 関数のテストを実装した。
+
+- テストファイルを `tests/test_convert/` 配下にサブモジュール分割した（`main.rs` + 各サブモジュール。既存の 86 テストは `main.rs` に残し、新規テストをサブモジュールとして追加）
+- ground truth 計算用の共通ヘルパー `tests/helpers/convert.rs` を新設した。libyuv の `row_common.cc` と同一の整数演算（BT.601 / BT.709 / BT.2020 / JPEG の各色変換係数、8↔10bit / 8↔12bit / 16→8bit 変換、RGB565 / AR30 のビットパック、UV 平均）を再現し、SIMD 実装と C 実装で同一の期待値になることを実測で確認した
+- 各代表関数に「正常系（既知ピクセル列の期待値比較）」と「エラーパス（バッファ不足・stride 不足・c_int 超過）」のテストを追加した
+- alpha 系 7 関数に正常系（アルファ値がそのままコピーされることの全画素検証）とバッファ不足テストを追加した
+- `CHANGES.md` の `### misc` に `[ADD]` エントリを追加した
