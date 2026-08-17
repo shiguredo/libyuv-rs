@@ -2,7 +2,7 @@
 
 - Priority: Medium
 - Created: 2026-08-04
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-08-18
 - Model: DeepSeek V4 Flash
 - Branch: feature/test-add-convert-tests
 - Polished: 2026-08-04
@@ -52,9 +52,36 @@ Medium。
 - `cargo fmt --all --check` と `cargo clippy --workspace --features source-build -- -D warnings` が成功すること
 - `CHANGES.md` の `## develop` の `### misc` に `[ADD]` エントリを追加すること
 
+## テスト対象の代表関数（選定一覧）
+
+各サブモジュールの代表関数とテスト方針を定める。ロスレス関数（copy 系・チャンネル入替系）は選定しない（正常系は 0055 の PBT に委譲する方針のため。エラーパスの代表カバーもロッシー変換側で兼ねる）。ground truth の計算は `tests/helpers/convert.rs` の参照実装（libyuv の `row_common.cc` と同一の整数演算を再現）で行う。
+
+- `colorspace.rs`: `h420_to_argb`（BT.709 limited）・`u420_to_argb`（BT.2020 limited）
+- `high_bitdepth.rs`: `i010_to_argb`（10bit→ARGB）・`i012_to_i420`（12bit→8bit）
+- `jpeg.rs`: `j420_to_argb`（BT.601 full range）・`argb_to_j420`（RGB→BT.601 full range）
+- `packed.rs`: `rgb565_to_argb` / `argb_to_rgb565`（ビットパック変換）・`p010_to_nv12`（10bit→8bit）
+- `hardware.rs`: `ayuv_to_nv12` / `ayuv_to_nv21`（AYUV→NV 系。android420 / mm21 / mt2t / detile 系は 0045 / 0046 / 0047 のスコープのため選定しない）
+- `argb.rs`: `ar30_to_argb` / `argb_to_ar30`（10bit パック変換）・`i420_to_rgba`（色変換 + チャンネル入替）
+- `i420.rs`: `i400_to_argb`（グレー→ARGB）・`i420_to_i400`（Y 抽出）・`i420_to_i010`（8bit→10bit）
+- `nv.rs`: `nv12_to_raw`（Y 抽出）・`nv21_to_yuv24`（NV21→YUV24）・`i444_to_nv12`（UV パック）
+- `subsampling.rs`: `i444_to_rgb24`・`i422_to_rgb24`（色変換。`i422_to_i444` のアップサンプリングは libyuv のスケーリング補間が SIMD 実装に依存し、ground truth をプラットフォーム非依存で固定できないため選定しない）
+- `mjpeg.rs`: `mjpeg_to_i420`（既知 JPEG のデコード結果を ground truth として固定）
+
+alpha 系 7 関数（`i420_alpha_to_argb` / `i420_alpha_to_abgr` / `i422_alpha_to_argb` / `i422_alpha_to_abgr` / `i444_alpha_to_argb` / `i444_alpha_to_abgr` / `argb_to_i420_alpha`）は、0050 の委譲どおり正常系・バッファ不足テストを追加する（stride 境界は 0050 で実装済み）。
+
 ## 解決方法
 
 1. サブモジュールごとにテスト対象関数の優先順位を決める（各サブモジュールの代表関数 2〜3 個を最優先。0044〜0050 の対象関数の境界値テストは各 bug issue のスコープのため対象外）
 2. ground truth 方式の正常系テストと境界値のエラーパステスト（バッファ不足・stride 不足・c_int 超過）を追加する
 3. テストファイルの分割（必要に応じて `tests/test_convert/` サブモジュール化）
 4. `CHANGES.md` の `### misc` に `[ADD]` エントリを追加する
+
+### 実装内容
+
+「テスト対象の代表関数（選定一覧）」の全 23 関数 + alpha 系 7 関数のテストを実装した。
+
+- テストファイルを `tests/test_convert/` 配下にサブモジュール分割した（`main.rs` + 各サブモジュール。既存の 86 テストは `main.rs` に残し、新規テストをサブモジュールとして追加）
+- ground truth 計算用の共通ヘルパー `tests/helpers/convert.rs` を新設した。libyuv の `row_common.cc` と同一の整数演算（BT.601 / BT.709 / BT.2020 / JPEG の各色変換係数、8↔10bit / 8↔12bit / 16→8bit 変換、RGB565 / AR30 のビットパック、UV 平均）を再現し、SIMD 実装と C 実装で同一の期待値になることを実測で確認した
+- 各代表関数に「正常系（既知ピクセル列の期待値比較）」と「エラーパス（バッファ不足・stride 不足・c_int 超過）」のテストを追加した
+- alpha 系 7 関数に正常系（アルファ値がそのままコピーされることの全画素検証）とバッファ不足テストを追加した
+- `CHANGES.md` の `### misc` に `[ADD]` エントリを追加した

@@ -2,6 +2,21 @@
 //!
 //! エラーパス・境界値と、既知解による正常系（Y 成分の抽出）を検証する。
 
+#[path = "../helpers/convert.rs"]
+mod helpers;
+
+mod alpha;
+mod argb;
+mod colorspace;
+mod hardware;
+mod high_bitdepth;
+mod i420;
+mod jpeg;
+mod mjpeg;
+mod nv;
+mod packed;
+mod subsampling;
+
 use std::ffi::c_int;
 
 use shiguredo_libyuv::{
