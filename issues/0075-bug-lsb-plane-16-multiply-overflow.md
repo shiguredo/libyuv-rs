@@ -2,7 +2,7 @@
 
 - Priority: High
 - Created: 2026-08-12
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-08-18
 - Model: DeepSeek V4 Flash
 - Branch: feature/fix-lsb-plane-16-multiply-overflow
 - Polished: 2026-08-17
@@ -67,3 +67,12 @@ SIMD 経路では `scale` を 16bit レーンへ放送する（AVX2 の `vpbroad
 2. 根拠（SIMD が `scale = 65536` の下位 16 bit を 0 として放送すること、C の `DivideRow_16_C` の符号付き乗算オーバーフロー）をコメントで明記し、docstring に `depth == 16` は恒等コピー（`sys::CopyPlane_16`）に置き換わる旨を追記する
 3. `tests/test_planar.rs` に画素値 32767 / 32768 / 65535 の恒等テスト（height >= 2）を追加する
 4. `CHANGES.md` の `## develop` セクションに `[FIX]` エントリを追加する
+
+### 実装内容
+
+- `src/planar.rs` の `convert_to_lsb_plane_16` で、既存の検証（要素単位の `require_c_int` / depth 範囲 / `stride >= width` / `checked_buf_size`）を通過後に `depth == 16` なら `sys::CopyPlane_16` を呼ぶ実装に変更した。`sys::CopyPlane_16` は内部で `stride * 2` / `width * 2` を `int` で計算するため、バイト単位の `c_int` 再検証（`half_float_plane` と同様にバッファサイズ検証より前に配置）を追加した。エラーの `function` は既存検証と同じ `"ConvertToLSBPlane_16"` を維持する
+- `depth != 16` は従来どおり `sys::ConvertToLSBPlane_16` を呼ぶため、既存の挙動は変わらない
+- 恒等コピーへの置き換え根拠（SIMD の 16bit レーン放送による全 0 出力・C の `DivideRow_16_C` の符号付き乗算オーバーフロー）と、置き換えが libyuv 実装依存で更新時に見直すべき旨をコメントで明記した
+- `tests/test_planar.rs`: `convert_to_lsb_plane_16_depth_16_is_identity`（stride > width のパディング配置で 32767 / 32768 / 65535 の恒等性と行送りを検証）/ `convert_to_lsb_plane_16_depth_16_stride_bytes_exceeds_c_int`（バイト単位の c_int 超過）/ `convert_to_lsb_plane_16_depth_16_zero_size_is_noop`（ゼロサイズの no-op）を追加した
+- `CHANGES.md` の `## develop` に `[FIX]` エントリを追加した
+- `cargo test --workspace --features source-build` / `cargo fmt --all --check` / `cargo clippy --workspace --features source-build -- -D warnings` のすべてが成功することを確認した
