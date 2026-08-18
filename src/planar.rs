@@ -4051,6 +4051,11 @@ pub fn convert_8_to_8_plane(
 /// `depth` は有効範囲 8〜16（crate の他の 16bit 変換関数と統一した仕様。C 側には
 /// assert がなく、`1 << depth` のシフトは負値や 31 以上の depth で未定義動作になる）。
 /// 範囲外の `depth` は `Err` を返す（ゼロサイズ入力でも同様）。
+///
+/// `depth == 16` は恒等コピー（`sys::CopyPlane_16`）に置き換わる。libyuv の
+/// `ConvertToLSBPlane_16` は `depth == 16` で SIMD 経路が全 0 を出力し、C 経路では
+/// 符号付き乗算が未定義動作になるため、変換が必要ない恒等コピーで代替する
+/// （根拠は実装コメントに詳述）。
 pub fn convert_to_lsb_plane_16(
     src: &[u16],
     src_stride: usize,
@@ -4107,6 +4112,50 @@ pub fn convert_to_lsb_plane_16(
         ));
     }
 
+    // depth == 16 では sys::ConvertToLSBPlane_16 を呼ばない。
+    //
+    // libyuv commit d23308a2a7442be8e559b1b471862fd7588d6a57 時点の ConvertToLSBPlane_16
+    // は `int scale = 1 << depth` を計算し、その scale を 16bit レーンへ放送する SIMD 行
+    // 関数（DivideRow_16_AVX2 / DivideRow_16_NEON / DivideRow_16_SVE2）または C の
+    // DivideRow_16_C へディスパッチする。depth == 16 では scale = 65536 = 0x00010000 の
+    // 下位 16 bit が 0 になるため、SIMD 経路は src が 0 でなくても出力が全 0 になる。
+    // C 経路の DivideRow_16_C は `dst[x] = (src[x] * scale) >> 16` の src[x] * scale が
+    // src[x] >= 32768 で int オーバーフロー（未定義動作）になる。depth == 16 は変換不要の
+    // 恒等操作なので sys::CopyPlane_16 による 16bit 行コピーに置き換える。
+    // この置き換えは libyuv の実装（ConvertToLSBPlane_16 / CopyPlane_16 /
+    // DivideRow_16_C）に依存する。libyuv 更新時には見直すこと
+    if depth == 16 {
+        // sys::CopyPlane_16 は内部で `src_stride_y * 2` / `dst_stride_y * 2` / `width * 2`
+        // を int で計算するため、要素単位の require_c_int だけでは INT_MAX / 2 超の
+        // stride / width が通過し、内部の int 乗算がオーバーフローする。
+        // half_float_plane と同様に、バイト単位の c_int 再検証をバッファサイズ検証より
+        // 前に置く（この検証がバッファサイズ検証より後だと、対になる巨大なバッファが
+        // 無ければ検証に到達できない）。
+        // require_c_int を通過済みの要素単位の値の 2 倍は usize ではオーバーフローしない
+        // ため、チェック付き乗算は不要
+        let src_stride_bytes = src_stride * 2;
+        let dst_stride_bytes = dst_stride * 2;
+        let width_bytes = size.width * 2;
+        require_c_int(
+            src_stride_bytes,
+            "ConvertToLSBPlane_16",
+            "source stride (bytes) exceeds c_int range",
+        )?;
+        require_c_int(
+            dst_stride_bytes,
+            "ConvertToLSBPlane_16",
+            "destination stride (bytes) exceeds c_int range",
+        )?;
+        // stride >= width により src/dst のバイト検証が先に発火するため実質的には
+        // 到達しないが、sys::CopyPlane_16 内部の width * 2 を明示的に保証する防御として
+        // 残す
+        require_c_int(
+            width_bytes,
+            "ConvertToLSBPlane_16",
+            "width (bytes) exceeds c_int range",
+        )?;
+    }
+
     // バッファサイズ計算（オーバーフロー安全）
     let src_size = checked_buf_size(
         src_stride,
@@ -4136,18 +4185,36 @@ pub fn convert_to_lsb_plane_16(
         ));
     }
 
-    // SAFETY: .validate() が全前提条件を検査済み。
-    unsafe {
-        sys::ConvertToLSBPlane_16(
-            src.as_ptr(),
-            src_stride as c_int,
-            dst.as_mut_ptr(),
-            dst_stride as c_int,
-            size.width as c_int,
-            size.height as c_int,
-            depth as c_int,
-        )
-    };
+    if depth == 16 {
+        // SAFETY: 手前の require_c_int（要素単位・バイト単位）/ stride >= width /
+        // バッファサイズ検証（checked_buf_size）で全前提条件を検査済み。バイト単位の
+        // stride / width が c_int 範囲内であるため、sys::CopyPlane_16 内部の int
+        // 乗算はオーバーフローしない
+        unsafe {
+            sys::CopyPlane_16(
+                src.as_ptr(),
+                src_stride as c_int,
+                dst.as_mut_ptr(),
+                dst_stride as c_int,
+                size.width as c_int,
+                size.height as c_int,
+            )
+        };
+    } else {
+        // SAFETY: 手前の require_c_int / stride >= width / バッファサイズ検証
+        // （checked_buf_size）で全前提条件を検査済み。
+        unsafe {
+            sys::ConvertToLSBPlane_16(
+                src.as_ptr(),
+                src_stride as c_int,
+                dst.as_mut_ptr(),
+                dst_stride as c_int,
+                size.width as c_int,
+                size.height as c_int,
+                depth as c_int,
+            )
+        };
+    }
 
     Ok(())
 }
