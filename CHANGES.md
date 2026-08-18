@@ -97,6 +97,11 @@
   - i420_alpha_to_argb / i420_alpha_to_abgr / i422_alpha_to_argb / i422_alpha_to_abgr / i444_alpha_to_argb / i444_alpha_to_abgr / argb_to_i420_alpha のアルファプレーンに require_c_int チェックと stride >= width チェックを追加する
   - stride の c_int 範囲超過と stride < width は従来通過していたが Err を返すようになる
   - @voluntas
+- [FIX] convert_to_lsb_plane_16 が depth == 16 で SIMD 経路では全 0 を出力し、C 経路では符号付き乗算が未定義動作になる問題を修正する
+  - depth == 16 では libyuv の ConvertToLSBPlane_16 を呼ばず、恒等コピー（CopyPlane_16）に置き換える
+  - libyuv の SIMD 行関数は scale = 65536 の下位 16 bit（0）をレーンへ放送するため、depth == 16 の非ゼロ入力を全 0 にしていた。C 経路（DivideRow_16_C）は src >= 32768 で符号付き int 乗算がオーバーフロー（未定義動作）していた
+  - depth != 16 の既存の挙動は変更しない
+  - @voluntas
 
 ### misc
 

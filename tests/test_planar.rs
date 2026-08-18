@@ -727,6 +727,92 @@ fn convert_to_lsb_msb_plane_16_depth_valid_boundaries() {
     }
 }
 
+// 正常系: convert_to_lsb_plane_16 の depth == 16 が恒等コピーになること。
+// libyuv の ConvertToLSBPlane_16 は depth == 16 で SIMD 経路が全 0 を出力し、
+// C 経路では符号付き乗算がオーバーフロー（未定義動作）になるため、本 crate では
+// depth == 16 を sys::CopyPlane_16 による行コピーに置き換えている。
+// stride > width とし C 側の行合体（coalesce）を無効化して、行ごとに
+// 異なる画素値（32767 / 32768 / 65535）で行送りが正しい 16bit 幅で行われることも検証する
+#[test]
+fn convert_to_lsb_plane_16_depth_16_is_identity() {
+    // stride > width のパディング付き配置にする（stride == width では CopyPlane の
+    // 行合体が発動し、行送りコードが実行されないため）。src のパディングは
+    // dst の初期値（0xFFFF）と異なる値にし、コピー実装が stride 単位で行全体を
+    // 書き込んだ場合に検出できるようにする
+    let width = 4;
+    let height = 2;
+    let stride = 6; // パディング 2 要素
+    let src = [
+        // 1 行目: 境界値 + パディング
+        0u16, 32767, 32768, 65535, 0x5A5A, 0x5A5A,
+        // 2 行目: 1 行目と異なる画素値（行送りの誤りを検出するため）+ パディング
+        65535, 32768, 32767, 0, 0x5A5A, 0x5A5A,
+    ];
+    let size = ImageSize::new(width, height);
+    let mut dst = [0xFFFFu16; 12];
+
+    convert_to_lsb_plane_16(&src, stride, &mut dst, stride, size, 16)
+        .expect("depth == 16 では Ok が返るべき");
+    // この assert は主に SIMD 経路の全 0 出力の回帰を検出する。C 経路のみの環境では
+    // 旧実装も 2 の補数ラップにより見かけ上恒等になるため検出不能（UB は出力の観測では
+    // 検証できない）。CI の SIMD 対応ランナー（Linux / macOS）では修正前コードが全 0 を
+    // 出すため回帰を検出できる
+    let expected = [
+        0u16, 32767, 32768, 65535, 0xFFFF, 0xFFFF, 65535, 32768, 32767, 0, 0xFFFF, 0xFFFF,
+    ];
+    assert_eq!(
+        dst, expected,
+        "depth == 16 は恒等コピーになり入力と一致するべき"
+    );
+}
+
+// 異常系: convert_to_lsb_plane_16 の depth == 16 で、要素単位では c_int 範囲内でも
+// バイト単位（stride * 2 / width * 2）にすると c_int の範囲を超える場合に Err が返ること
+#[test]
+fn convert_to_lsb_plane_16_depth_16_stride_bytes_exceeds_c_int() {
+    let src = vec![0u16; 1];
+    let mut dst = vec![0u16; 1];
+    let size = ImageSize::new(1, 1);
+    // 要素単位では c_int 範囲内だが、* 2 すると範囲を超える最小の stride を使う
+    // （half_float_plane 側は内部で * 2 してから判定するため c_int::MAX でも検証が
+    // 発火したが、こちらは要素単位の require_c_int を通る必要があるため、* 2 超過の
+    // 最小境界 (c_int::MAX / 2 + 1) を選ぶ）
+    let max_stride = (c_int::MAX as usize) / 2 + 1;
+
+    let result = convert_to_lsb_plane_16(&src, max_stride, &mut dst, 1, size, 16);
+    let err = result.expect_err("src 側のバイト単位 stride 超過では Err が返るべき");
+    assert!(
+        err.to_string()
+            .contains("source stride (bytes) exceeds c_int range"),
+        "src 側のバイト単位 stride 超過の reason が返るべき: {}",
+        err
+    );
+
+    let result = convert_to_lsb_plane_16(&src, 1, &mut dst, max_stride, size, 16);
+    let err = result.expect_err("dst 側のバイト単位 stride 超過では Err が返るべき");
+    assert!(
+        err.to_string()
+            .contains("destination stride (bytes) exceeds c_int range"),
+        "dst 側のバイト単位 stride 超過の reason が返るべき: {}",
+        err
+    );
+}
+
+// 正常系: convert_to_lsb_plane_16 の depth == 16 はゼロサイズ入力で no-op（Ok）になること。
+// ゼロサイズは恒等コピーの意味論としても no-op であり、libyuv の C 実装
+// （ConvertToLSBPlane_16 / CopyPlane_16）も早期 return するため、Ok を返す契約を固定する
+#[test]
+fn convert_to_lsb_plane_16_depth_16_zero_size_is_noop() {
+    let src = [0u16; 0];
+    let mut dst = [0u16; 0];
+
+    let result = convert_to_lsb_plane_16(&src, 0, &mut dst, 0, ImageSize::new(0, 0), 16);
+    assert!(
+        result.is_ok(),
+        "ゼロサイズ + depth == 16 では Ok（no-op）が返るべき"
+    );
+}
+
 // 異常系: convert_to_lsb_plane_16 / convert_to_msb_plane_16 の depth が有効範囲
 // (8..=16) 外で Err が返ること
 #[test]
