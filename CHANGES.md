@@ -137,6 +137,10 @@
   - `llvm-nm -u` に `--format=just-symbols` を追加し、プラットフォーム間の出力形式を統一する（macOS と Linux ELF / Windows COFF の bsd 形式の差で行頭アンカーがマッチせず検査が不発になっていた）
   - Windows の \r 混入対策として `tr -d '\r'` を追加する
   - @voluntas
+- [FIX] verify_symbol_rewrite.sh の未解決シンボル検査が jpeg_/jsimd_ 以外の書き換え対象を検出できない問題を修正する
+  - `jpeg_` / `jsimd_` 接頭辞の grep を `symbol_rename_map_jpeg.txt` の第 1 フィールドとの完全一致突合（comm）に置き換える
+  - `jinit_*` / `jpeg12_*` 等の書き換え対象全体が検出範囲に入り、マップ欠落・空マップ・形式ドリフト（抽出件数と総行数の不一致）時は失敗する
+  - @voluntas
 
 ## 2026.1.0
 
