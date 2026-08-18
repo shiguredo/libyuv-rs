@@ -2,7 +2,7 @@
 
 - Priority: Medium
 - Created: 2026-08-12
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-08-18
 - Model: DeepSeek V4 Flash
 - Branch: feature/fix-verify-symbol-rewrite-coverage
 - Polished: 2026-08-17
@@ -61,3 +61,16 @@ ERROR / 進捗ログ / ファイル先頭の Assertion 説明は、`jpeg_/jsimd_
 2. 検査範囲の根拠（jpeg マップ第 1 フィールドと一致させること、右列は使わないこと、部分一致は使わないこと、最終行を落とさないこと）をコメントで明記する
 3. 0051 と同じ足場で、**(a) と (b) は別ラン** とする。(a) C 名 `jinit_master_decompress` のみの未書き換え検出、(b) `jpeg_CreateDecompress` の未書き換え検出、(c) 書き換え済みでの偽陽性なし、(d) macOS 実物成功、を確認する
 4. `CHANGES.md` の `## develop` の `### misc` セクションに `[FIX]` エントリを追加する
+
+### 実装内容
+
+- `scripts/verify_symbol_rewrite.sh` の `check_unresolved` を、`symbol_rename_map_jpeg.txt` の第 1 フィールド（旧名）と `llvm-nm -u --format=just-symbols` の未定義シンボルの完全一致突合（`LC_ALL=C comm -12`）に置き換えた
+- 両側の先頭 `_` を高々 1 個落としてから突合する（macOS のマップ左列は `_jinit_*`、ELF / COFF の nm 出力は `jinit_*` のため）。C 識別子フィルタでオブジェクトファイル名行（`jpeg_nbits.c.o:` 等）を除外する
+- 第 2 フィールド（新名）は集合に入れない（書き換え済みアーカイブの未定義には新名が残るため）。部分一致の grep は使わない（旧名が新名の部分文字列になるため）
+- マップ欠落・空マップ・空行のみ・形式ドリフト（抽出件数と総行数の不一致）をすべて ERROR にする。`awk 'NF { count++ } END { print count + 0 }'` で総行数と抽出件数を照合し、1 行でも抽出から脱落したら失敗する
+- `unresolved` が空（`llvm-nm` が未定義シンボルを 1 つも報告しない）場合も ERROR にする
+- `llvm-nm` の失敗は `set -e` で捕捉する（コマンド置換を `local` と分離）
+- ERROR メッセージには検出した未書き換えシンボル名（`leftover`）を含める
+- 検証: (a) `jinit_master_decompress` 未書き換えのみの ELF アーカイブで exit 1（修正前スクリプトは exit 0）、(b) `jpeg_CreateDecompress` 未書き換えで exit 1、(c) macOS 実物・全 OUT_DIR で exit 0（偽陽性なし）、(d-1) マップ欠落 / (d-2) 空マップ / (e) 破損マップ / (f) nm 未定義 0 / (g) 部分脱落 / (h) 空行のみの各ケースで exit 1 を確認した
+- `bash -n` 構文チェック成功
+- `CHANGES.md` の `## develop` の `### misc` に `[FIX]` エントリを追加した
