@@ -76,6 +76,12 @@ jobs:
           bash scripts/verify_symbol_rewrite.sh "$OUT_DIR"
           bash scripts/verify_libyuv_source.sh "$OUT_DIR"
 
+  mobile:
+    name: Mobile prebuilt
+    permissions:
+      contents: read
+    uses: ./.github/workflows/mobile.yml
+
   # docs.rs 向けビルド確認
   docs-rs:
     name: docs.rs
@@ -91,6 +97,7 @@ jobs:
   slack_notify:
     needs:
       - test
+      - mobile
       - docs-rs
     runs-on: ubuntu-slim
     if: always()
