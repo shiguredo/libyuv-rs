@@ -108,6 +108,9 @@ fn main() {
     println!("cargo::rerun-if-changed=build.rs");
     println!("cargo::rerun-if-env-changed=CARGO_FEATURE_SOURCE_BUILD");
     println!("cargo::rerun-if-env-changed=LIBYUV_TARGET");
+    println!("cargo::rerun-if-env-changed=IPHONEOS_DEPLOYMENT_TARGET");
+    println!("cargo::rerun-if-env-changed=ANDROID_NDK_HOME");
+    println!("cargo::rerun-if-env-changed=ANDROID_PLATFORM");
 
     // 各種変数やビルドディレクトリのセットアップ
     let out_dir = PathBuf::from(env::var_os("OUT_DIR").expect("infallible"));
@@ -159,6 +162,9 @@ fn main() {
     match target.as_str() {
         "linux" => println!("cargo::rustc-link-lib=stdc++"),
         "macos" | "ios" => println!("cargo::rustc-link-lib=c++"),
+        // Android NDK の libc++.a は `INPUT(-lc++_static -lc++abi)` のリンカスクリプトで、
+        // static 指定により libc++_static.a と libc++abi.a が静的リンクされる
+        "android" => println!("cargo::rustc-link-lib=static=c++"),
         _ => {}
     }
 }
@@ -408,7 +414,28 @@ fn build_from_source(out_dir: &Path, output_bindings_path: &Path) -> PathBuf {
         "CMAKE_PREFIX_PATH",
         libjpeg_turbo.install_prefix.display().to_string(),
     );
+    // モバイルでは CMake の CMAKE_FIND_ROOT_PATH が SDK / NDK を指し、
+    // CMAKE_PREFIX_PATH の install prefix が再ルートされて find_package(JPEG) が
+    // 失敗するため、探索に頼らず JPEG の include / library を直接指定する
+    if is_target_mobile() {
+        libyuv_cfg
+            .define(
+                "JPEG_INCLUDE_DIR",
+                libjpeg_turbo.install_prefix.join("include"),
+            )
+            .define(
+                "JPEG_LIBRARY",
+                libjpeg_turbo
+                    .install_prefix
+                    .join("lib")
+                    .join(LIBJPEG_TURBO.cmake_install_lib_filename()),
+            );
+    }
     apply_cmake_defines(&mut libyuv_cfg, &LIBYUV);
+
+    // モバイル向けの SDK / ツールチェーンを指定する。
+    // 戻り値の clang 引数は bindgen にも同じ設定を渡すために使う
+    let clang_args = configure_mobile_build(&mut libyuv_cfg);
 
     let libyuv_install = libyuv_cfg.build();
 
@@ -454,6 +481,12 @@ fn build_from_source(out_dir: &Path, output_bindings_path: &Path) -> PathBuf {
         .header(install_include_dir.join("libyuv.h").display().to_string())
         // libyuv ヘッダから推移的に libjpeg-turbo の型が混入することを防ぐ
         .blocklist_type("jpeg_.*")
+        // row.h が取り込む stdlib.h 由来の malloc / realloc 宣言は、size_t の型表記が
+        // Rust の期待する型と一致せず suspicious_runtime_symbol_definitions の対象になる。
+        // このクレートからは呼ばないため生成しない
+        .blocklist_function("^(malloc|realloc)$")
+        // モバイルでは CMake と同じ SDK / ABI を bindgen にも指定する
+        .clang_args(clang_args)
         .parse_callbacks(Box::new(yuv_rename.callbacks))
         .generate()
         .expect("failed to generate bindings")
@@ -484,6 +517,9 @@ fn build_libjpeg_turbo(
     let mut cfg = Config::new(&src_dir);
     cfg.profile("Release");
     apply_cmake_defines(&mut cfg, &LIBJPEG_TURBO);
+    // モバイル向けの SDK / ツールチェーンを指定する
+    // (bindgen 用の clang 引数は libyuv 側の設定で取得する)
+    configure_mobile_build(&mut cfg);
     let install_prefix = cfg.build();
 
     // install 後の静的ライブラリは
@@ -539,6 +575,119 @@ fn apply_cmake_defines(cfg: &mut Config, lib: &LibraryConfig) {
     }
 }
 
+/// モバイル向けの CMake 設定と bindgen 用の clang 引数を構成する。
+///
+/// iOS では Xcode SDK、Android では NDK のツールチェーンを指定し、
+/// libyuv と libjpeg-turbo を同じ SDK / ABI / 最小 OS バージョンでビルドする。
+/// モバイル以外のターゲットでは何も設定せず、空の clang 引数を返す。
+fn configure_mobile_build(config: &mut Config) -> Vec<String> {
+    let target_os = env::var("CARGO_CFG_TARGET_OS").expect("CARGO_CFG_TARGET_OS is not set");
+    let target = env::var("TARGET").expect("TARGET is not set");
+
+    match target_os.as_str() {
+        "ios" => {
+            // Rust のターゲットで実機とシミュレーターを区別する。
+            // 根拠: rustc book の *-apple-ios / Requirements。仕様は将来変更される可能性がある。
+            let (sdk, arch, simulator_suffix, default_deployment_target) = match target.as_str() {
+                "aarch64-apple-ios" => ("iphoneos", "arm64", "", "13.0"),
+                // arm64 シミュレーターは Rust と Clang のターゲット下限が iOS 14.0。
+                // 根拠: Rust 1.93 の OSVersion::minimum_deployment_target。
+                // ターゲットの下限は将来変更される可能性がある。
+                "aarch64-apple-ios-sim" => ("iphonesimulator", "arm64", "-simulator", "14.0"),
+                _ => panic!("unsupported iOS target: {target}"),
+            };
+            let deployment_target = env::var("IPHONEOS_DEPLOYMENT_TARGET")
+                .unwrap_or_else(|_| default_deployment_target.to_string());
+            let output = Command::new("xcrun")
+                .args(["--sdk", sdk, "--show-sdk-path"])
+                .output()
+                .expect("failed to run xcrun. Ensure Xcode is installed");
+            if !output.status.success() {
+                panic!("failed to find iOS SDK: {sdk}");
+            }
+            let sdk_path = String::from_utf8(output.stdout).expect("invalid iOS SDK path");
+            let sdk_path = sdk_path.trim();
+
+            // cmake クレートはクロスコンパイル時に CMAKE_SYSTEM_NAME=iOS を自動設定するため、
+            // SDK とアーキテクチャの指定だけで実機とシミュレーターを分けられる。
+            // cc クレートの既定フラグと CMake の SDK 選択が競合しないよう、
+            // コンパイラのターゲット設定は CMake に任せる。
+            config
+                .no_default_flags(true)
+                .define("CMAKE_OSX_SYSROOT", sdk_path)
+                .define("CMAKE_OSX_ARCHITECTURES", arch)
+                .define("CMAKE_OSX_DEPLOYMENT_TARGET", &deployment_target);
+
+            vec![
+                format!("--target={arch}-apple-ios{deployment_target}{simulator_suffix}"),
+                "-isysroot".to_string(),
+                sdk_path.to_string(),
+            ]
+        }
+        "android" => {
+            let ndk = PathBuf::from(
+                env::var_os("ANDROID_NDK_HOME")
+                    .expect("ANDROID_NDK_HOME is not set. Set it to the Android NDK directory"),
+            );
+            let (abi, clang_target) = match target.as_str() {
+                "aarch64-linux-android" => ("arm64-v8a", "aarch64-linux-android"),
+                "x86_64-linux-android" => ("x86_64", "x86_64-linux-android"),
+                _ => panic!("unsupported Android target: {target}"),
+            };
+            let platform = env::var("ANDROID_PLATFORM").unwrap_or_else(|_| "21".to_string());
+            // bindgen の Clang ターゲットには API 名ではなく数値が必要なため、
+            // CMake にも同じ数値を渡して NDK の API 名解決との差異を防ぐ。
+            let api_level = platform
+                .strip_prefix("android-")
+                .unwrap_or(&platform)
+                .parse::<u32>()
+                .expect("ANDROID_PLATFORM must be a numeric API level or android-<API level>");
+            // NDK が下限未満の API level を引き上げると bindgen と食い違うため、ここで拒否する。
+            assert!(
+                api_level >= 21,
+                "ANDROID_PLATFORM must be at least API level 21"
+            );
+            let host_tag = match env::consts::OS {
+                "linux" => "linux-x86_64",
+                "macos" => "darwin-x86_64",
+                "windows" => "windows-x86_64",
+                os => panic!("unsupported Android NDK host: {os}"),
+            };
+            let toolchain = ndk.join("toolchains/llvm/prebuilt").join(host_tag);
+            let sysroot = toolchain.join("sysroot");
+
+            // cmake クレートもコンパイラ種別を調べるため、PATH 上のターゲット別
+            // ラッパーを探索させずに NDK の実際のコンパイラを指定する。
+            let mut c_config = cc::Build::new();
+            c_config.compiler(toolchain.join("bin").join(exe_name("clang")));
+            let mut cxx_config = cc::Build::new();
+            cxx_config.compiler(toolchain.join("bin").join(exe_name("clang++")));
+
+            // NDK が提供するツールチェーンを使い、CMake 独自の NDK 検出を避ける。
+            // 根拠: Android NDK ガイドの CMake / The CMake toolchain file。
+            // SDK の構成や引数は将来変更される可能性がある。
+            config
+                .init_c_cfg(c_config)
+                .init_cxx_cfg(cxx_config)
+                .define(
+                    "CMAKE_TOOLCHAIN_FILE",
+                    ndk.join("build/cmake/android.toolchain.cmake"),
+                )
+                .define("ANDROID_ABI", abi)
+                .define("ANDROID_PLATFORM", api_level.to_string())
+                // libyuv は C++ コード (convert_jpeg.cc 等) を含むため、
+                // NDK の C++ 標準ライブラリを指定してビルドできるようにする。
+                .define("ANDROID_STL", "c++_static");
+
+            vec![
+                format!("--target={clang_target}{api_level}"),
+                format!("--sysroot={}", sysroot.display()),
+            ]
+        }
+        _ => Vec::new(),
+    }
+}
+
 /// `LibraryConfig` が x86_64 で NASM 必須としていれば、NASM の存在を確認する。
 ///
 /// NASM が見つからない場合は panic でビルドを停止する。
@@ -574,10 +723,19 @@ fn is_target_windows() -> bool {
         .unwrap_or(false)
 }
 
-/// ターゲット OS が macOS かどうかを判定する。
-fn is_target_macos() -> bool {
+/// ターゲットベンダーが Apple かどうかを判定する。
+///
+/// Mach-O ではシンボル先頭に `_` が付くため、macOS と iOS をまとめて判定する。
+fn is_target_apple() -> bool {
+    env::var("CARGO_CFG_TARGET_VENDOR")
+        .map(|v| v == "apple")
+        .unwrap_or(false)
+}
+
+/// ターゲット OS が iOS / Android かどうかを判定する。
+fn is_target_mobile() -> bool {
     env::var("CARGO_CFG_TARGET_OS")
-        .map(|v| v == "macos")
+        .map(|v| v == "ios" || v == "android")
         .unwrap_or(false)
 }
 
@@ -588,7 +746,7 @@ fn is_target_msvc() -> bool {
         .unwrap_or(false)
 }
 
-// CARGO_CFG_TARGET_OS + CARGO_CFG_TARGET_ARCH からプラットフォーム名を生成する
+// CARGO_CFG_TARGET_OS + CARGO_CFG_TARGET_ARCH (モバイルは TARGET) からプラットフォーム名を生成する
 fn get_target_platform() -> String {
     if let Ok(target) = env::var("LIBYUV_TARGET") {
         return target;
@@ -596,6 +754,18 @@ fn get_target_platform() -> String {
 
     let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
     let target_arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap_or_default();
+
+    // モバイルは iOS 実機とシミュレーターの区別が必要なため、TARGET の完全一致で判定する
+    if target_os == "ios" || target_os == "android" {
+        let rust_target = env::var("TARGET").expect("TARGET is not set");
+        return match rust_target.as_str() {
+            "aarch64-apple-ios" => "ios_arm64".to_string(),
+            "aarch64-apple-ios-sim" => "ios-sim_arm64".to_string(),
+            "aarch64-linux-android" => "android_arm64".to_string(),
+            "x86_64-linux-android" => "android_x86_64".to_string(),
+            _ => panic!("unsupported mobile target: {rust_target}"),
+        };
+    }
 
     match (target_os.as_str(), target_arch.as_str()) {
         ("linux", "x86_64") => format!("{}_x86_64", detect_linux_distro()),
@@ -636,13 +806,13 @@ fn detect_linux_distro() -> String {
 // rust-toolchain.toml に components = ["llvm-tools"] の記載が必要。
 //
 // プラットフォームごとのシンボル形式の違い:
-//   - macOS (Mach-O): シンボル先頭に `_` が付く (例: _I420ToNV12)
+//   - macOS / iOS (Mach-O): シンボル先頭に `_` が付く (例: _I420ToNV12)
 //   - Linux (ELF): 先頭 `_` なし (例: I420ToNV12)
 //   - Windows x64 (COFF): 先頭 `_` なし (例: I420ToNV12)
 //
 // bindgen の generated_link_name_override は返した文字列に \u{1} プレフィックスを
 // 自動付加する。\u{1} はコンパイラに「この名前をそのまま使え（マングリングするな）」と
-// 指示するため、プラットフォーム固有のシンボル名 (macOS なら _shiguredo_yuv_I420ToNV12)
+// 指示するため、プラットフォーム固有のシンボル名 (macOS / iOS なら _shiguredo_yuv_I420ToNV12)
 // をそのまま返す必要がある。
 
 /// llvm-nm / llvm-objcopy のパスを保持する
@@ -659,14 +829,14 @@ struct LlvmTools {
 struct SymbolRenameMaps {
     /// llvm-objcopy の --redefine-syms 用マップ
     ///
-    /// キー: 元のシンボル名 (例: macOS なら _I420ToNV12、Linux なら I420ToNV12)
-    /// 値: 書き換え後のシンボル名 (例: macOS なら _shiguredo_yuv_I420ToNV12)
+    /// キー: 元のシンボル名 (例: macOS / iOS なら _I420ToNV12、Linux なら I420ToNV12)
+    /// 値: 書き換え後のシンボル名 (例: macOS / iOS なら _shiguredo_yuv_I420ToNV12)
     objcopy_map: HashMap<String, String>,
 
     /// bindgen の #[link_name] 用マップ
     ///
     /// キー: C シンボル名 (プラットフォーム非依存、例: I420ToNV12)
-    /// 値: 書き換え後のシンボル名 (プラットフォーム依存、例: macOS なら _shiguredo_yuv_I420ToNV12)
+    /// 値: 書き換え後のシンボル名 (プラットフォーム依存、例: macOS / iOS なら _shiguredo_yuv_I420ToNV12)
     ///
     /// bindgen は \u{1} プレフィックスを付加してマングリングを抑制するため、
     /// 値にはプラットフォーム固有のシンボル名を格納する必要がある。
@@ -720,7 +890,8 @@ fn rename_defined_symbols(
     prefix: &str,
     map_filename: &str,
 ) -> RenameResult {
-    let is_macos = is_target_macos();
+    // Mach-O (macOS / iOS) ではシンボル先頭に `_` が付く
+    let is_macho = is_target_apple();
 
     // シンボル名の変換ルール
     //   例 (yuv): I420ToNV12 → shiguredo_yuv_I420ToNV12
@@ -728,7 +899,7 @@ fn rename_defined_symbols(
     let rename_symbol = |name: &str| -> Option<String> { Some(format!("{prefix}_{name}")) };
 
     let symbols = collect_defined_external_symbols(&tools.nm, lib_path);
-    let maps = build_symbol_rename_maps(&symbols, is_macos, &rename_symbol);
+    let maps = build_symbol_rename_maps(&symbols, is_macho, &rename_symbol);
 
     let map_file_path = out_dir.join(map_filename);
     write_objcopy_rename_map(&maps.objcopy_map, &map_file_path);
@@ -861,7 +1032,7 @@ fn collect_defined_external_symbols(nm_path: &Path, lib_path: &Path) -> Vec<Stri
 /// llvm-nm の --format=just-symbols 出力にはオブジェクトファイル名 (planar_functions.cc.o: 等) も
 /// 含まれるため、この関数で C 識別子のみをフィルタリングする。
 ///
-/// macOS の Mach-O ではシンボル先頭に `_` が付くため、`_` で始まる文字列も受け入れる。
+/// Mach-O (macOS / iOS) ではシンボル先頭に `_` が付くため、`_` で始まる文字列も受け入れる。
 fn is_c_identifier(s: &str) -> bool {
     let mut chars = s.chars();
     match chars.next() {
@@ -874,7 +1045,7 @@ fn is_c_identifier(s: &str) -> bool {
 /// objcopy 用と bindgen 用のリネームマップを生成する
 fn build_symbol_rename_maps(
     symbols: &[String],
-    is_macos: bool,
+    is_macho: bool,
     rename_symbol: &dyn Fn(&str) -> Option<String>,
 ) -> SymbolRenameMaps {
     let mut objcopy_map = HashMap::new();
@@ -882,9 +1053,9 @@ fn build_symbol_rename_maps(
 
     for sym in symbols {
         // プラットフォーム固有のプレフィックスを除去して C シンボル名を取得する
-        //   macOS: _I420ToNV12 → I420ToNV12
+        //   macOS / iOS: _I420ToNV12 → I420ToNV12
         //   Linux/Windows: I420ToNV12 → I420ToNV12 (変化なし)
-        let c_name = if is_macos {
+        let c_name = if is_macho {
             sym.strip_prefix('_').unwrap_or(sym)
         } else {
             sym.as_str()
@@ -892,7 +1063,7 @@ fn build_symbol_rename_maps(
 
         if let Some(new_c_name) = rename_symbol(c_name) {
             // objcopy 用: プラットフォーム固有のプレフィックスを再付与する
-            let new_sym = if is_macos {
+            let new_sym = if is_macho {
                 format!("_{new_c_name}")
             } else {
                 new_c_name.clone()

@@ -34,7 +34,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - run: rustup update stable
+      - run: rustup show
       - name: Install NASM
         shell: bash
         run: |
@@ -76,6 +76,12 @@ jobs:
           bash scripts/verify_symbol_rewrite.sh "$OUT_DIR"
           bash scripts/verify_libyuv_source.sh "$OUT_DIR"
 
+  mobile:
+    name: Mobile prebuilt
+    permissions:
+      contents: read
+    uses: ./.github/workflows/mobile.yml
+
   # docs.rs 向けビルド確認
   docs-rs:
     name: docs.rs
@@ -85,12 +91,13 @@ jobs:
       DOCS_RS: 1
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - run: rustup update stable
+      - run: rustup show
       - run: cargo doc --no-deps
 
   slack_notify:
     needs:
       - test
+      - mobile
       - docs-rs
     runs-on: ubuntu-slim
     if: always()

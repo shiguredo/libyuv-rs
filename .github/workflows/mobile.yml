@@ -1,0 +1,178 @@
+name: Mobile prebuilt
+
+on:
+  workflow_call:
+    inputs:
+      release-version:
+        description: GitHub Release にアップロードするバージョン。空の場合はビルドと検証のみ実行する
+        type: string
+        default: ""
+
+env:
+  RUST_BACKTRACE: 1
+  ANDROID_PLATFORM: "21"
+  ANDROID_NDK_VERSION: "28.2.13676358"
+
+jobs:
+  build:
+    name: Build prebuilt (${{ matrix.target }})
+    # iOS には Xcode、Android には Android SDK と NDK が必要なため ubuntu-slim は使えない。
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: ios_arm64
+            rust-target: aarch64-apple-ios
+            deployment-target: "13.0"
+            os: macos-15
+          - target: ios-sim_arm64
+            rust-target: aarch64-apple-ios-sim
+            deployment-target: "14.0"
+            os: macos-15
+          - target: android_arm64
+            rust-target: aarch64-linux-android
+            os: ubuntu-24.04
+          - target: android_x86_64
+            rust-target: x86_64-linux-android
+            os: ubuntu-24.04
+    env:
+      PREBUILT_TARGET: ${{ matrix.target }}
+      RUST_TARGET: ${{ matrix.rust-target }}
+      IPHONEOS_DEPLOYMENT_TARGET: ${{ matrix.deployment-target }}
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Rust target
+        run: |
+          rustup show
+          rustup target add "$RUST_TARGET"
+
+      # build.rs の取得先とアップロード先が同じリリースであることを保証する。
+      - name: Verify release version
+        if: inputs.release-version != ''
+        env:
+          RELEASE_VERSION: ${{ inputs.release-version }}
+        run: |
+          package_version=$(cargo metadata --locked --no-deps --format-version=1 \
+            | jq -r '.packages[] | select(.name == "shiguredo_libyuv") | .version')
+          if [ "$RELEASE_VERSION" != "$package_version" ]; then
+            echo "::error::release version does not match Cargo package version"
+            exit 1
+          fi
+
+      # libjpeg-turbo の x86_64 ビルドには NASM が必要。
+      - name: Install NASM (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y nasm
+
+      - name: Install NASM (macOS)
+        if: runner.os == 'macOS'
+        run: command -v nasm > /dev/null || brew install nasm
+
+      - name: Set up Android NDK
+        if: startsWith(matrix.target, 'android_')
+        run: |
+          ndk_dir="$ANDROID_HOME/ndk/$ANDROID_NDK_VERSION"
+          if [ ! -d "$ndk_dir" ]; then
+            "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;$ANDROID_NDK_VERSION"
+          fi
+          echo "ANDROID_NDK_HOME=$ndk_dir" >> "$GITHUB_ENV"
+          target_key=$(echo "$RUST_TARGET" | tr '[:lower:]-' '[:upper:]_')
+          echo "CARGO_TARGET_${target_key}_LINKER=$ndk_dir/toolchains/llvm/prebuilt/linux-x86_64/bin/${RUST_TARGET}${ANDROID_PLATFORM}-clang" >> "$GITHUB_ENV"
+
+      # rlib だけでは C シンボルのリンクを検証できないため、テスト実行ファイルを生成する。
+      # 実行には実機またはエミュレーターが必要なので、ここではリンクまで検証する。
+      - name: Build and verify Rust linking with source-build
+        id: build
+        run: |
+          cargo test --release --locked --lib --no-run --target "$RUST_TARGET" --features source-build \
+            --message-format=json > build-messages.json
+          # キャッシュ内の古い出力を拾わないよう、今回の build.rs の出力先を取得する。
+          package_id=$(cargo pkgid)
+          out_dir=$(jq -r --arg package_id "$package_id" \
+            'select(.reason == "build-script-executed" and .package_id == $package_id) | .out_dir' \
+            build-messages.json)
+          if [ ! -f "$out_dir/lib/libshiguredo_yuv.a" ]; then
+            echo "::error::installed static library not found"
+            exit 1
+          fi
+          echo "out-dir=$out_dir" >> "$GITHUB_OUTPUT"
+
+      - name: Verify symbols
+        env:
+          LIBYUV_OUT_DIR: ${{ steps.build.outputs.out-dir }}
+        run: |
+          # シンボル書き換えの完了と未書き換え参照の残存を検証する
+          bash scripts/verify_symbol_rewrite.sh "$LIBYUV_OUT_DIR"
+
+          # 定義済み外部シンボルが全て shiguredo_yuv_ / shiguredo_jpeg_ 付きであることを検証する。
+          # Mach-O の先頭 _ を除いてからプレフィックスを確認する。
+          sysroot=$(rustc --print sysroot)
+          host_triple=$(rustc -vV | sed -n 's/^host: //p')
+          llvm_nm="$sysroot/lib/rustlib/$host_triple/bin/llvm-nm"
+          for lib in libshiguredo_yuv.a libshiguredo_jpeg.a; do
+            prefix="shiguredo_yuv_"
+            case "$lib" in *jpeg*) prefix="shiguredo_jpeg_" ;; esac
+            "$llvm_nm" --defined-only --extern-only --format=just-symbols \
+              "$LIBYUV_OUT_DIR/lib/$lib" > symbols.txt
+            symbols=$(sed 's/^_//' symbols.txt | grep -E '^[a-zA-Z_][a-zA-Z0-9_]*$')
+            if echo "$symbols" | grep -v "^${prefix}"; then
+              echo "::error::$lib has symbols without ${prefix} prefix"
+              exit 1
+            fi
+          done
+
+      - name: Create prebuilt archive
+        env:
+          LIBYUV_OUT_DIR: ${{ steps.build.outputs.out-dir }}
+        run: |
+          mkdir -p staging/lib
+          cp "$LIBYUV_OUT_DIR/lib/libshiguredo_yuv.a" staging/lib/
+          cp "$LIBYUV_OUT_DIR/lib/libshiguredo_jpeg.a" staging/lib/
+          cp "$LIBYUV_OUT_DIR/bindings.rs" staging/
+          cp THIRD_PARTY_LICENSES staging/
+          archive="libyuv-$PREBUILT_TARGET.tar.gz"
+          # macOS の tar が混入させる AppleDouble 系のファイルを避ける
+          COPYFILE_DISABLE=1 tar czf "$archive" -C staging .
+          if command -v sha256sum > /dev/null; then
+            sha256sum "$archive" > "$archive.sha256"
+          else
+            shasum -a 256 "$archive" > "$archive.sha256"
+          fi
+
+      - name: Verify prebuilt archive
+        env:
+          LIBYUV_OUT_DIR: ${{ steps.build.outputs.out-dir }}
+        run: |
+          archive="libyuv-$PREBUILT_TARGET.tar.gz"
+          if command -v sha256sum > /dev/null; then
+            sha256sum --check "$archive.sha256"
+          else
+            shasum -a 256 --check "$archive.sha256"
+          fi
+          mkdir -p unpacked
+          tar xzf "$archive" -C unpacked
+          # 配布する実物が、リンク済みのライブラリと生成したバインディングに一致することを検証する。
+          cmp "$LIBYUV_OUT_DIR/lib/libshiguredo_yuv.a" unpacked/lib/libshiguredo_yuv.a
+          cmp "$LIBYUV_OUT_DIR/lib/libshiguredo_jpeg.a" unpacked/lib/libshiguredo_jpeg.a
+          cmp "$LIBYUV_OUT_DIR/bindings.rs" unpacked/bindings.rs
+          cmp THIRD_PARTY_LICENSES unpacked/THIRD_PARTY_LICENSES
+
+      - name: Upload prebuilt archive
+        if: inputs.release-version != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ inputs.release-version }}
+        run: |
+          gh release upload "$RELEASE_VERSION" \
+            "libyuv-$PREBUILT_TARGET.tar.gz" \
+            "libyuv-$PREBUILT_TARGET.tar.gz.sha256" \
+            --clobber
+
+      # アップロード済みの成果物を build.rs が自動選択し、リンクできることも確認する。
+      - name: Verify released prebuilt
+        if: inputs.release-version != ''
+        run: cargo test --release --locked --lib --no-run --target "$RUST_TARGET"

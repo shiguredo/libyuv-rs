@@ -12,6 +12,7 @@
 ## develop
 
 - [CHANGE] MSRV (rust-version) を 1.93 に上げる
+  - rust-toolchain.toml の channel も rust-version と同じ 1.93 に揃える
   - @voluntas
 - [CHANGE] build.rs を複数の外部ライブラリに対応できるよう汎用化する
   - `LIB_NAME` / `LINK_NAME` / `SYMBOL_PREFIX` 定数を `LibraryConfig` 構造体に置き換える
@@ -40,6 +41,8 @@
   - スケーリング非対応 (`src_size == dst_size` を強制)
   - @voluntas
 - [ADD] Ubuntu 26.04 (x86_64 / arm64) をサポート対象に追加する
+  - @voluntas
+- [ADD] iOS 実機 / シミュレーターおよび Android (arm64-v8a / x86_64) 向けのビルド、CI、prebuilt 対応を追加する
   - @voluntas
 - [UPDATE] `libyuv` のハッシュを `d23308a2a7442be8e559b1b471862fd7588d6a57` に更新する
   - <https://chromium.googlesource.com/libyuv/libyuv/+/d23308a2a7442be8e559b1b471862fd7588d6a57>
