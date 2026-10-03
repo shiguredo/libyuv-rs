@@ -41,6 +41,8 @@
   - @voluntas
 - [ADD] Ubuntu 26.04 (x86_64 / arm64) をサポート対象に追加する
   - @voluntas
+- [ADD] iOS 実機 / シミュレーターおよび Android (arm64-v8a / x86_64) 向けのビルド、CI、prebuilt 対応を追加する
+  - @voluntas
 - [UPDATE] `libyuv` のハッシュを `d23308a2a7442be8e559b1b471862fd7588d6a57` に更新する
   - <https://chromium.googlesource.com/libyuv/libyuv/+/d23308a2a7442be8e559b1b471862fd7588d6a57>
   - @voluntas

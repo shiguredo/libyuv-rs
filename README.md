@@ -52,6 +52,9 @@ Google の [libyuv](https://chromium.googlesource.com/libyuv/libyuv/) を利用�
 - macOS 15 arm64
 - Windows Server 2025 x86_64
 - Windows 11 x86_64
+- iOS 13.0 以降 (実機 arm64)
+- iOS 14.0 以降 (シミュレーター arm64)
+- Android API level 21 以降 (arm64-v8a / x86_64)
 
 ## 対応フォーマット
 
@@ -112,6 +115,29 @@ Google の [libyuv](https://chromium.googlesource.com/libyuv/libyuv/) を利用�
 cargo build
 ```
 
+### iOS / Android 向け prebuilt
+
+Cargo のターゲットに応じて、以下のアーカイブを自動選択します。
+各アーカイブにはシンボル書き換え済みの `lib/libshiguredo_yuv.a`、`lib/libshiguredo_jpeg.a`、`bindings.rs`、`THIRD_PARTY_LICENSES` を収録し、SHA256 チェックサムを添付します。
+
+| 対象 | Rust ターゲット | アーカイブ名 |
+| --- | --- | --- |
+| iOS 実機 arm64 | `aarch64-apple-ios` | `libyuv-ios_arm64.tar.gz` |
+| iOS シミュレーター arm64 | `aarch64-apple-ios-sim` | `libyuv-ios-sim_arm64.tar.gz` |
+| Android arm64-v8a | `aarch64-linux-android` | `libyuv-android_arm64.tar.gz` |
+| Android x86_64 | `x86_64-linux-android` | `libyuv-android_x86_64.tar.gz` |
+
+prebuilt の対象は iOS 実機が 13.0 以降、iOS シミュレーターが 14.0 以降、Android が API level 21 以降です。
+モバイル向けの成果物は、対応を追加したバージョンの GitHub Release から提供します。
+
+```bash
+rustup target add aarch64-apple-ios
+IPHONEOS_DEPLOYMENT_TARGET=13.0 cargo build --target aarch64-apple-ios
+```
+
+アプリケーションのリンクには、iOS では Xcode と各ターゲットの下限以上の `IPHONEOS_DEPLOYMENT_TARGET` 設定、Android では Android NDK と対象 ABI のリンカー設定が必要です。
+[iOS の Rust ターゲット](https://doc.rust-lang.org/rustc/platform-support/apple-ios.html) と [Android NDK の CMake ガイド](https://developer.android.com/ndk/guides/cmake) も参照してください。
+
 ### ソースからビルド
 
 libyuv をソースからビルドする場合は `source-build` feature を有効にしてください。
@@ -124,6 +150,37 @@ cargo build --features source-build
 
 - Git
 - C / C++ コンパイラ
+- rustup の `llvm-tools` コンポーネント (シンボル書き換えに使用)
+- NASM (Android x86_64 の libjpeg-turbo ビルドに必要)
+
+```bash
+rustup component add llvm-tools
+```
+
+iOS では、Xcode の SDK を使って実機とシミュレーターをビルドします。
+最小バージョンは `IPHONEOS_DEPLOYMENT_TARGET` で指定できます。
+未指定の場合は実機が `13.0`、arm64 シミュレーターが `14.0` です。
+
+```bash
+IPHONEOS_DEPLOYMENT_TARGET=13.0 cargo build --target aarch64-apple-ios --features source-build
+IPHONEOS_DEPLOYMENT_TARGET=14.0 cargo build --target aarch64-apple-ios-sim --features source-build
+```
+
+Android では、`ANDROID_NDK_HOME` に NDK のディレクトリを指定します。
+`ANDROID_PLATFORM` で最小 API level を数値または `android-<数値>` の形式で指定でき、未指定の場合は `21` です。
+指定できる API level は `21` 以降です。
+以下は Linux ホストでの arm64-v8a 向けの例です。
+
+```bash
+export ANDROID_NDK_HOME=/path/to/android-ndk
+export ANDROID_PLATFORM=21
+export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang"
+rustup target add aarch64-linux-android
+cargo build --target aarch64-linux-android --features source-build
+```
+
+リリース用の Android prebuilt は NDK `28.2.13676358` でビルドします。
+CI では、すべてのモバイルターゲットでソースビルド、シンボル書き換え、Rust のリンク、アーカイブ生成を検証します。
 
 ### docs.rs 向けビルド
 
@@ -138,6 +195,9 @@ DOCS_RS=1 cargo doc --no-deps
 | 環境変数 | 説明 |
 |---|---|
 | `LIBYUV_TARGET` | prebuilt バイナリのプラットフォーム名を明示的に指定する |
+| `IPHONEOS_DEPLOYMENT_TARGET` | iOS ソースビルドの最小 OS バージョン (未指定時は実機 `13.0`、arm64 シミュレーター `14.0`) |
+| `ANDROID_NDK_HOME` | Android ソースビルドで使用する NDK のディレクトリ |
+| `ANDROID_PLATFORM` | Android ソースビルドの最小 API level (未指定時は `21`) |
 
 ## 使い方
 
