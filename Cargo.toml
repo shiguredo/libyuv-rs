@@ -38,6 +38,8 @@ exclude = ["fuzz"]
 
 [build-dependencies]
 bindgen = "0.72"
+# cmake クレートのコンパイラ判定に Android NDK の C / C++ コンパイラを指定する
+cc = "1.4"
 shiguredo_cmake = "4.3"
 shiguredo_toml = "2026.2"
 
