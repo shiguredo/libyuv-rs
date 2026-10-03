@@ -12,6 +12,7 @@
 ## develop
 
 - [CHANGE] MSRV (rust-version) を 1.93 に上げる
+  - rust-toolchain.toml の channel も rust-version と同じ 1.93 に揃える
   - @voluntas
 - [CHANGE] build.rs を複数の外部ライブラリに対応できるよう汎用化する
   - `LIB_NAME` / `LINK_NAME` / `SYMBOL_PREFIX` 定数を `LibraryConfig` 構造体に置き換える
