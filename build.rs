@@ -481,6 +481,10 @@ fn build_from_source(out_dir: &Path, output_bindings_path: &Path) -> PathBuf {
         .header(install_include_dir.join("libyuv.h").display().to_string())
         // libyuv ヘッダから推移的に libjpeg-turbo の型が混入することを防ぐ
         .blocklist_type("jpeg_.*")
+        // row.h が取り込む stdlib.h 由来の malloc / realloc 宣言は、size_t の型表記が
+        // Rust の期待する型と一致せず suspicious_runtime_symbol_definitions の対象になる。
+        // このクレートからは呼ばないため生成しない
+        .blocklist_function("^(malloc|realloc)$")
         // モバイルでは CMake と同じ SDK / ABI を bindgen にも指定する
         .clang_args(clang_args)
         .parse_callbacks(Box::new(yuv_rename.callbacks))
