@@ -121,6 +121,9 @@
   - ground truth の計算は libyuv の行関数実装を再現した共通ヘルパーで行い、SIMD 実装と C 実装で同一の期待値になることを確認する
   - テストファイルを convert テストディレクトリ配下にサブモジュール分割する
   - @voluntas
+- [ADD] `THIRD_PARTY_LICENSES` に libyuv のライセンス (BSD 3-Clause) を追加する
+  - prebuilt アーカイブに同梱するライセンス条文が libjpeg-turbo のみで、libyuv の記載が欠落していた
+  - @voluntas
 - [UPDATE] lint 抑制を #[allow(...)] から #[expect(...)] に置換する
   - @voluntas
 - [UPDATE] CI / release ワークフローに NASM のインストールを追加する
