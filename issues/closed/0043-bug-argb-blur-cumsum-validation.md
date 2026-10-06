@@ -25,9 +25,11 @@ libyuv の `ARGBBlur`（`planar_functions.cc`、commit `d23308a2a7442be8e559b1b4
 
 > Caller should allocate CumulativeSum table of width * height * 16 bytes aligned to 16 byte boundary. height can be radius * 2 + 2 to save memory as the buffer is treated as circular.
 
-C 実装では `radius` は `min(radius, height)` と `min(radius, width / 2 - 1)` に clamp され、`max_cumsum_bot_row = &dst_cumsum[(radius * 2 + 2) * dst_stride32_cumsum];` をラップ境界として循環させる。cumsum への書き込みは合計 `height` 回（初期の cumsum 計算 `ARGBComputeCumulativeSum` を高さ `radius` で呼んだ `radius` 回 + メインループ内 `(y + radius) < height` のときのみ進行する高々 `height - radius` 回）だが、循環バッファにより書き込み先の行インデックスは 0 〜 `min(height - 1, radius * 2 + 1)` の範囲に収まる。つまり必要行数は最大 `min(height, radius * 2 + 2)` 行である。
+C 実装では `radius` は `min(radius, height)` と `min(radius, width / 2 - 1)` に clamp され、`max_cumsum_bot_row = &dst_cumsum[(radius * 2 + 2) * dst_stride32_cumsum];` をラップ境界として循環させる。
+cumsum への書き込みは合計 `height` 回（初期の cumsum 計算 `ARGBComputeCumulativeSum` を高さ `radius` で呼んだ `radius` 回 + メインループ内 `(y + radius) < height` のときのみ進行する高々 `height - radius` 回）だが、循環バッファにより書き込み先の行インデックスは 0 〜 `min(height - 1, radius * 2 + 1)` の範囲に収まる。つまり必要行数は最大 `min(height, radius * 2 + 2)` 行である。
 
-一方 `src/planar.rs` の `argb_blur` は `cumsum.len() >= stride32_cumsum * size.height` で検証する。`height > radius * 2 + 2` のとき（radius が小さいほど顕著）、C の契約どおり `radius * 2 + 2` 行のバッファで足りるのに `height` 行を要求して Err を返す。例: 3840x2160、radius=1（最小ストライド）では C は 4 行（約 246 KB）で処理できるが、現行検証は 2160 行（約 133 MB）を要求する。また `argb_blur` の docstring は cumsum の必要サイズを一切明記しておらず、呼び出し側は C 側のドキュメントを読まないとサイズ要件を知れない。
+一方 `src/planar.rs` の `argb_blur` は `cumsum.len() >= stride32_cumsum * size.height` で検証する。`height > radius * 2 + 2` のとき（radius が小さいほど顕著）、C の契約どおり `radius * 2 + 2` 行のバッファで足りるのに `height` 行を要求して Err を返す。例: 3840x2160、radius=1（最小ストライド）では C は 4 行（約 246 KB）で処理できるが、現行検証は 2160 行（約 133 MB）を要求する。
+また `argb_blur` の docstring は cumsum の必要サイズを一切明記しておらず、呼び出し側は C 側のドキュメントを読まないとサイズ要件を知れない。
 
 ## 設計方針
 

@@ -7,19 +7,23 @@
 ## 対象関数
 
 ### I420Alpha
+
 - I420AlphaToARGB
 - I420AlphaToABGR
 - ARGBToI420Alpha
 
 ### I422Alpha
+
 - I422AlphaToARGB
 - I422AlphaToABGR
 
 ### I444Alpha
+
 - I444AlphaToARGB
 - I444AlphaToABGR
 
 ### ARGB アルファ操作
+
 - ARGBCopyAlpha
 - ARGBCopyYToAlpha
 - ARGBExtractAlpha

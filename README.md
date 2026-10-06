@@ -61,7 +61,7 @@ Google の [libyuv](https://chromium.googlesource.com/libyuv/libyuv/) を利用�
 ### YUV (3 プレーン)
 
 | フォーマット | クロマサブサンプリング | 備考 |
-|---|---|---|
+| --- | --- | --- |
 | I420 | 4:2:0 | 最も一般的 |
 | I422 | 4:2:2 | |
 | I444 | 4:4:4 | |
@@ -71,7 +71,7 @@ Google の [libyuv](https://chromium.googlesource.com/libyuv/libyuv/) を利用�
 ### YUV (2 プレーン)
 
 | フォーマット | クロマ順序 | 備考 |
-|---|---|---|
+| --- | --- | --- |
 | NV12 | UV | H.264 / H.265 デコーダー出力で一般的 |
 | NV21 | VU | Android カメラ出力で一般的 |
 | NV24 | UV (4:4:4) | |
@@ -79,7 +79,7 @@ Google の [libyuv](https://chromium.googlesource.com/libyuv/libyuv/) を利用�
 ### RGB
 
 | フォーマット | ピクセルサイズ |
-|---|---|
+| --- | --- |
 | ARGB | 4 bytes |
 | ABGR | 4 bytes |
 | RGBA | 4 bytes |
@@ -93,14 +93,14 @@ Google の [libyuv](https://chromium.googlesource.com/libyuv/libyuv/) を利用�
 ### パック YUV
 
 | フォーマット | ピクセルサイズ | 備考 |
-|---|---|---|
+| --- | --- | --- |
 | YUY2 (YUYV) | 2 bytes | 4:2:2 パック |
 | UYVY | 2 bytes | 4:2:2 パック |
 
 ### 高ビット深度
 
 | フォーマット | ビット深度 |
-|---|---|
+| --- | --- |
 | I010 / I210 / I410 | 10bit |
 | I012 / I212 / I412 | 12bit |
 | P010 / P012 / P016 / P210 / P410 | 10-16bit |
@@ -193,7 +193,7 @@ DOCS_RS=1 cargo doc --no-deps
 ### 環境変数
 
 | 環境変数 | 説明 |
-|---|---|
+| --- | --- |
 | `LIBYUV_TARGET` | prebuilt バイナリのプラットフォーム名を明示的に指定する |
 | `IPHONEOS_DEPLOYMENT_TARGET` | iOS ソースビルドの最小 OS バージョン (未指定時は実機 `13.0`、arm64 シミュレーター `14.0`) |
 | `ANDROID_NDK_HOME` | Android ソースビルドで使用する NDK のディレクトリ |
@@ -332,7 +332,7 @@ i420_alpha_to_argb(&src, &alpha_plane, 640, &mut dst, size, true)?;
 ### `FilterMode`
 
 | バリアント | 説明 |
-|---|---|
+| --- | --- |
 | `FilterMode::None` | フィルタなし (最速、最低品質) |
 | `FilterMode::Linear` | 線形フィルタ (高速、適度な品質) |
 | `FilterMode::Bilinear` | バイリニア (中程度) |
@@ -341,7 +341,7 @@ i420_alpha_to_argb(&src, &alpha_plane, 640, &mut dst, size, true)?;
 ### `RotationMode`
 
 | バリアント | 説明 |
-|---|---|
+| --- | --- |
 | `RotationMode::None` | 回転なし (0 度) |
 | `RotationMode::Rotate90` | 時計回り 90 度 |
 | `RotationMode::Rotate180` | 180 度 |
@@ -352,7 +352,7 @@ i420_alpha_to_argb(&src, &alpha_plane, 640, &mut dst, size, true)?;
 フォーマットごとに専用の型を提供しています。各型は `Image` (読み取り専用) と `ImageMut` (書き込み可能) のペアです。
 
 | 型の例 | フィールド | 用途 |
-|---|---|---|
+| --- | --- | --- |
 | `I420Image` / `I420ImageMut` | y, u, v + stride | 3 プレーン YUV 4:2:0 |
 | `I422Image` / `I422ImageMut` | y, u, v + stride | 3 プレーン YUV 4:2:2 |
 | `Nv12Image` / `Nv12ImageMut` | y, uv + stride | 2 プレーン NV12 |
@@ -366,7 +366,7 @@ i420_alpha_to_argb(&src, &alpha_plane, 640, &mut dst, size, true)?;
 ## モジュール構成
 
 | モジュール | 関数数 | 内容 |
-|---|---|---|
+| --- | --- | --- |
 | `convert` | 244 | フォーマット変換 |
 | `planar` | 67 | プレーン操作・ARGB 加工 |
 | `rotate` | 20 | 回転・転置 |

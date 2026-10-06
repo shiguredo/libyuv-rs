@@ -25,7 +25,8 @@ High。
 
 一方 libyuv の実装（commit `d23308a2a7442be8e559b1b471862fd7588d6a57` 時点）:
 
-- `MM21ToNV12`（`convert.cc`）は `DetilePlane(src_y, ..., width, height, 32)` と `DetilePlane(src_uv, ..., (width + 1) & ~1, (height + sign) / 2, 16)` でタイル配置を読む。`MM21ToI420` は Y に `DetilePlane`、UV に `DetileSplitUVPlane`、`MM21ToYUY2` は `DetileToYUY2` を使う（読み出し規則は同一）。タイル配置では、1 タイル行の読み出し幅は幅を 16 の倍数に切り上げた値（padded width）× タイル高になり、タイル行間隔は stride × タイル高になる。線形サイズより大きくなりうる
+- `MM21ToNV12`（`convert.cc`）は `DetilePlane(src_y, ..., width, height, 32)` と `DetilePlane(src_uv, ..., (width + 1) & ~1, (height + sign) / 2, 16)` でタイル配置を読む。`MM21ToI420` は Y に `DetilePlane`、UV に `DetileSplitUVPlane`、`MM21ToYUY2` は `DetileToYUY2` を使う（読み出し規則は同一）。
+  タイル配置では、1 タイル行の読み出し幅は幅を 16 の倍数に切り上げた値（padded width）× タイル高になり、タイル行間隔は stride × タイル高になる。線形サイズより大きくなりうる
 - `MT2TToP010`（`convert.cc`）は `convert.h` のコメントにある通り stride がバイト単位で、タイル行ごとに `UnpackMT2T` が Y は `padded_width * 32 * 10 / 8` バイト、UV は `padded_width * 16 * 10 / 8` バイトを読む
 
 `mm21_to_i420` / `mm21_to_nv12` / `mm21_to_yuy2` / `mt2t_to_p010`（`src/convert/hardware.rs`）はすべてこの不十分な `validate` を通して unsafe 呼び出しを行う。例: 1920x1080、stride=1920 の MT2T で検証は Y = 2,073,600 バイトで通過するが、C 側の最終読み出しは 2,104,320 バイト目に及ぶ。
@@ -34,7 +35,8 @@ High。
 
 `Mm21Image` / `Mt2tImage` 用の専用検証を実装する（`define_nv_image` マクロの線形検証を流用しない）。
 
-必要サイズは C 側の読み出しパターン（1 タイル行の読み出し幅 = 幅を 16 の倍数に切り上げた値 × タイル高、タイル行間隔 = stride × タイル高）から導出する。padded width は `width.div_ceil(16) * 16`、タイル行数は `height.div_ceil(32)` とする。UV のタイル行数は `(height + 1) / 2`（= ceil(height / 2)）のタイル高 16 分割で `height.div_ceil(32)` と等価（`ceil(ceil(h/2)/16) == ceil(h/32)`。`(height + 1).div_ceil(32)` ではない。height が 32 の倍数のとき 1 タイル行分過大になるため注意）:
+必要サイズは C 側の読み出しパターン（1 タイル行の読み出し幅 = 幅を 16 の倍数に切り上げた値 × タイル高、タイル行間隔 = stride × タイル高）から導出する。padded width は `width.div_ceil(16) * 16`、タイル行数は `height.div_ceil(32)` とする。UV のタイル行数は `(height + 1) / 2`（= ceil(height / 2)）のタイル高 16 分割で `height.div_ceil(32)` と等価（`ceil(ceil(h/2)/16) == ceil(h/32)`。
+`(height + 1).div_ceil(32)` ではない。height が 32 の倍数のとき 1 タイル行分過大になるため注意）:
 
 - MM21 Y の必要サイズ: `(height.div_ceil(32) - 1) * y_stride * 32 + padded_width * 32`
 - MM21 UV の必要サイズ: `(height.div_ceil(32) - 1) * uv_stride * 16 + padded_width * 16`（幅は `(width + 1) & !1` を 16 の倍数に切り上げる）
@@ -42,6 +44,7 @@ High。
 - MT2T UV の必要サイズ: `(height.div_ceil(32) - 1) * uv_stride * 16 + padded_width * 16 * 10 / 8`
 
 注意点:
+
 - 上記の式は安全側（過大要求）である。MM21 は実際には最終タイル列の余り分と最終タイル行の端数行分を読まないため、式は最大 480 バイト（32 行 × 15 バイト。行あたり 16 - (width % 16) バイトの過大）+ 端数行分過大。MT2T は部分タイル行でもフルサイズを読むため正確。検証式の根拠コメント（libyuv の `DetilePlane` / `DetileSplitUVPlane` / `DetileToYUY2` / `MT2TToP010` の行送り規則への参照）をコメントで明記し、MM21 側が保守的である旨も併記する
 - height == 0 では `height.div_ceil(32) - 1` がアンダーフローするため、ゼロサイズは式の前に `Err` を返す（0064 のゼロサイズ統一方針と整合）
 - 現行の線形検証が持つ stride 下限チェック（`y_stride >= width`、`uv_stride >= ceil(width / 2) * 2`）は専用検証でも維持する

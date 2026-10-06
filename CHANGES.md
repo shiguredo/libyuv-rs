@@ -120,7 +120,8 @@
 - [ADD] 欠落テストファイルを作成しバリデーション内部関数の単体テストを追加する
   - @voluntas
 - [ADD] convert モジュールの代表関数に ground truth 方式の単体テストを追加する
-  - 各サブモジュールの代表関数 (h420_to_argb / u420_to_argb / i010_to_argb / i012_to_i420 / j420_to_argb / argb_to_j420 / rgb565_to_argb / argb_to_rgb565 / p010_to_nv12 / ayuv_to_nv12 / ayuv_to_nv21 / ar30_to_argb / argb_to_ar30 / i420_to_rgba / i400_to_argb / i420_to_i400 / i420_to_i010 / nv12_to_raw / nv21_to_yuv24 / i444_to_nv12 / i444_to_rgb24 / i422_to_rgb24 / mjpeg_to_i420) の正常系 (既知ピクセル列の期待値比較) とエラーパス (バッファ不足・stride 不足・c_int 超過) を追加する
+  - 各サブモジュールの代表関数 (h420_to_argb / u420_to_argb / i010_to_argb / i012_to_i420 / j420_to_argb / argb_to_j420 / rgb565_to_argb / argb_to_rgb565 / p010_to_nv12 / ayuv_to_nv12 / ayuv_to_nv21 / ar30_to_argb / argb_to_ar30 / i420_to_rgba / i400_to_argb / i420_to_i400 / i420_to_i010 / nv12_to_raw
+    / nv21_to_yuv24 / i444_to_nv12 / i444_to_rgb24 / i422_to_rgb24 / mjpeg_to_i420) の正常系 (既知ピクセル列の期待値比較) とエラーパス (バッファ不足・stride 不足・c_int 超過) を追加する
   - alpha 系 7 関数の正常系・バッファ不足テストを追加する (アルファ stride 検証から委譲された分)
   - ground truth の計算は libyuv の行関数実装を再現した共通ヘルパーで行い、SIMD 実装と C 実装で同一の期待値になることを確認する
   - テストファイルを convert テストディレクトリ配下にサブモジュール分割する
@@ -140,6 +141,13 @@
 - [UPDATE] CI / release ワークフローに NASM のインストールを追加する
   - @voluntas
 - [UPDATE] 全 unsafe ブロック (357 箇所) に SAFETY コメントを追加する
+  - @voluntas
+- [UPDATE] `prek.toml` を shiguredo-rust 規約に合わせて整備する
+  - builtin フックを拡充し、tombi の lint / format と markdownlint-cli2 のフックを追加する
+  - `cargo test` を `pre-push` ステージ限定にする
+  - @voluntas
+- [UPDATE] CI の clippy を `--all-targets` 付きに変更する
+  - フックと CI でテストコードを含む lint 範囲を揃える
   - @voluntas
 - [FIX] libyuv の util ツール (cpuid / yuvconvert / yuvconstants) をビルド対象から外す
   - `util/cpuid.c` に Intel APX 命令 (`vdpphps`) が含まれ GitHub Actions の binutils ではアセンブルできないため、build.rs で libyuv の `CMakeLists.txt` をパッチして util ツールビルドを除外する

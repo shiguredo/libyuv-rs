@@ -10,7 +10,7 @@ libyuv の C API は関数名もパラメータ名も具体的なフォーマッ
 ## 現状
 
 | 抽象型 | 共有しているフォーマット |
-|---|---|
+| --- | --- |
 | `PlanarImage` / `PlanarImageMut` | I420, I422, I444, J420, J422, J444, I400 |
 | `BiplanarImage` / `BiplanarImageMut` | NV12, NV21, NV24 |
 | `PackedImage` / `PackedImageMut` | ARGB, ABGR, RGBA, BGRA, RGB24, RAW, RGB565, YUY2, UYVY 等 |

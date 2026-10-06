@@ -39,15 +39,18 @@ Medium。呼び出し元がエラーを検出できず、`size.width` / `size.he
 **`size: ImageSize` のセマンティクス（重要）**: `width` はフル画像幅（= インターリーブ UV 行のバイト数。NV12 では 1 ピクセルあたり U+V で 2 バイトだが、インターリーブ行全体では画像幅と等しいバイト数になる）。`height` は UV プレーンの行数（4:2:0 なら画像高さ / 2）。`split_uv_plane` の `width`（UV ペア数 = 画像幅 / 2）とはセマンティクスが異なる。
 
 libyuv の C 実装 (`planar_functions.cc`) と単体テスト (`planar_test.cc`) で確認:
+
 - C 実装: `DetileSplitUVRow_C` は 1 行あたり `width` バイトの src を消費し、U を `(width+1)/2` バイト、V を `(width+1)/2` バイト出力する
 - 単体テスト: `width` にフル画像幅 `benchmark_width_` を渡し、`dst_stride_u` に `(benchmark_width_ + 1) / 2` を渡している
 
 正しい stride 関係:
+
 - `src_stride_uv >= round_up(size.width, 16)`（タイル配置は 16 バイト単位で処理するため、stride は 16 の倍数に丸めた幅以上必要。libyuv テストでは `(benchmark_width_ + 15) & ~15` を使用）
 - `dst_stride_u >= (size.width + 1) / 2`（U プレーン行は画像幅の半分。dst はリニア出力）
 - `dst_stride_v >= (size.width + 1) / 2`（V プレーン行は画像幅の半分。dst はリニア出力）
 
-**src_uv のバッファサイズ（タイル配置）**: src はリニアではなくタイル配置バッファである。C 実装のポインタ進行 (`planar_functions.cc:1273-1281`) はタイルグループ間で `src_stride_uv * tile_height` ずつ飛ぶため、安全な最小バッファは `src_stride_uv * ceil(height / tile_height) * tile_height` である。`height % tile_height != 0` のとき、リニア相当サイズ (`src_stride_uv * height`) ちょうどのバッファでは OOB 読み取りが発生する（例: width=32, height=17, tile_height=16, src_stride_uv=32 → リニア相当 544 バイトだが実際は 1024 バイト必要）。dst_u / dst_v はリニア出力なので `checked_buf_size(dst_stride_*, size.height)` で正しい。
+**src_uv のバッファサイズ（タイル配置）**: src はリニアではなくタイル配置バッファである。C 実装のポインタ進行 (`planar_functions.cc:1273-1281`) はタイルグループ間で `src_stride_uv * tile_height` ずつ飛ぶため、安全な最小バッファは `src_stride_uv * ceil(height / tile_height) * tile_height` である。
+`height % tile_height != 0` のとき、リニア相当サイズ (`src_stride_uv * height`) ちょうどのバッファでは OOB 読み取りが発生する（例: width=32, height=17, tile_height=16, src_stride_uv=32 → リニア相当 544 バイトだが実際は 1024 バイト必要）。dst_u / dst_v はリニア出力なので `checked_buf_size(dst_stride_*, size.height)` で正しい。
 
 **`tile_height` の制約**: libyuv 内部で `(y & (tile_height - 1))` のビットマスクを使用するため、`tile_height` は 2 の累乗でなければならない。`tile_height == 0` は debug ビルドの `assert(tile_height > 0)` で abort する。兄弟関数 `DetilePlane` は `IS_POWEROFTWO(tile_height)` を検査している。
 

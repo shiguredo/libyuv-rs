@@ -7,12 +7,14 @@ Android フォーマット、MJPEG デコード、MM21/MT2T 等のハードウ�
 ## 対象関数
 
 ### Android
+
 - Android420ToARGB
 - Android420ToABGR
 - Android420ToI420
 - Android420ToI420Rotate
 
 ### MJPEG
+
 - MJPGToARGB
 - MJPGToI420
 - MJPGToNV12
@@ -20,18 +22,22 @@ Android フォーマット、MJPEG デコード、MM21/MT2T 等のハードウ�
 - MJPGSize
 
 ### MM21
+
 - MM21ToI420
 - MM21ToNV12
 - MM21ToYUY2
 
 ### MT2T
+
 - MT2TToP010
 
 ### AYUV
+
 - AYUVToNV12
 - AYUVToNV21
 
 ### Detile
+
 - DetilePlane
 - DetilePlane_16
 - DetileSplitUVPlane

@@ -10,11 +10,11 @@ repository = "https://github.com/shiguredo/libyuv-rs"
 license = "Apache-2.0"
 build = "build.rs"
 include = [
-    "/LICENSE",
-    "/README.md",
-    "/THIRD_PARTY_LICENSES",
-    "/build.rs",
-    "/src/**",
+  "/LICENSE",
+  "/README.md",
+  "/THIRD_PARTY_LICENSES",
+  "/build.rs",
+  "/src/**",
 ]
 
 # 以降は外部ライブラリビルド用のメタデータ

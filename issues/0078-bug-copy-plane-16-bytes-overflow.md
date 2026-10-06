@@ -10,7 +10,9 @@
 
 ## 目的
 
-`src/planar.rs` の `copy_plane_16` は、要素単位の `require_c_int` チェックのみで `sys::CopyPlane_16` を呼んでいる。`sys::CopyPlane_16`（libyuv の C 実装、commit `d23308a2a7442be8e559b1b471862fd7588d6a57` 時点の `planar_functions.cc`）は内部でバイト換算（`src_stride_y * 2` / `dst_stride_y * 2` / `width * 2`）を `int` で計算するため、要素単位では c_int 範囲内でも `INT_MAX / 2` 超の stride / width が通過し、C 側の int 乗算がオーバーフロー（未定義動作）になる経路がある。バイト単位の c_int 再検証を追加して経路をなくす。
+`src/planar.rs` の `copy_plane_16` は、要素単位の `require_c_int` チェックのみで `sys::CopyPlane_16` を呼んでいる。
+`sys::CopyPlane_16`（libyuv の C 実装、commit `d23308a2a7442be8e559b1b471862fd7588d6a57` 時点の `planar_functions.cc`）は内部でバイト換算（`src_stride_y * 2` / `dst_stride_y * 2` / `width * 2`）を `int` で計算するため、要素単位では c_int 範囲内でも `INT_MAX / 2` 超の stride / width が通過し、C 側の int 乗算がオーバーフロー（未定義動作）になる経路がある。
+バイト単位の c_int 再検証を追加して経路をなくす。
 
 ## 優先度根拠
 

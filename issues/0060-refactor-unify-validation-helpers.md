@@ -10,7 +10,8 @@
 
 ## 目的
 
-`src/lib.rs` のバッファ検証ヘルパー 8 個（`validate_yuv_src_inner` / `validate_yuv_dst_inner` / `validate_nv_src_inner` / `validate_nv_dst_inner` / `validate_yuv16_src_inner` / `validate_yuv16_dst_inner` / `validate_nv16_src_inner` / `validate_nv16_dst_inner`）が、エラーメッセージの "source" / "destination" 以外は 100% 同一の実装を 4 組重複させている。src / dst をパラメータで切り替える 1 関数に統合する。
+`src/lib.rs` のバッファ検証ヘルパー 8 個（`validate_yuv_src_inner` / `validate_yuv_dst_inner` / `validate_nv_src_inner` / `validate_nv_dst_inner` / `validate_yuv16_src_inner` / `validate_yuv16_dst_inner` / `validate_nv16_src_inner` / `validate_nv16_dst_inner`）が、
+エラーメッセージの "source" / "destination" 以外は 100% 同一の実装を 4 組重複させている。src / dst をパラメータで切り替える 1 関数に統合する。
 
 ## 優先度根拠
 

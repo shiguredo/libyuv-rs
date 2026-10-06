@@ -30,6 +30,7 @@
 `build.rs:592-607` の `get_target_platform` は `CARGO_CFG_TARGET_OS == "linux"` のとき `detect_linux_distro()` を呼ぶが、`detect_linux_distro()` (`build.rs:610-626`) はビルドホストの `/etc/os-release` を読む。macOS / Windows から Linux ターゲットへのクロスコンパイル時には `unsupported Linux distribution` で panic する。
 
 影響:
+
 - macOS / Windows ホストで `cargo build --target x86_64-unknown-linux-gnu` 等を実行すると即座に panic する
 - `LIBYUV_TARGET` 環境変数を設定すれば回避可能だが、未設定時のエラーメッセージが不親切
 
@@ -38,6 +39,7 @@
 `build.rs:376-378` で `let _ = fs::remove_dir_all(&out_source_dir);` としているため、削除に失敗しても次の `fs::create_dir` で `AlreadyExists` となり、原因のわからない panic になる。
 
 影響:
+
 - 前回ビルドの残骸が残っている状態（権限不足、他プロセスのファイルロック等）で source-build を実行すると、"failed to create source directory" という不十分なメッセージで失敗する
 - 真の原因（削除失敗）が隠蔽される
 
@@ -46,6 +48,7 @@
 `build.rs:158-163` で `CARGO_CFG_TARGET_OS` が `linux` / `macos` / `ios` 以外の場合、C++ 標準ライブラリをリンクしない。libyuv は C++ コードを含むため、Android 等で未解決シンボルが発生する。
 
 影響:
+
 - `cargo build --target aarch64-linux-android` 等で `__cxa_atexit` 等の C++ ランタイムシンボルが未解決となりリンクエラーになる
 - Android NDK では `c++_shared` または `c++_static` をリンクする必要がある
 
@@ -54,6 +57,7 @@
 `build.rs:1059-1133` の docs.rs 用ダミー bindings は `MJPG*` 関数と基本的な enum 定数しか含んでおらず、`DOCS_RS=1 cargo build` で 352 件の未定義シンボルエラーが発生する。
 
 影響:
+
 - docs.rs 上で crate のドキュメントが生成できない
 - `src/lib.rs` 等から参照されている他の FFI 関数がダミー bindings に存在しないため、リンク段階で大量の未定義シンボルが発生する
 

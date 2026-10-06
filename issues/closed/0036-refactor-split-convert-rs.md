@@ -25,7 +25,7 @@ Medium。現時点で機能上の問題はないが、MJPEG 追加でさらに�
 ### モジュール分割 (10 モジュール)
 
 | モジュール | 内容 | 概算行数 |
-|---|---|---|
+| --- | --- | --- |
 | `i420.rs` | I420↔ARGB/ABGR/RGB24/NV12/NV21/I422/I444/I400、I420→10bit/AR30 等、I420 コピー | ~700 |
 | `nv.rs` | NV12/NV21↔ARGB/ABGR/RGB24/I420、I444/I422→NV12/NV21、NV コピー、abgr→NV、NV→raw/rgb565/yuv24/nv24 | ~800 |
 | `argb.rs` | ARGB/ABGR/RGBA/BGRA 相互変換、AR30/AB30/AR64/AB64 変換、RAW 変換、ARGB→YUV、ARGB コピー | ~1100 |
