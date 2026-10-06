@@ -2,7 +2,7 @@
 
 - Priority: High
 - Created: 2026-10-06
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-10-06
 - Model: DeepSeek V4.1 Flash
 - Branch: develop
 - Polished: {YYYY-MM-DD}
@@ -44,7 +44,7 @@ High。
 
 ## 解決方法
 
-1. `THIRD_PARTY_LICENSES` の libjpeg-turbo セクションの後に libyuv の BSD 3-Clause 条文を追加する
-2. `README.md` に `## libyuv ライセンス` 節を追加する
-3. `CHANGES.md` の `## develop` の `### misc` に `[ADD]` エントリを追加する
-4. `bash scripts/verify_license_hash.sh` で 1 行目の見出しが壊れていないことを確認する
+1. `THIRD_PARTY_LICENSES` の末尾に libyuv の BSD 3-Clause 条文を追加した（1 行目の libjpeg-turbo 見出しは `scripts/verify_license_hash.sh` が参照するため変更していない）
+2. `README.md` に `## libyuv ライセンス` 節を追加した
+3. `CHANGES.md` の `## develop` に `[ADD]` エントリを追加した
+4. `bash scripts/verify_license_hash.sh` が成功することを確認した
