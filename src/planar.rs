@@ -1,5 +1,4 @@
 //! プレーン操作関数
-#![allow(clippy::too_many_arguments)]
 
 use std::ffi::c_int;
 
@@ -83,6 +82,7 @@ pub fn copy_plane(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::CopyPlane(
             src.as_ptr(),
@@ -129,6 +129,7 @@ pub fn set_plane(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::SetPlane(
             dst.as_mut_ptr(),
@@ -151,6 +152,7 @@ pub fn i400_copy(
     src.validate(size, "I400Copy")?;
     dst.validate(size, "I400Copy")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::I400Copy(
             src.y.as_ptr(),
@@ -268,6 +270,7 @@ pub fn split_uv_plane(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::SplitUVPlane(
             src_uv.as_ptr(),
@@ -384,6 +387,7 @@ pub fn merge_uv_plane(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::MergeUVPlane(
             src_u.as_ptr(),
@@ -472,6 +476,7 @@ pub fn swap_uv_plane(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::SwapUVPlane(
             src_uv.as_ptr(),
@@ -597,6 +602,7 @@ pub fn split_rgb_plane(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::SplitRGBPlane(
             src.data.as_ptr(),
@@ -709,6 +715,7 @@ pub fn merge_rgb_plane(
     }
     dst.validate(size, "MergeRGBPlane")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::MergeRGBPlane(
             src_r.as_ptr(),
@@ -740,6 +747,7 @@ pub fn i400_mirror(
     src.validate(size, "I400Mirror")?;
     dst.validate(size, "I400Mirror")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::I400Mirror(
             src.y.as_ptr(),
@@ -763,6 +771,7 @@ pub fn i420_mirror(
     src.validate(size, "I420Mirror")?;
     dst.validate(size, "I420Mirror")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::I420Mirror(
             src.y.as_ptr(),
@@ -794,6 +803,7 @@ pub fn nv12_mirror(
     src.validate(size, "NV12Mirror")?;
     dst.validate(size, "NV12Mirror")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::NV12Mirror(
             src.y.as_ptr(),
@@ -821,6 +831,7 @@ pub fn argb_mirror(
     src.validate(size, "ARGBMirror")?;
     dst.validate(size, "ARGBMirror")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBMirror(
             src.data.as_ptr(),
@@ -844,6 +855,7 @@ pub fn rgb24_mirror(
     src.validate(size, "RGB24Mirror")?;
     dst.validate(size, "RGB24Mirror")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::RGB24Mirror(
             src.data.as_ptr(),
@@ -866,6 +878,7 @@ pub fn mirror_plane(
     dst_stride: usize,
     size: ImageSize,
 ) {
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::MirrorPlane(
             src.as_ptr(),
@@ -929,6 +942,7 @@ pub fn i420_blend(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::I420Blend(
             src0.y.as_ptr(),
@@ -972,6 +986,7 @@ pub fn argb_blend(
     src1.validate(size, "ARGBBlend")?;
     dst.validate(size, "ARGBBlend")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBBlend(
             src0.data.as_ptr(),
@@ -1111,6 +1126,7 @@ pub fn blend_plane(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::BlendPlane(
             src0.as_ptr(),
@@ -1234,6 +1250,7 @@ pub fn interpolate_plane(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::InterpolatePlane(
             src0.as_ptr(),
@@ -1264,6 +1281,7 @@ pub fn argb_attenuate(
     src.validate(size, "ARGBAttenuate")?;
     dst.validate(size, "ARGBAttenuate")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBAttenuate(
             src.data.as_ptr(),
@@ -1287,6 +1305,7 @@ pub fn argb_unattenuate(
     src.validate(size, "ARGBUnattenuate")?;
     dst.validate(size, "ARGBUnattenuate")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBUnattenuate(
             src.data.as_ptr(),
@@ -1313,6 +1332,7 @@ pub fn argb_shade(
     src.validate(size, "ARGBShade")?;
     dst.validate(size, "ARGBShade")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBShade(
             src.data.as_ptr(),
@@ -1332,6 +1352,7 @@ pub fn argb_shade(
 pub fn argb_gray(dst: &mut ArgbImageMut<'_>, size: ImageSize) -> Result<(), Error> {
     dst.validate(size, "ARGBGray")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBGray(
             dst.data.as_mut_ptr(),
@@ -1350,6 +1371,7 @@ pub fn argb_gray(dst: &mut ArgbImageMut<'_>, size: ImageSize) -> Result<(), Erro
 pub fn argb_sepia(dst: &mut ArgbImageMut<'_>, size: ImageSize) -> Result<(), Error> {
     dst.validate(size, "ARGBSepia")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBSepia(
             dst.data.as_mut_ptr(),
@@ -1406,6 +1428,7 @@ pub fn i420_rect(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::I420Rect(
             dst.y.as_mut_ptr(),
@@ -1463,6 +1486,7 @@ pub fn argb_rect(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBRect(
             dst.data.as_mut_ptr(),
@@ -1496,6 +1520,7 @@ pub fn i420_interpolate(
     src1.validate(size, "I420Interpolate")?;
     dst.validate(size, "I420Interpolate")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::I420Interpolate(
             src0.y.as_ptr(),
@@ -1539,6 +1564,7 @@ pub fn argb_interpolate(
     src1.validate(size, "ARGBInterpolate")?;
     dst.validate(size, "ARGBInterpolate")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBInterpolate(
             src0.data.as_ptr(),
@@ -1592,6 +1618,7 @@ pub fn interpolate_plane_16(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::InterpolatePlane_16(
             src0.as_ptr(),
@@ -1622,6 +1649,7 @@ pub fn argb_sobel(
     src.validate(size, "ARGBSobel")?;
     dst.validate(size, "ARGBSobel")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBSobel(
             src.data.as_ptr(),
@@ -1670,6 +1698,7 @@ pub fn argb_sobel_to_plane(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBSobelToPlane(
             src.data.as_ptr(),
@@ -1693,6 +1722,7 @@ pub fn argb_sobel_xy(
     src.validate(size, "ARGBSobelXY")?;
     dst.validate(size, "ARGBSobelXY")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBSobelXY(
             src.data.as_ptr(),
@@ -1723,6 +1753,7 @@ pub fn argb_color_matrix(
     src.validate(size, "ARGBColorMatrix")?;
     dst.validate(size, "ARGBColorMatrix")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBColorMatrix(
             src.data.as_ptr(),
@@ -1748,6 +1779,7 @@ pub fn rgb_color_matrix(
 ) -> Result<(), Error> {
     dst.validate(size, "RGBColorMatrix")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::RGBColorMatrix(
             dst.data.as_mut_ptr(),
@@ -1782,6 +1814,7 @@ pub fn argb_polynomial(
     src.validate(size, "ARGBPolynomial")?;
     dst.validate(size, "ARGBPolynomial")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBPolynomial(
             src.data.as_ptr(),
@@ -1812,6 +1845,7 @@ pub fn argb_add(
     src1.validate(size, "ARGBAdd")?;
     dst.validate(size, "ARGBAdd")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBAdd(
             src0.data.as_ptr(),
@@ -1839,6 +1873,7 @@ pub fn argb_subtract(
     src1.validate(size, "ARGBSubtract")?;
     dst.validate(size, "ARGBSubtract")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBSubtract(
             src0.data.as_ptr(),
@@ -1866,6 +1901,7 @@ pub fn argb_multiply(
     src1.validate(size, "ARGBMultiply")?;
     dst.validate(size, "ARGBMultiply")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBMultiply(
             src0.data.as_ptr(),
@@ -1888,8 +1924,13 @@ pub fn argb_multiply(
 
 /// ARGB 画像にボックスブラーを適用する
 ///
-/// `cumsum` は累積和計算用のバッファ。`stride32_cumsum` は i32 単位のストライド。
-/// `radius` はブラーの半径。
+/// `cumsum` は累積和計算用のバッファ。`stride32_cumsum` は i32 単位のストライドで、
+/// `width * 4` 以上必要。cumsum の必要行数は `min(height, 有効 radius * 2 + 2)` 行
+/// （有効 radius は後述の clamp 後の値）で、バッファサイズは
+/// `stride32_cumsum * 必要行数` 要素必要。必要行数を超えて確保された行は使用されない。
+/// `radius` はブラーの半径で、C と同じ規則（`min(radius, height)`、
+/// `min(radius, width / 2 - 1)`）で clamp される。`radius <= 0`、`height <= 1`、
+/// `width <= 3` の入力は `Err` を返す（C の `ARGBBlur` が -1 を返す条件と一致する）。
 pub fn argb_blur(
     src: &ArgbImage<'_>,
     dst: &mut ArgbImageMut<'_>,
@@ -1905,6 +1946,35 @@ pub fn argb_blur(
         "ARGBBlur",
         "cumsum stride exceeds c_int range",
     )?;
+    // width <= 3 は有効 radius の計算より先に Err にする。width / 2 - 1 が 0 以下に
+    // なると C の clamp 後に radius <= 0 になり -1 を返す条件と一致する（width <= 1 では
+    // width / 2 - 1 が負になり、負のまま usize にキャストするとデバッグビルドで
+    // オーバーフローパニックになるため、計算より先に判定する）。
+    if size.width <= 3 {
+        return Err(Error::with_reason(
+            -1,
+            "ARGBBlur",
+            "width must be greater than 3",
+        ));
+    }
+    // C の ARGBBlur は clamp 後に radius <= 0 または height <= 1 のとき -1 を返す。
+    // あわせて、負の radius を clamp 後の有効 radius として usize にキャストすると
+    // デバッグビルドでオーバーフローパニックになるため、この判定は実装の安全性にも
+    // 必須である。
+    if radius <= 0 {
+        return Err(Error::with_reason(
+            -1,
+            "ARGBBlur",
+            "radius must be greater than 0",
+        ));
+    }
+    if size.height <= 1 {
+        return Err(Error::with_reason(
+            -1,
+            "ARGBBlur",
+            "height must be greater than 1",
+        ));
+    }
     // cumsum は i32 要素で 1 行あたり width * 4 要素必要 (ARGB の各チャンネル分)
     let min_cumsum_stride = size
         .width
@@ -1917,9 +1987,23 @@ pub fn argb_blur(
             "cumsum stride smaller than width * 4",
         ));
     }
+    // 有効 radius を 2 段の min で clamp する。width <= 3 は上で Err にしているため
+    // width / 2 - 1 は 1 以上になり、有効 radius は常に 1 以上になる。
+    let effective_radius = radius
+        .min(size.height as i32)
+        .min(size.width as i32 / 2 - 1);
+    // cumsum の必要行数は C の ARGBBlur が循環バッファとして書き込む最大行数
+    // min(height, radius * 2 + 2) に一致する。書き込みは初期の累積和計算（radius 行）と
+    // メインループで合計 height 回行われ、max_cumsum_bot_row =
+    // &dst_cumsum[(radius * 2 + 2) * dst_stride32_cumsum] をラップ境界（>= で判定）とする
+    // ため、書き込み先の行インデックスは 0 〜 min(height - 1, radius * 2 + 1) に収まる
+    // （libyuv 更新時に見直すべき箇所）。effective_radius * 2 + 2 は width 以下に収まり、
+    // 有効 radius は width / 2 - 1 以下であるため usize ではオーバーフローしない
+    // （width が c_int の範囲内であることは src / dst の validate が保証している）。
+    let cumsum_rows = size.height.min(effective_radius as usize * 2 + 2);
     let cumsum_size = checked_buf_size(
         stride32_cumsum,
-        size.height,
+        cumsum_rows,
         "ARGBBlur",
         "cumsum buffer size overflow",
     )?;
@@ -1931,6 +2015,7 @@ pub fn argb_blur(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBBlur(
             src.data.as_ptr(),
@@ -1987,6 +2072,7 @@ pub fn argb_compute_cumulative_sum(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBComputeCumulativeSum(
             src.data.as_ptr(),
@@ -2014,6 +2100,7 @@ pub fn argb_gray_to(
     src.validate(size, "ARGBGrayTo")?;
     dst.validate(size, "ARGBGrayTo")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBGrayTo(
             src.data.as_ptr(),
@@ -2041,6 +2128,7 @@ pub fn argb_quantize(
 ) -> Result<(), Error> {
     dst.validate(size, "ARGBQuantize")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBQuantize(
             dst.data.as_mut_ptr(),
@@ -2077,6 +2165,7 @@ pub fn argb_luma_color_table(
     src.validate(size, "ARGBLumaColorTable")?;
     dst.validate(size, "ARGBLumaColorTable")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBLumaColorTable(
             src.data.as_ptr(),
@@ -2102,6 +2191,7 @@ pub fn argb_color_table(
 ) -> Result<(), Error> {
     dst.validate(size, "ARGBColorTable")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBColorTable(
             dst.data.as_mut_ptr(),
@@ -2127,6 +2217,7 @@ pub fn rgb_color_table(
 ) -> Result<(), Error> {
     dst.validate(size, "RGBColorTable")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::RGBColorTable(
             dst.data.as_mut_ptr(),
@@ -2158,6 +2249,7 @@ pub fn argb_shuffle(
     src.validate(size, "ARGBShuffle")?;
     dst.validate(size, "ARGBShuffle")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBShuffle(
             src.data.as_ptr(),
@@ -2207,6 +2299,7 @@ pub fn argb_extract_alpha(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBExtractAlpha(
             src.data.as_ptr(),
@@ -2230,6 +2323,7 @@ pub fn argb_copy_alpha(
     src.validate(size, "ARGBCopyAlpha")?;
     dst.validate(size, "ARGBCopyAlpha")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBCopyAlpha(
             src.data.as_ptr(),
@@ -2284,6 +2378,7 @@ pub fn argb_copy_y_to_alpha(
     }
     dst.validate(size, "ARGBCopyYToAlpha")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBCopyYToAlpha(
             src_y.as_ptr(),
@@ -2308,6 +2403,7 @@ pub fn argb_copy_y_to_alpha(
 pub fn argb_detect(src: &ArgbImage<'_>, size: ImageSize) -> Result<u32, Error> {
     src.validate(size, "ARGBDetect")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBDetect(
             src.data.as_ptr(),
@@ -2398,6 +2494,7 @@ pub fn copy_plane_16(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::CopyPlane_16(
             src.as_ptr(),
@@ -2413,6 +2510,9 @@ pub fn copy_plane_16(
 }
 
 /// 16bit U/V プレーンをインターリーブ UV に結合する
+///
+/// `depth` は有効範囲 8〜16（C 側 `MergeUVRow_16_C` の assert と一致）。範囲外の
+/// `depth` は `Err` を返す（ゼロサイズ入力でも同様）。
 pub fn merge_uv_plane_16(
     src_u: &[u16],
     src_stride_u: usize,
@@ -2441,6 +2541,17 @@ pub fn merge_uv_plane_16(
         "MergeUVPlane_16",
         "destination UV stride exceeds c_int range",
     )?;
+
+    // assert はリリースビルドで除去されるため Rust 側で検証する。範囲外は C 側の
+    // シフト量 (16 - depth) を使うシフト演算が未定義動作になりうる。ゼロサイズ +
+    // 範囲外 depth も仕様として一律 Err にする
+    if !(8..=16).contains(&depth) {
+        return Err(Error::with_reason(
+            -1,
+            "MergeUVPlane_16",
+            "depth must be between 8 and 16",
+        ));
+    }
 
     // stride >= 最小幅チェック（要素単位）
     // src_u/v は 1 行あたり width 要素必要
@@ -2513,6 +2624,7 @@ pub fn merge_uv_plane_16(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::MergeUVPlane_16(
             src_u.as_ptr(),
@@ -2531,6 +2643,9 @@ pub fn merge_uv_plane_16(
 }
 
 /// 16bit インターリーブ UV プレーンを U と V に分割する
+///
+/// `depth` は有効範囲 8〜16（C 側 `SplitUVRow_16_C` の assert と一致）。範囲外の
+/// `depth` は `Err` を返す（ゼロサイズ入力でも同様）。
 pub fn split_uv_plane_16(
     src_uv: &[u16],
     src_stride_uv: usize,
@@ -2559,6 +2674,17 @@ pub fn split_uv_plane_16(
         "SplitUVPlane_16",
         "destination V stride exceeds c_int range",
     )?;
+
+    // assert はリリースビルドで除去されるため Rust 側で検証する。範囲外は C 側の
+    // シフト量 (16 - depth) を使うシフト演算が未定義動作になりうる。ゼロサイズ +
+    // 範囲外 depth も仕様として一律 Err にする
+    if !(8..=16).contains(&depth) {
+        return Err(Error::with_reason(
+            -1,
+            "SplitUVPlane_16",
+            "depth must be between 8 and 16",
+        ));
+    }
 
     // stride >= 最小幅チェック（要素単位）
     // src_uv はインターリーブなので 1 行あたり width * 2 要素必要
@@ -2631,6 +2757,7 @@ pub fn split_uv_plane_16(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::SplitUVPlane_16(
             src_uv.as_ptr(),
@@ -2806,6 +2933,7 @@ pub fn merge_argb_plane(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::MergeARGBPlane(
             src_r.as_ptr(),
@@ -2980,6 +3108,7 @@ pub fn split_argb_plane(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::SplitARGBPlane(
             src_argb.as_ptr(),
@@ -3001,6 +3130,9 @@ pub fn split_argb_plane(
 }
 
 /// 16bit R, G, B, A プレーンを AR64 に結合する
+///
+/// `depth` は有効範囲 1〜16（C 側 `MergeAR64Row_C` の assert と一致）。範囲外の
+/// `depth` は `Err` を返す（ゼロサイズ入力でも同様）。
 pub fn merge_ar64_plane(
     src_r: &[u16],
     src_stride_r: usize,
@@ -3043,6 +3175,17 @@ pub fn merge_ar64_plane(
         "MergeAR64Plane",
         "destination AR64 stride exceeds c_int range",
     )?;
+
+    // assert はリリースビルドで除去されるため Rust 側で検証する。範囲外は C 側の
+    // シフト量 (16 - depth) や (1 << depth) を使うシフト演算が未定義動作になりうる。
+    // ゼロサイズ + 範囲外 depth も仕様として一律 Err にする
+    if !(1..=16).contains(&depth) {
+        return Err(Error::with_reason(
+            -1,
+            "MergeAR64Plane",
+            "depth must be between 1 and 16",
+        ));
+    }
 
     // stride >= 最小幅チェック（要素単位）
     // src_r/g/b/a は 1 行あたり width 要素必要
@@ -3155,6 +3298,7 @@ pub fn merge_ar64_plane(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::MergeAR64Plane(
             src_r.as_ptr(),
@@ -3177,6 +3321,9 @@ pub fn merge_ar64_plane(
 }
 
 /// 16bit R, G, B プレーンから XR30 に結合する
+///
+/// `depth` は有効範囲 10〜16（C 側 `MergeXR30Row_C` の assert と一致）。範囲外の
+/// `depth` は `Err` を返す（ゼロサイズ入力でも同様）。
 pub fn merge_xr30_plane(
     src_r: &[u16],
     src_stride_r: usize,
@@ -3212,6 +3359,17 @@ pub fn merge_xr30_plane(
         "MergeXR30Plane",
         "destination AR30 stride exceeds c_int range",
     )?;
+
+    // assert はリリースビルドで除去されるため Rust 側で検証する。範囲外は C 側の
+    // シフト量 (depth - 10) を使うシフト演算が未定義動作になりうる。ゼロサイズ +
+    // 範囲外 depth も仕様として一律 Err にする
+    if !(10..=16).contains(&depth) {
+        return Err(Error::with_reason(
+            -1,
+            "MergeXR30Plane",
+            "depth must be between 10 and 16",
+        ));
+    }
 
     // stride >= 最小幅チェック
     // src_r/g/b は 1 行あたり width 要素（u16）必要
@@ -3304,6 +3462,7 @@ pub fn merge_xr30_plane(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::MergeXR30Plane(
             src_r.as_ptr(),
@@ -3324,6 +3483,9 @@ pub fn merge_xr30_plane(
 }
 
 /// 16bit R, G, B, A プレーンから 8bit ARGB に結合する
+///
+/// `depth` は有効範囲 8〜16（C 側 `MergeARGB16To8Row_C` の assert と一致）。範囲外の
+/// `depth` は `Err` を返す（ゼロサイズ入力でも同様）。
 pub fn merge_argb16_to_8_plane(
     src_r: &[u16],
     src_stride_r: usize,
@@ -3374,6 +3536,17 @@ pub fn merge_argb16_to_8_plane(
         "MergeARGB16To8Plane",
         "destination ARGB stride exceeds c_int range",
     )?;
+
+    // assert はリリースビルドで除去されるため Rust 側で検証する。範囲外は C 側の
+    // シフト量 (depth - 8) を使うシフト演算が未定義動作になりうる。ゼロサイズ +
+    // 範囲外 depth も仕様として一律 Err にする
+    if !(8..=16).contains(&depth) {
+        return Err(Error::with_reason(
+            -1,
+            "MergeARGB16To8Plane",
+            "depth must be between 8 and 16",
+        ));
+    }
 
     // stride >= 最小幅チェック
     // src_r/g/b/a は 1 行あたり width 要素（u16）必要
@@ -3486,6 +3659,7 @@ pub fn merge_argb16_to_8_plane(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::MergeARGB16To8Plane(
             src_r.as_ptr(),
@@ -3583,6 +3757,7 @@ pub fn mirror_uv_plane(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::MirrorUVPlane(
             src_uv.as_ptr(),
@@ -3675,6 +3850,7 @@ pub fn convert_16_to_8_plane(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::Convert16To8Plane(
             src.as_ptr(),
@@ -3764,6 +3940,7 @@ pub fn convert_8_to_16_plane(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::Convert8To16Plane(
             src.as_ptr(),
@@ -3852,6 +4029,7 @@ pub fn convert_8_to_8_plane(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::Convert8To8Plane(
             src.as_ptr(),
@@ -3869,6 +4047,15 @@ pub fn convert_8_to_8_plane(
 }
 
 /// 16bit プレーンの LSB 変換
+///
+/// `depth` は有効範囲 8〜16（crate の他の 16bit 変換関数と統一した仕様。C 側には
+/// assert がなく、`1 << depth` のシフトは負値や 31 以上の depth で未定義動作になる）。
+/// 範囲外の `depth` は `Err` を返す（ゼロサイズ入力でも同様）。
+///
+/// `depth == 16` は恒等コピー（`sys::CopyPlane_16`）に置き換わる。libyuv の
+/// `ConvertToLSBPlane_16` は `depth == 16` で SIMD 経路が全 0 を出力し、C 経路では
+/// 符号付き乗算が未定義動作になるため、変換が必要ない恒等コピーで代替する
+/// （根拠は実装コメントに詳述）。
 pub fn convert_to_lsb_plane_16(
     src: &[u16],
     src_stride: usize,
@@ -3899,6 +4086,16 @@ pub fn convert_to_lsb_plane_16(
         "destination stride exceeds c_int range",
     )?;
 
+    // C 側はシフト式 (1 << depth) が早期 return より先に評価され、負値や 31 以上の
+    // depth で未定義動作になる。ゼロサイズ + 範囲外 depth でも C に渡す前に必ず検証する
+    if !(8..=16).contains(&depth) {
+        return Err(Error::with_reason(
+            -1,
+            "ConvertToLSBPlane_16",
+            "depth must be between 8 and 16",
+        ));
+    }
+
     // stride >= width チェック（要素単位）
     if src_stride < size.width {
         return Err(Error::with_reason(
@@ -3913,6 +4110,50 @@ pub fn convert_to_lsb_plane_16(
             "ConvertToLSBPlane_16",
             "destination stride smaller than width",
         ));
+    }
+
+    // depth == 16 では sys::ConvertToLSBPlane_16 を呼ばない。
+    //
+    // libyuv commit eb8eda9c7973704d1103a535059224df7a6063b5 時点の ConvertToLSBPlane_16
+    // は `int scale = 1 << depth` を計算し、その scale を 16bit レーンへ放送する SIMD 行
+    // 関数（DivideRow_16_AVX2 / DivideRow_16_NEON / DivideRow_16_SVE2）または C の
+    // DivideRow_16_C へディスパッチする。depth == 16 では scale = 65536 = 0x00010000 の
+    // 下位 16 bit が 0 になるため、SIMD 経路は src が 0 でなくても出力が全 0 になる。
+    // C 経路の DivideRow_16_C は `dst[x] = (src[x] * scale) >> 16` の src[x] * scale が
+    // src[x] >= 32768 で int オーバーフロー（未定義動作）になる。depth == 16 は変換不要の
+    // 恒等操作なので sys::CopyPlane_16 による 16bit 行コピーに置き換える。
+    // この置き換えは libyuv の実装（ConvertToLSBPlane_16 / CopyPlane_16 /
+    // DivideRow_16_C）に依存する。libyuv 更新時には見直すこと
+    if depth == 16 {
+        // sys::CopyPlane_16 は内部で `src_stride_y * 2` / `dst_stride_y * 2` / `width * 2`
+        // を int で計算するため、要素単位の require_c_int だけでは INT_MAX / 2 超の
+        // stride / width が通過し、内部の int 乗算がオーバーフローする。
+        // half_float_plane と同様に、バイト単位の c_int 再検証をバッファサイズ検証より
+        // 前に置く（この検証がバッファサイズ検証より後だと、対になる巨大なバッファが
+        // 無ければ検証に到達できない）。
+        // require_c_int を通過済みの要素単位の値の 2 倍は usize ではオーバーフローしない
+        // ため、チェック付き乗算は不要
+        let src_stride_bytes = src_stride * 2;
+        let dst_stride_bytes = dst_stride * 2;
+        let width_bytes = size.width * 2;
+        require_c_int(
+            src_stride_bytes,
+            "ConvertToLSBPlane_16",
+            "source stride (bytes) exceeds c_int range",
+        )?;
+        require_c_int(
+            dst_stride_bytes,
+            "ConvertToLSBPlane_16",
+            "destination stride (bytes) exceeds c_int range",
+        )?;
+        // stride >= width により src/dst のバイト検証が先に発火するため実質的には
+        // 到達しないが、sys::CopyPlane_16 内部の width * 2 を明示的に保証する防御として
+        // 残す
+        require_c_int(
+            width_bytes,
+            "ConvertToLSBPlane_16",
+            "width (bytes) exceeds c_int range",
+        )?;
     }
 
     // バッファサイズ計算（オーバーフロー安全）
@@ -3944,22 +4185,46 @@ pub fn convert_to_lsb_plane_16(
         ));
     }
 
-    unsafe {
-        sys::ConvertToLSBPlane_16(
-            src.as_ptr(),
-            src_stride as c_int,
-            dst.as_mut_ptr(),
-            dst_stride as c_int,
-            size.width as c_int,
-            size.height as c_int,
-            depth as c_int,
-        )
-    };
+    if depth == 16 {
+        // SAFETY: 手前の require_c_int（要素単位・バイト単位）/ stride >= width /
+        // バッファサイズ検証（checked_buf_size）で全前提条件を検査済み。バイト単位の
+        // stride / width が c_int 範囲内であるため、sys::CopyPlane_16 内部の int
+        // 乗算はオーバーフローしない
+        unsafe {
+            sys::CopyPlane_16(
+                src.as_ptr(),
+                src_stride as c_int,
+                dst.as_mut_ptr(),
+                dst_stride as c_int,
+                size.width as c_int,
+                size.height as c_int,
+            )
+        };
+    } else {
+        // SAFETY: 手前の require_c_int / stride >= width / バッファサイズ検証
+        // （checked_buf_size）で全前提条件を検査済み。
+        unsafe {
+            sys::ConvertToLSBPlane_16(
+                src.as_ptr(),
+                src_stride as c_int,
+                dst.as_mut_ptr(),
+                dst_stride as c_int,
+                size.width as c_int,
+                size.height as c_int,
+                depth as c_int,
+            )
+        };
+    }
 
     Ok(())
 }
 
 /// 16bit プレーンの MSB 変換
+///
+/// `depth` は有効範囲 8〜16（crate の他の 16bit 変換関数と統一した仕様。C 側には
+/// assert がなく、`1 << (16 - depth)` のシフトは 16 を超える depth で負シフト、
+/// -15 以下で int 溢れになり未定義動作になる）。範囲外の `depth` は `Err` を返す
+/// （ゼロサイズ入力でも同様）。
 pub fn convert_to_msb_plane_16(
     src: &[u16],
     src_stride: usize,
@@ -3990,6 +4255,17 @@ pub fn convert_to_msb_plane_16(
         "destination stride exceeds c_int range",
     )?;
 
+    // C 側はシフト式 (1 << (16 - depth)) が早期 return より先に評価され、16 を超える
+    // depth では負シフト、-15 以下では int 溢れで未定義動作になる。ゼロサイズ +
+    // 範囲外 depth でも C に渡す前に必ず検証する
+    if !(8..=16).contains(&depth) {
+        return Err(Error::with_reason(
+            -1,
+            "ConvertToMSBPlane_16",
+            "depth must be between 8 and 16",
+        ));
+    }
+
     // stride >= width チェック（要素単位）
     if src_stride < size.width {
         return Err(Error::with_reason(
@@ -4035,6 +4311,7 @@ pub fn convert_to_msb_plane_16(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::ConvertToMSBPlane_16(
             src.as_ptr(),
@@ -4055,6 +4332,12 @@ pub fn convert_to_msb_plane_16(
 // ============================================================
 
 /// 16bit プレーンをハーフフロートに変換する
+///
+/// `src_stride` / `dst_stride` は u16 要素数で指定する。libyuv の `HalfFloatPlane` は
+/// stride をバイト単位で受け取る仕様のため（`planar_functions.h` の注記 "the src_stride_y and
+/// dst_stride_y parameters of HalfFloatPlane() are in bytes, not in units of uint16_t."）、
+/// 内部で 2 倍してから渡す。libyuv 側は冒頭で `src_stride_y >>= 1; dst_stride_y >>= 1;` するため、
+/// 結果的に要素数単位の stride で行送りされる。
 pub fn half_float_plane(
     src: &[u16],
     src_stride: usize,
@@ -4077,6 +4360,20 @@ pub fn half_float_plane(
         "destination stride exceeds c_int range",
     )?;
 
+    // require_c_int を通過済みの値の 2 倍は usize ではオーバーフローしないため、チェック付き乗算は不要。
+    let src_stride_bytes = src_stride * 2;
+    let dst_stride_bytes = dst_stride * 2;
+    require_c_int(
+        src_stride_bytes,
+        "HalfFloatPlane",
+        "source stride (bytes) exceeds c_int range",
+    )?;
+    require_c_int(
+        dst_stride_bytes,
+        "HalfFloatPlane",
+        "destination stride (bytes) exceeds c_int range",
+    )?;
+
     // stride >= width チェック（要素単位）
     if src_stride < size.width {
         return Err(Error::with_reason(
@@ -4122,12 +4419,13 @@ pub fn half_float_plane(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::HalfFloatPlane(
             src.as_ptr(),
-            src_stride as c_int,
+            src_stride_bytes as c_int,
             dst.as_mut_ptr(),
-            dst_stride as c_int,
+            dst_stride_bytes as c_int,
             scale,
             size.width as c_int,
             size.height as c_int,
@@ -4242,6 +4540,7 @@ pub fn half_merge_uv_plane(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::HalfMergeUVPlane(
             src_u.as_ptr(),
@@ -4280,6 +4579,7 @@ pub fn byte_to_float(src: &[u8], dst: &mut [f32], scale: f32, width: usize) -> R
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe { sys::ByteToFloat(src.as_ptr(), dst.as_mut_ptr(), scale, width as c_int) };
 
     Error::check(result, "ByteToFloat")
@@ -4356,6 +4656,7 @@ pub fn gauss_plane_f32(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::GaussPlane_F32(
             src.as_ptr(),

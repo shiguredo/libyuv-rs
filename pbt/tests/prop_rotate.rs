@@ -28,7 +28,7 @@ proptest! {
                 u: &mut u2, u_stride: width / 2,
                 v: &mut v2, v_stride: width / 2,
             };
-            i420_rotate(&src, size, &mut dst, size, RotationMode::Rotate180).unwrap();
+            i420_rotate(&src, size, &mut dst, size, RotationMode::Rotate180).expect("I420 の 180 度回転が成功すること");
         }
 
         // 2 回目
@@ -46,7 +46,7 @@ proptest! {
                 u: &mut u3, u_stride: width / 2,
                 v: &mut v3, v_stride: width / 2,
             };
-            i420_rotate(&src2, size, &mut dst2, size, RotationMode::Rotate180).unwrap();
+            i420_rotate(&src2, size, &mut dst2, size, RotationMode::Rotate180).expect("I420 の 180 度回転の二重適用が成功すること");
         }
 
         prop_assert_eq!(&y, &y3);
@@ -87,7 +87,7 @@ proptest! {
                     u: &mut next_u, u_stride: dst_w / 2,
                     v: &mut next_v, v_stride: dst_w / 2,
                 };
-                i420_rotate(&src, src_size, &mut dst, dst_size, RotationMode::Rotate90).unwrap();
+                i420_rotate(&src, src_size, &mut dst, dst_size, RotationMode::Rotate90).expect("I420 の 90 度回転が成功すること");
             }
 
             cur_y = next_y;
@@ -114,14 +114,14 @@ proptest! {
         {
             let src = ArgbImage { data: &argb, stride: width * 4 };
             let mut dst = ArgbImageMut { data: &mut argb2, stride: width * 4 };
-            argb_rotate(&src, size, &mut dst, size, RotationMode::Rotate180).unwrap();
+            argb_rotate(&src, size, &mut dst, size, RotationMode::Rotate180).expect("ARGB の 180 度回転が成功すること");
         }
 
         let mut argb3 = vec![0u8; width * height * 4];
         {
             let src2 = ArgbImage { data: &argb2, stride: width * 4 };
             let mut dst2 = ArgbImageMut { data: &mut argb3, stride: width * 4 };
-            argb_rotate(&src2, size, &mut dst2, size, RotationMode::Rotate180).unwrap();
+            argb_rotate(&src2, size, &mut dst2, size, RotationMode::Rotate180).expect("ARGB の 180 度回転の二重適用が成功すること");
         }
 
         prop_assert_eq!(&argb, &argb3);
@@ -136,10 +136,10 @@ proptest! {
         let size = ImageSize::new(width, height);
 
         let mut buf2 = vec![0u8; width * height];
-        rotate_plane(&plane, width, size, &mut buf2, width, size, RotationMode::Rotate180).unwrap();
+        rotate_plane(&plane, width, size, &mut buf2, width, size, RotationMode::Rotate180).expect("プレーンの 180 度回転が成功すること");
 
         let mut buf3 = vec![0u8; width * height];
-        rotate_plane(&buf2, width, size, &mut buf3, width, size, RotationMode::Rotate180).unwrap();
+        rotate_plane(&buf2, width, size, &mut buf3, width, size, RotationMode::Rotate180).expect("プレーンの 180 度回転の二重適用が成功すること");
 
         prop_assert_eq!(&plane, &buf3);
     }

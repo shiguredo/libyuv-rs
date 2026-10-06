@@ -2,7 +2,7 @@
 //!
 //! [libyuv]: https://chromium.googlesource.com/libyuv/libyuv/
 #![warn(missing_docs)]
-#![allow(clippy::too_many_arguments)]
+#![expect(clippy::too_many_arguments)]
 
 mod sys;
 
@@ -168,6 +168,160 @@ fn checked_buf_size(
     stride
         .checked_mul(height)
         .ok_or_else(|| Error::with_reason(-1, function, reason))
+}
+
+/// タイル配置の必要サイズ（最終タイル行を含む）をオーバーフロー安全に計算する。
+/// タイル行間隔は stride * tile_height、最終タイル行の読み出しは tile_row_size バイト
+/// （libyuv の行送り規則。planar_functions.cc の DetilePlane と convert.cc の
+/// MT2TToP010 を参照）。tile_rows は 1 以上であること（呼び出し側でゼロサイズを
+/// Err にしている）
+fn checked_tiled_buf_size(
+    tile_rows: usize,
+    stride: usize,
+    tile_height: usize,
+    tile_row_size: usize,
+    function: &'static str,
+) -> Result<usize, Error> {
+    tile_rows
+        .checked_sub(1)
+        .and_then(|v| v.checked_mul(stride))
+        .and_then(|v| v.checked_mul(tile_height))
+        .and_then(|v| v.checked_add(tile_row_size))
+        .ok_or_else(|| Error::with_reason(-1, function, "tiled buffer size overflow"))
+}
+
+/// タイル行の読み出しサイズをオーバーフロー安全に計算する。
+/// 10bit パック（MT2T）は 10/8 倍になる。padded_width は 16 の倍数のため、
+/// 10/8 倍しても切り捨ては発生しない
+fn checked_tile_row_size(
+    padded_width: usize,
+    tile_height: usize,
+    is_10bit: bool,
+    function: &'static str,
+) -> Result<usize, Error> {
+    padded_width
+        .checked_mul(tile_height)
+        .and_then(|v| {
+            if is_10bit {
+                v.checked_mul(10).map(|w| w / 8)
+            } else {
+                Some(v)
+            }
+        })
+        .ok_or_else(|| Error::with_reason(-1, function, "tile row size overflow"))
+}
+
+/// タイルの幅（ピクセル）
+const TILE_WIDTH: usize = 16;
+/// Y プレーンのタイル高（行）
+const Y_TILE_HEIGHT: usize = 32;
+/// UV プレーンのタイル高（行）
+const UV_TILE_HEIGHT: usize = 16;
+
+/// タイル形式（MM21 / MT2T）のソースバッファ検証。
+///
+/// タイル配置では 1 タイル行の読み出し幅が、幅を 16 の倍数に切り上げた値 × タイル高になり、
+/// 線形サイズ（stride * height）より大きくなりうる。タイル行数は Y / UV とも
+/// `height.div_ceil(32)`（`ceil(ceil(h / 2) / 16) == ceil(h / 32)` のため。UV の
+/// タイル高は 16、Y は 32）。MM21 は 8bit、MT2T は 10bit パック（10/8 倍）で読み出す。
+///
+/// 検証は安全側（過大要求）である。MM21 は実際には最終タイル列の余り分と最終タイル行の
+/// 端数行分を読まないため、式は最大で 1 タイル行分過大になる。MT2T は部分タイル行でも
+/// フルサイズを読むため正確。
+fn validate_tiled_nv_src_inner(
+    y: &[u8],
+    y_stride: usize,
+    uv: &[u8],
+    uv_stride: usize,
+    size: ImageSize,
+    function: &'static str,
+    is_10bit: bool,
+) -> Result<(), Error> {
+    // c_int 範囲チェック
+    require_c_int(size.width, function, "width exceeds c_int range")?;
+    require_c_int(size.height, function, "height exceeds c_int range")?;
+    require_c_int(y_stride, function, "Y stride exceeds c_int range")?;
+    require_c_int(uv_stride, function, "UV stride exceeds c_int range")?;
+
+    // ゼロサイズはタイル行数の計算（height.div_ceil(32) - 1）がアンダーフローするため
+    // 先に Err にする。MM21 は height == 0 でも libyuv が no-op 成功を返すため、
+    // この Err は検証側で一律に定める（ゼロサイズ入力はモジュール全体で Err に
+    // 統一する方針と整合）
+    if size.width == 0 || size.height == 0 {
+        return Err(Error::with_reason(
+            -1,
+            function,
+            "width and height must be greater than 0",
+        ));
+    }
+
+    // stride 下限チェック（線形検証と同じ最小 stride の sanity チェック。
+    // タイル行間の読み出し重なりは必要サイズ検証が担保するため、ここでは
+    // 8bit 換算の最小幅のみを要求する）
+    if y_stride < size.width {
+        return Err(Error::with_reason(
+            -1,
+            function,
+            "Y stride smaller than width",
+        ));
+    }
+    let min_uv_stride = size
+        .width
+        .div_ceil(2)
+        .checked_mul(2)
+        .ok_or_else(|| Error::with_reason(-1, function, "UV minimum stride overflow"))?;
+    if uv_stride < min_uv_stride {
+        return Err(Error::with_reason(
+            -1,
+            function,
+            "UV stride smaller than chroma width",
+        ));
+    }
+
+    // タイル行の読み出し幅（16 の倍数に切り上げ）。MM21 の UV 幅 (width + 1) & ~1 も
+    // 16 の倍数に切り上げると width の切り上げと一致するため、Y / UV とも同じ幅になる
+    let padded_width = size
+        .width
+        .div_ceil(TILE_WIDTH)
+        .checked_mul(TILE_WIDTH)
+        .ok_or_else(|| Error::with_reason(-1, function, "padded width overflow"))?;
+
+    let tile_rows = size.height.div_ceil(Y_TILE_HEIGHT);
+
+    // 最終タイル行の読み出しサイズ（Y: タイル高 32、UV: タイル高 16）
+    let y_tile_row_size = checked_tile_row_size(padded_width, Y_TILE_HEIGHT, is_10bit, function)?;
+    let uv_tile_row_size = checked_tile_row_size(padded_width, UV_TILE_HEIGHT, is_10bit, function)?;
+
+    // 必要サイズの検証
+    let y_size = checked_tiled_buf_size(
+        tile_rows,
+        y_stride,
+        Y_TILE_HEIGHT,
+        y_tile_row_size,
+        function,
+    )?;
+    if y.len() < y_size {
+        return Err(Error::with_reason(
+            -1,
+            function,
+            "source Y buffer too small",
+        ));
+    }
+    let uv_size = checked_tiled_buf_size(
+        tile_rows,
+        uv_stride,
+        UV_TILE_HEIGHT,
+        uv_tile_row_size,
+        function,
+    )?;
+    if uv.len() < uv_size {
+        return Err(Error::with_reason(
+            -1,
+            function,
+            "source UV buffer too small",
+        ));
+    }
+    Ok(())
 }
 
 fn validate_yuv_src_inner(
@@ -701,8 +855,8 @@ macro_rules! define_yuv_image {
         }
 
         impl $name<'_> {
-            /// ソースバッファのバリデーション
             #[allow(dead_code)]
+            /// ソースバッファのバリデーション
             pub(crate) fn validate(&self, size: ImageSize, function: &'static str) -> Result<(), Error> {
                 validate_yuv_src_inner(
                     self.y, self.y_stride,
@@ -743,8 +897,8 @@ macro_rules! define_yuv_image {
                 }
             }
 
-            /// デスティネーションバッファのバリデーション
             #[allow(dead_code)]
+            /// デスティネーションバッファのバリデーション
             pub(crate) fn validate(&self, size: ImageSize, function: &'static str) -> Result<(), Error> {
                 validate_yuv_dst_inner(
                     self.y, self.y_stride,
@@ -770,8 +924,8 @@ macro_rules! define_y_image {
         }
 
         impl $name<'_> {
-            /// ソースバッファのバリデーション
             #[allow(dead_code)]
+            /// ソースバッファのバリデーション
             pub(crate) fn validate(&self, size: ImageSize, function: &'static str) -> Result<(), Error> {
                 require_c_int(size.width, function, "width exceeds c_int range")?;
                 require_c_int(size.height, function, "height exceeds c_int range")?;
@@ -805,8 +959,8 @@ macro_rules! define_y_image {
                 }
             }
 
-            /// デスティネーションバッファのバリデーション
             #[allow(dead_code)]
+            /// デスティネーションバッファのバリデーション
             pub(crate) fn validate(&self, size: ImageSize, function: &'static str) -> Result<(), Error> {
                 require_c_int(size.width, function, "width exceeds c_int range")?;
                 require_c_int(size.height, function, "height exceeds c_int range")?;
@@ -841,8 +995,8 @@ macro_rules! define_nv_image {
         }
 
         impl $name<'_> {
-            /// ソースバッファのバリデーション
             #[allow(dead_code)]
+            /// ソースバッファのバリデーション
             pub(crate) fn validate(&self, size: ImageSize, function: &'static str) -> Result<(), Error> {
                 validate_nv_src_inner(
                     self.y, self.y_stride,
@@ -876,8 +1030,8 @@ macro_rules! define_nv_image {
                 }
             }
 
-            /// デスティネーションバッファのバリデーション
             #[allow(dead_code)]
+            /// デスティネーションバッファのバリデーション
             pub(crate) fn validate(&self, size: ImageSize, function: &'static str) -> Result<(), Error> {
                 validate_nv_dst_inner(
                     self.y, self.y_stride,
@@ -902,8 +1056,8 @@ macro_rules! define_packed_image {
         }
 
         impl $name<'_> {
-            /// ソースバッファのバリデーション
             #[allow(dead_code)]
+            /// ソースバッファのバリデーション
             pub(crate) fn validate(&self, size: ImageSize, function: &'static str) -> Result<(), Error> {
                 require_c_int(size.width, function, "width exceeds c_int range")?;
                 require_c_int(size.height, function, "height exceeds c_int range")?;
@@ -939,8 +1093,8 @@ macro_rules! define_packed_image {
                 }
             }
 
-            /// デスティネーションバッファのバリデーション
             #[allow(dead_code)]
+            /// デスティネーションバッファのバリデーション
             pub(crate) fn validate(&self, size: ImageSize, function: &'static str) -> Result<(), Error> {
                 require_c_int(size.width, function, "width exceeds c_int range")?;
                 require_c_int(size.height, function, "height exceeds c_int range")?;
@@ -981,8 +1135,8 @@ macro_rules! define_yuv_image16 {
         }
 
         impl $name<'_> {
-            /// ソースバッファのバリデーション
             #[allow(dead_code)]
+            /// ソースバッファのバリデーション
             pub(crate) fn validate(&self, size: ImageSize, function: &'static str) -> Result<(), Error> {
                 validate_yuv16_src_inner(
                     self.y, self.y_stride,
@@ -1023,8 +1177,8 @@ macro_rules! define_yuv_image16 {
                 }
             }
 
-            /// デスティネーションバッファのバリデーション
             #[allow(dead_code)]
+            /// デスティネーションバッファのバリデーション
             pub(crate) fn validate(&self, size: ImageSize, function: &'static str) -> Result<(), Error> {
                 validate_yuv16_dst_inner(
                     self.y, self.y_stride,
@@ -1054,8 +1208,8 @@ macro_rules! define_nv_image16 {
         }
 
         impl $name<'_> {
-            /// ソースバッファのバリデーション
             #[allow(dead_code)]
+            /// ソースバッファのバリデーション
             pub(crate) fn validate(&self, size: ImageSize, function: &'static str) -> Result<(), Error> {
                 validate_nv16_src_inner(
                     self.y, self.y_stride,
@@ -1089,8 +1243,8 @@ macro_rules! define_nv_image16 {
                 }
             }
 
-            /// デスティネーションバッファのバリデーション
             #[allow(dead_code)]
+            /// デスティネーションバッファのバリデーション
             pub(crate) fn validate(&self, size: ImageSize, function: &'static str) -> Result<(), Error> {
                 validate_nv16_dst_inner(
                     self.y, self.y_stride,
@@ -1115,8 +1269,8 @@ macro_rules! define_packed_image16 {
         }
 
         impl $name<'_> {
-            /// ソースバッファのバリデーション
             #[allow(dead_code)]
+            /// ソースバッファのバリデーション
             pub(crate) fn validate(&self, size: ImageSize, function: &'static str) -> Result<(), Error> {
                 require_c_int(size.width, function, "width exceeds c_int range")?;
                 require_c_int(size.height, function, "height exceeds c_int range")?;
@@ -1152,8 +1306,8 @@ macro_rules! define_packed_image16 {
                 }
             }
 
-            /// デスティネーションバッファのバリデーション
             #[allow(dead_code)]
+            /// デスティネーションバッファのバリデーション
             pub(crate) fn validate(&self, size: ImageSize, function: &'static str) -> Result<(), Error> {
                 require_c_int(size.width, function, "width exceeds c_int range")?;
                 require_c_int(size.height, function, "height exceeds c_int range")?;
@@ -1244,12 +1398,74 @@ define_nv_image!(/// NV12 画像 (Y + UV インターリーブ, 4:2:0)
 define_nv_image!(/// NV21 画像 (Y + VU インターリーブ, 4:2:0)
     Nv21Image, /// NV21 画像 (可変)
     Nv21ImageMut, 2, 2);
-define_nv_image!(/// MM21 画像 (タイル形式, 4:2:0)
-    Mm21Image, /// MM21 画像 (可変)
-    Mm21ImageMut, 2, 2);
-define_nv_image!(/// MT2T 画像 (10bit タイル形式, 4:2:0)
-    Mt2tImage, /// MT2T 画像 (可変)
-    Mt2tImageMut, 2, 2);
+
+/// MM21 画像 (MediaTek タイル形式, 4:2:0)
+///
+/// データはタイル配置（幅 16 ピクセル × 高さ 32 行のブロック）で並ぶため、バッファには
+/// 線形サイズ（stride * height）より過大な「タイル配置の必要サイズ」（幅を 16 の倍数に
+/// 切り上げた値 × タイル高 × タイル行数）が必要になる。
+#[derive(Debug)]
+pub struct Mm21Image<'a> {
+    /// Y プレーンデータ
+    pub y: &'a [u8],
+    /// Y プレーンのストライド（行あたりのバイト数）
+    pub y_stride: usize,
+    /// UV プレーンデータ（インターリーブ）
+    pub uv: &'a [u8],
+    /// UV プレーンのストライド
+    pub uv_stride: usize,
+}
+
+impl Mm21Image<'_> {
+    /// ソースバッファのバリデーション
+    pub(crate) fn validate(&self, size: ImageSize, function: &'static str) -> Result<(), Error> {
+        // MM21 は 8bit のため 10/8 倍しない
+        validate_tiled_nv_src_inner(
+            self.y,
+            self.y_stride,
+            self.uv,
+            self.uv_stride,
+            size,
+            function,
+            false,
+        )
+    }
+}
+
+/// MT2T 画像 (MediaTek 10bit タイル形式, 4:2:0)
+///
+/// `y_stride` / `uv_stride` は**バイト単位**で指定する。MT2T は 10bit パックのため、
+/// 1 行のバイト数は幅の 10/8 倍になり、libyuv の `MT2TToP010` は stride をバイト単位で
+/// 受け取る。データはタイル配置（幅 16 ピクセル × 高さ 32 行のブロック）で並ぶため、
+/// バッファには線形サイズより過大な「タイル配置の必要サイズ」（幅を 16 の倍数に
+/// 切り上げた値 × タイル高 × タイル行数 × 10/8）が必要になる。
+#[derive(Debug)]
+pub struct Mt2tImage<'a> {
+    /// Y プレーンデータ
+    pub y: &'a [u8],
+    /// Y プレーンのストライド（行あたりのバイト数）
+    pub y_stride: usize,
+    /// UV プレーンデータ（インターリーブ）
+    pub uv: &'a [u8],
+    /// UV プレーンのストライド
+    pub uv_stride: usize,
+}
+
+impl Mt2tImage<'_> {
+    /// ソースバッファのバリデーション
+    pub(crate) fn validate(&self, size: ImageSize, function: &'static str) -> Result<(), Error> {
+        // MT2T は 10bit パックのため 10/8 倍する
+        validate_tiled_nv_src_inner(
+            self.y,
+            self.y_stride,
+            self.uv,
+            self.uv_stride,
+            size,
+            function,
+            true,
+        )
+    }
+}
 
 // 4:2:2 (UV 高さ = height, UV 幅 = width / 2)
 define_nv_image!(/// NV16 画像 (Y + UV インターリーブ, 4:2:2)
@@ -1391,3 +1607,135 @@ define_packed_image16!(/// AR64 画像 (16bit ARGB, 4 要素/pixel)
 define_packed_image16!(/// AB64 画像 (16bit ABGR, 4 要素/pixel)
     Ab64Image, /// AB64 画像 (可変)
     Ab64ImageMut, 4);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // require_c_int: c_int::MAX は Ok を返すこと
+    #[test]
+    fn require_c_int_max_ok() {
+        let result = require_c_int(c_int::MAX as usize, "test", "test reason");
+        assert!(result.is_ok(), "c_int::MAX は Ok を返すべき");
+    }
+
+    // require_c_int: c_int::MAX + 1 は Err を返すこと
+    #[test]
+    fn require_c_int_overflow_err() {
+        let result = require_c_int(c_int::MAX as usize + 1, "test", "test reason");
+        assert!(result.is_err(), "c_int::MAX + 1 は Err を返すべき");
+    }
+
+    // checked_buf_size: 通常の乗算は Ok を返すこと
+    #[test]
+    fn checked_buf_size_normal_ok() {
+        let result = checked_buf_size(8, 8, "test", "test reason");
+        assert!(result.is_ok(), "8 * 8 は Ok を返すべき");
+        assert_eq!(result.expect("Ok が返るはず"), 64);
+    }
+
+    // checked_buf_size: オーバーフローは Err を返すこと
+    #[test]
+    fn checked_buf_size_overflow_err() {
+        let result = checked_buf_size(usize::MAX, 2, "test", "test reason");
+        assert!(result.is_err(), "usize::MAX * 2 は Err を返すべき");
+    }
+
+    // checked_tiled_buf_size: 通常の計算は Ok を返すこと
+    #[test]
+    fn checked_tiled_buf_size_normal_ok() {
+        let result = checked_tiled_buf_size(3, 8, 32, 512, "test");
+        assert!(result.is_ok(), "タイル配置の必要サイズは Ok を返すべき");
+        assert_eq!(result.expect("Ok が返るはず"), (3 - 1) * 8 * 32 + 512);
+    }
+
+    // checked_tiled_buf_size: tile_rows == 0 でもアンダーフローせず Err を返すこと
+    #[test]
+    fn checked_tiled_buf_size_zero_tile_rows_err() {
+        let result = checked_tiled_buf_size(0, 8, 32, 512, "test");
+        assert!(result.is_err(), "tile_rows == 0 は Err を返すべき");
+    }
+
+    // checked_tiled_buf_size: オーバーフローは Err を返すこと
+    #[test]
+    fn checked_tiled_buf_size_overflow_err() {
+        let result = checked_tiled_buf_size(usize::MAX, usize::MAX, 32, 512, "test");
+        assert!(result.is_err(), "オーバーフローは Err を返すべき");
+    }
+
+    // checked_tile_row_size: 8bit はタイル高倍のサイズを返すこと
+    #[test]
+    fn checked_tile_row_size_eight_bit_ok() {
+        let result = checked_tile_row_size(16, 32, false, "test");
+        assert!(result.is_ok(), "8bit のタイル行サイズは Ok を返すべき");
+        assert_eq!(result.expect("Ok が返るはず"), 16 * 32);
+    }
+
+    // checked_tile_row_size: 10bit は 10/8 倍を返すこと
+    #[test]
+    fn checked_tile_row_size_ten_bit_ok() {
+        let result = checked_tile_row_size(16, 32, true, "test");
+        assert!(result.is_ok(), "10bit のタイル行サイズは Ok を返すべき");
+        assert_eq!(result.expect("Ok が返るはず"), 16 * 32 * 10 / 8);
+    }
+
+    // checked_tile_row_size: オーバーフローは Err を返すこと
+    #[test]
+    fn checked_tile_row_size_overflow_err() {
+        let result = checked_tile_row_size(usize::MAX, 32, false, "test");
+        assert!(result.is_err(), "オーバーフローは Err を返すべき");
+    }
+
+    // validate_yuv_src_inner: 正常系で Ok を返すこと
+    #[test]
+    fn validate_yuv_src_inner_ok() {
+        let y = vec![0u8; 64];
+        let u = vec![0u8; 16];
+        let v = vec![0u8; 16];
+        let size = ImageSize::new(8, 8);
+        let result = validate_yuv_src_inner(&y, 8, &u, 4, &v, 4, size, 2, 2, "test");
+        assert!(result.is_ok(), "正常なバッファでは Ok を返すべき");
+    }
+
+    // validate_yuv_src_inner: バッファ不足で Err を返すこと
+    #[test]
+    fn validate_yuv_src_inner_buffer_too_small() {
+        let y = vec![0u8; 10]; // 64 バイト必要だが 10 しか用意しない
+        let u = vec![0u8; 16];
+        let v = vec![0u8; 16];
+        let size = ImageSize::new(8, 8);
+        let result = validate_yuv_src_inner(&y, 8, &u, 4, &v, 4, size, 2, 2, "test");
+        assert!(result.is_err(), "バッファ不足では Err を返すべき");
+    }
+
+    // validate_yuv_src_inner: stride 不足で Err を返すこと
+    #[test]
+    fn validate_yuv_src_inner_stride_too_small() {
+        let y = vec![0u8; 64];
+        let u = vec![0u8; 16];
+        let v = vec![0u8; 16];
+        let size = ImageSize::new(8, 8);
+        let result = validate_yuv_src_inner(&y, 4, &u, 4, &v, 4, size, 2, 2, "test");
+        assert!(result.is_err(), "stride 不足では Err を返すべき");
+    }
+
+    // validate_nv_src_inner: 正常系で Ok を返すこと
+    #[test]
+    fn validate_nv_src_inner_ok() {
+        let y = vec![0u8; 64];
+        let uv = vec![0u8; 32];
+        let size = ImageSize::new(8, 8);
+        let result = validate_nv_src_inner(&y, 8, &uv, 8, size, 2, 2, "test");
+        assert!(result.is_ok(), "正常なバッファでは Ok を返すべき");
+    }
+
+    // validate_nv_src_inner: バッファ不足で Err を返すこと
+    #[test]
+    fn validate_nv_src_inner_buffer_too_small() {
+        let y = vec![0u8; 10];
+        let uv = vec![0u8; 32];
+        let size = ImageSize::new(8, 8);
+        let result = validate_nv_src_inner(&y, 8, &uv, 8, size, 2, 2, "test");
+        assert!(result.is_err(), "バッファ不足では Err を返すべき");
+    }
+}

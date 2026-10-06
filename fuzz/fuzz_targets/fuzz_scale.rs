@@ -60,7 +60,7 @@ fuzz_target!(|input: FuzzScale| {
         let y = take(&mut pool, sw * sh);
         let u = take(&mut pool, (sw / 2) * (sh / 2));
         let v = take(&mut pool, (sw / 2) * (sh / 2));
-        let src = PlanarImage {
+        let src = I420Image {
             y: &y, y_stride: sw,
             u: &u, u_stride: sw / 2,
             v: &v, v_stride: sw / 2,
@@ -68,7 +68,7 @@ fuzz_target!(|input: FuzzScale| {
         let mut dst_y = vec![0u8; dw * dh];
         let mut dst_u = vec![0u8; (dw / 2) * (dh / 2)];
         let mut dst_v = vec![0u8; (dw / 2) * (dh / 2)];
-        let mut dst = PlanarImageMut {
+        let mut dst = I420ImageMut {
             y: &mut dst_y, y_stride: dw,
             u: &mut dst_u, u_stride: dw / 2,
             v: &mut dst_v, v_stride: dw / 2,
@@ -80,12 +80,12 @@ fuzz_target!(|input: FuzzScale| {
     {
         let y = take(&mut pool, sw * sh);
         let chroma = take(&mut pool, sw * (sh / 2));
-        let src = BiplanarImage { y: &y, y_stride: sw, chroma: &chroma, chroma_stride: sw };
+        let src = Nv12Image { y: &y, y_stride: sw, uv: &chroma, uv_stride: sw };
         let mut dst_y = vec![0u8; dw * dh];
         let mut dst_chroma = vec![0u8; dw * (dh / 2)];
-        let mut dst = BiplanarImageMut {
+        let mut dst = Nv12ImageMut {
             y: &mut dst_y, y_stride: dw,
-            chroma: &mut dst_chroma, chroma_stride: dw,
+            uv: &mut dst_chroma, uv_stride: dw,
         };
         let _ = nv12_scale(&src, src_size, &mut dst, dst_size, filter);
     }
@@ -93,9 +93,9 @@ fuzz_target!(|input: FuzzScale| {
     // ARGB スケール
     {
         let argb = take(&mut pool, sw * sh * 4);
-        let src = PackedImage { data: &argb, stride: sw * 4 };
+        let src = ArgbImage { data: &argb, stride: sw * 4 };
         let mut dst_argb = vec![0u8; dw * dh * 4];
-        let mut dst = PackedImageMut { data: &mut dst_argb, stride: dw * 4 };
+        let mut dst = ArgbImageMut { data: &mut dst_argb, stride: dw * 4 };
         let _ = argb_scale(&src, src_size, &mut dst, dst_size, filter);
     }
 

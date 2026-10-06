@@ -7,6 +7,7 @@ AR30 (10bit packed RGB), AR64/AB64 (16bit per channel) HDR フォーマットの
 ## 対象関数
 
 ### AR30
+
 - AR30ToARGB
 - AR30ToABGR
 - AR30ToAB30
@@ -14,11 +15,13 @@ AR30 (10bit packed RGB), AR64/AB64 (16bit per channel) HDR フォーマットの
 - ABGRToAR30
 
 ### AR64
+
 - AR64ToARGB
 - AR64ToAB64
 - ARGBToAR64
 
 ### AB64
+
 - AB64ToARGB
 - ARGBToAB64
 

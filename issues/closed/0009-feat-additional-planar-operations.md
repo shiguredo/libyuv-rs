@@ -7,6 +7,7 @@
 ## 対象関数
 
 ### コピー
+
 - I422Copy
 - I444Copy
 - I010Copy
@@ -16,12 +17,14 @@
 - CopyPlane_16
 
 ### プレーン操作
+
 - MirrorUVPlane
 - HalfMergeUVPlane
 - SplitARGBPlane
 - MergeARGBPlane
 
 ### 16bit プレーン
+
 - SplitUVPlane_16
 - MergeUVPlane_16
 - InterpolatePlane_16
@@ -32,6 +35,7 @@
 - ConvertToMSBPlane_16
 
 ### AR64/ARGB16 プレーン
+
 - MergeAR64Plane
 - MergeARGB16To8Plane
 - MergeXR30Plane

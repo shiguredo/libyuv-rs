@@ -26,7 +26,7 @@ proptest! {
             u: &mut u2, u_stride: width / 2,
             v: &mut v2, v_stride: width / 2,
         };
-        i420_scale(&src, size, &mut dst, size, FilterMode::None).unwrap();
+        i420_scale(&src, size, &mut dst, size, FilterMode::None).expect("I420 スケールが成功すること");
 
         prop_assert_eq!(&y, &y2);
         prop_assert_eq!(&u, &u2);
@@ -44,7 +44,7 @@ proptest! {
 
         let mut argb2 = vec![0u8; width * height * 4];
         let mut dst = ArgbImageMut { data: &mut argb2, stride: width * 4 };
-        argb_scale(&src, size, &mut dst, size, FilterMode::None).unwrap();
+        argb_scale(&src, size, &mut dst, size, FilterMode::None).expect("ARGB スケールが成功すること");
 
         prop_assert_eq!(&argb, &argb2);
     }
@@ -64,7 +64,7 @@ proptest! {
             y: &mut y2, y_stride: width,
             uv: &mut chroma2, uv_stride: width,
         };
-        nv12_scale(&src, size, &mut dst, size, FilterMode::None).unwrap();
+        nv12_scale(&src, size, &mut dst, size, FilterMode::None).expect("NV12 スケールが成功すること");
 
         prop_assert_eq!(&y, &y2);
         prop_assert_eq!(&chroma, &chroma2);
@@ -79,7 +79,7 @@ proptest! {
         let size = ImageSize::new(width, height);
 
         let mut dst = vec![0u8; width * height];
-        scale_plane(&plane, width, size, &mut dst, width, size, FilterMode::None).unwrap();
+        scale_plane(&plane, width, size, &mut dst, width, size, FilterMode::None).expect("プレーンスケールが成功すること");
 
         prop_assert_eq!(&plane, &dst);
     }

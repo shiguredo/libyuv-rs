@@ -1,5 +1,11 @@
 name: Release
 
+# 任意のタグ push で発火する。タグ push は canary.py の verify_release_branch が
+# develop / release/* ブランチ上に限定する。
+# canary タグ (例: 2026.2.0-canary.7) では prerelease として GitHub Release を作成したうえで
+# crates.io にも canary 版を公開する。正式タグ (例: 2026.2.0) では通常の Release として公開する。
+# タグ名は Cargo.toml の [package] version と一致している必要がある
+# (build.rs が CARGO_PKG_VERSION をタグ名として prebuilt の URL を組み立てるため)。
 on:
   push:
     tags:
@@ -13,15 +19,37 @@ jobs:
     name: "Create GitHub Release"
     timeout-minutes: 20
     runs-on: ubuntu-slim
+    permissions:
+      contents: write
     outputs:
       version: ${{ steps.get_version.outputs.VERSION }}
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Get the version
         id: get_version
         run: echo "VERSION=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_OUTPUT
+
+      - name: Verify tag matches Cargo.toml version
+        env:
+          VERSION: ${{ steps.get_version.outputs.VERSION }}
+        run: |
+          # Cargo.toml の [package] セクションの version を読み取る。
+          # package.metadata.external-dependencies.libyuv にも version があるため、
+          # 1 段目の sed で [package] から次の [ セクションまでを範囲として抽出する。
+          CARGO_VERSION=$(
+            sed -n '/^\[package\]/,/^\[/p' Cargo.toml |
+              sed -n 's/^version *= *"\(.*\)"/\1/p'
+          )
+          if [ -z "$CARGO_VERSION" ]; then
+            echo "Failed to read version from Cargo.toml [package] section" >&2
+            exit 1
+          fi
+          if [ "$VERSION" != "$CARGO_VERSION" ]; then
+            echo "Tag version ($VERSION) does not match Cargo.toml version ($CARGO_VERSION)" >&2
+            exit 1
+          fi
 
       - name: Create Release
         env:
@@ -47,29 +75,56 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - target: ubuntu-26.04_x86_64
+            os: ubuntu-26.04
+            lib_name: libshiguredo_yuv.a
+            jpeg_lib_name: libshiguredo_jpeg.a
+          - target: ubuntu-26.04_arm64
+            os: ubuntu-26.04-arm
+            lib_name: libshiguredo_yuv.a
+            jpeg_lib_name: libshiguredo_jpeg.a
           - target: ubuntu-24.04_x86_64
             os: ubuntu-24.04
-            lib_name: libyuv.a
+            lib_name: libshiguredo_yuv.a
+            jpeg_lib_name: libshiguredo_jpeg.a
           - target: ubuntu-24.04_arm64
             os: ubuntu-24.04-arm
-            lib_name: libyuv.a
+            lib_name: libshiguredo_yuv.a
+            jpeg_lib_name: libshiguredo_jpeg.a
           - target: ubuntu-22.04_x86_64
             os: ubuntu-22.04
-            lib_name: libyuv.a
+            lib_name: libshiguredo_yuv.a
+            jpeg_lib_name: libshiguredo_jpeg.a
           - target: ubuntu-22.04_arm64
             os: ubuntu-22.04-arm
-            lib_name: libyuv.a
+            lib_name: libshiguredo_yuv.a
+            jpeg_lib_name: libshiguredo_jpeg.a
           - target: macos_arm64
             os: macos-15
-            lib_name: libyuv.a
+            lib_name: libshiguredo_yuv.a
+            jpeg_lib_name: libshiguredo_jpeg.a
           - target: windows_x86_64
             os: windows-2025
-            lib_name: yuv.lib
+            lib_name: shiguredo_yuv.lib
+            jpeg_lib_name: shiguredo_jpeg.lib
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install NASM
+        shell: bash
+        run: |
+          case "${{ runner.os }}" in
+            Linux)
+              if [ "${{ runner.arch }}" = "X64" ]; then
+                sudo apt-get update && sudo apt-get install -y nasm
+              fi
+              ;;
+            macOS)   brew install nasm ;;
+            Windows) choco install nasm -y && echo "C:\\Program Files\\NASM" >> $GITHUB_PATH ;;
+          esac
 
       - name: Build with source-build
         run: cargo build --release --features source-build
@@ -78,16 +133,50 @@ jobs:
         id: find_out_dir
         shell: bash
         run: |
-          OUT_DIR=$(find target/release/build/shiguredo_libyuv-*/out -maxdepth 0 -type d 2>/dev/null | head -1)
+          set -euo pipefail
+          # ci.yml の Verify symbol rewrite と同じ空 glob ガードを適用する
+          candidates=$(find target/release/build/shiguredo_libyuv-*/out -maxdepth 0 -type d 2>/dev/null || true)
+          if [ -z "$candidates" ]; then
+            echo "ERROR: no OUT_DIR matched target/release/build/shiguredo_libyuv-*/out"
+            exit 1
+          fi
+          # BSD wc -l は先頭に空白を付ける ($'       1' 等) ため数値比較で評価する
+          count=$(echo "$candidates" | wc -l)
+          if [ "$count" -ne 1 ]; then
+            echo "ERROR: expected 1 OUT_DIR but got $count:"
+            echo "$candidates"
+            exit 1
+          fi
+          OUT_DIR=$(echo "$candidates" | head -1)
           echo "OUT_DIR=${OUT_DIR}" >> $GITHUB_OUTPUT
+
+      - name: Verify symbol rewrite
+        shell: bash
+        run: bash scripts/verify_symbol_rewrite.sh "${{ steps.find_out_dir.outputs.OUT_DIR }}"
 
       - name: Create prebuilt archive
         shell: bash
         run: |
+          set -euo pipefail
           mkdir -p staging/lib
           cp "${{ steps.find_out_dir.outputs.OUT_DIR }}/lib/${{ matrix.lib_name }}" staging/lib/
+          cp "${{ steps.find_out_dir.outputs.OUT_DIR }}/lib/${{ matrix.jpeg_lib_name }}" staging/lib/
           cp "${{ steps.find_out_dir.outputs.OUT_DIR }}/bindings.rs" staging/
+          cp LICENSE staging/
+          cp THIRD_PARTY_LICENSES staging/
           tar czf libyuv-${{ matrix.target }}.tar.gz -C staging .
+
+      - name: Verify archive contents
+        shell: bash
+        run: |
+          set -euo pipefail
+          # grep -q が早期終了すると tar が SIGPIPE を受けて pipefail で失敗扱いになるため
+          # 一旦変数に格納してから検査する
+          contents=$(tar tzf libyuv-${{ matrix.target }}.tar.gz)
+          if ! echo "$contents" | grep -q "^\./THIRD_PARTY_LICENSES$"; then
+            echo "ERROR: THIRD_PARTY_LICENSES missing from libyuv-${{ matrix.target }}.tar.gz"
+            exit 1
+          fi
 
       - name: Generate SHA256 checksum
         shell: bash
@@ -108,23 +197,42 @@ jobs:
             libyuv-${{ matrix.target }}.tar.gz.sha256 \
             --clobber
 
+  build-mobile-prebuilt:
+    name: Build mobile prebuilt
+    needs: github-release
+    permissions:
+      contents: write
+    uses: ./.github/workflows/mobile.yml
+    with:
+      release-version: ${{ needs.github-release.outputs.version }}
+
   publish:
-    needs: [github-release, build-prebuilt]
+    needs: [github-release, build-prebuilt, build-mobile-prebuilt]
     timeout-minutes: 10
     runs-on: ubuntu-24.04
     environment: release
     permissions:
       id-token: write
     steps:
-      - uses: actions/checkout@v6
-      - uses: rust-lang/crates-io-auth-action@v1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: rust-lang/crates-io-auth-action@c6f97d42243bad5fab37ca0427f495c86d5b1a18 # v1.0.5
         id: auth
-      - run: cargo publish
+
+      # 本番 publish の前にパッケージ内容を検証する。
+      # include リストの欠落や README / LICENSE 不足による失敗を事前に検出し、
+      # 「GitHub Release は作成済みだが crates.io 未公開」の状態を防ぐ。
+      - name: Verify package contents with cargo publish --dry-run
+        run: cargo publish --dry-run
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+
+      - name: Publish to crates.io
+        run: cargo publish
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
 
   slack_notify:
-    needs: [github-release, build-prebuilt, publish]
+    needs: [github-release, build-prebuilt, build-mobile-prebuilt, publish]
     timeout-minutes: 5
     runs-on: ubuntu-slim
     if: ${{ always() }}
