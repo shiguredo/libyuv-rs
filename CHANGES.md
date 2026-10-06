@@ -109,13 +109,6 @@
 
 ### misc
 
-- [UPDATE] `release.yml` にタグと `Cargo.toml` の version の整合検証と `cargo publish --dry-run` を追加する
-  - `build.rs` は `CARGO_PKG_VERSION` をタグ名として prebuilt の URL を組み立てるため、不一致は利用者のビルドを 404 で壊す
-  - `github-release` ジョブに `permissions: contents: write` を明示する
-  - @voluntas
-- [UPDATE] `canary.py` を正式リリース (canary 版から正式版への引き下げ) に対応させる
-  - `--release` フラグ、`CHANGES.md` のリリース日更新、ブランチ・作業ツリー検証を追加する
-  - @voluntas
 - [CHANGE] convert.rs をサブモジュールに分割する
   - @voluntas
 - [ADD] MJPEG fuzz ターゲットを追加する
@@ -130,6 +123,13 @@
   - @voluntas
 - [ADD] `THIRD_PARTY_LICENSES` に libyuv のライセンス (BSD 3-Clause) を追加する
   - prebuilt アーカイブに同梱するライセンス条文が libjpeg-turbo のみで、libyuv の記載が欠落していた
+  - @voluntas
+- [UPDATE] `canary.py` を正式リリース (canary 版から正式版への引き下げ) に対応させる
+  - `--release` フラグ、`CHANGES.md` のリリース日更新、ブランチ・作業ツリー検証を追加する
+  - @voluntas
+- [UPDATE] `release.yml` にタグと `Cargo.toml` の version の整合検証と `cargo publish --dry-run` を追加する
+  - `build.rs` は `CARGO_PKG_VERSION` をタグ名として prebuilt の URL を組み立てるため、不一致は利用者のビルドを 404 で壊す
+  - `github-release` ジョブに `permissions: contents: write` を明示する
   - @voluntas
 - [UPDATE] lint 抑制を #[allow(...)] から #[expect(...)] に置換する
   - @voluntas
