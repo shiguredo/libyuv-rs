@@ -2,7 +2,7 @@
 
 - Priority: Medium
 - Created: 2026-08-04
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-10-06
 - Model: DeepSeek V4 Flash
 - Branch: feature/refactor-release-procedure
 - Polished: {YYYY-MM-DD}
@@ -43,7 +43,17 @@ Medium。
 
 ## 解決方法
 
-1. リリース手順を調査・整理する（canary から正式への流れ）
-2. 手順書を作成する
-3. `canary.py` を必要に応じて拡張する
-4. release.yml に整合検証を追加する
+- `canary.py` に `--release` フラグを追加し、canary 版から正式版への引き下げ（`2026.2.0-canary.6` → `2026.2.0`）に対応した
+- `CHANGES.md` の `## develop` の下にリリース版の見出しとリリース日を追加する `update_changes` を追加した（次バージョン向けの変更を引き続き `## develop` に追記できるよう、`## develop` は残す）
+- `--dry-run` 時は対話確認をスキップし、非対話環境でも実行できるようにした
+- `verify_release_branch` を追加し、タグ push を `develop` または `release/` ブランチかつクリーンな作業ツリーに限定した
+- コミットメッセージを shiguredo-git 規約に適合させ（`バージョンを <version> に更新する` / `canary バージョンを <version> に更新する`）、`git add` の対象に `CHANGES.md` を追加した
+- `--release` を非 canary 版に対して実行した場合はエラーにした（誤って canary 版を新たに作るのを防ぐ）
+- `README.md` に `## リリース手順`（canary リリース / 正式リリース）を追加した
+- `release.yml` の先頭コメントにタグ push で publish される条件（canary は prerelease + crates.io 公開、正式版は通常 Release）を明記した
+
+検証:
+
+- `python3 canary.py --release --dry-run` が `2026.2.0-canary.6` → `2026.2.0` の変換と `CHANGES.md` の更新内容を非対話で表示することを確認した
+- `python3 canary.py --dry-run` が `2026.2.0-canary.7` へのインクリメントを非対話で表示することを確認した
+- 非 canary 版（`2026.2.0`）に対する `--release` がエラーになることを確認した
