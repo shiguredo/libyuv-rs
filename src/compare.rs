@@ -6,7 +6,7 @@ use crate::{Error, I420Image, ImageSize, checked_buf_size, require_c_int, sys};
 
 /// I420 画像間の PSNR（ピーク信号対雑音比）を計算する
 ///
-/// 返り値は dB 単位の PSNR 値。同一画像の場合は `f64::INFINITY` を返す。
+/// 返り値は dB 単位の PSNR 値。同一画像の場合は `kMaxPsnr` (128.0) を返す。
 pub fn i420_psnr(
     src_a: &I420Image<'_>,
     src_b: &I420Image<'_>,
@@ -15,6 +15,16 @@ pub fn i420_psnr(
     src_a.validate(size, "I420Psnr")?;
     src_b.validate(size, "I420Psnr")?;
 
+    // ゼロサイズ入力は意味のない値（kMaxPsnr）が正常値として返るためエラーにする
+    if size.width == 0 || size.height == 0 {
+        return Err(Error::with_reason(
+            -1,
+            "I420Psnr",
+            "width and height must be greater than 0",
+        ));
+    }
+
+    // SAFETY: require_c_int と checked_buf_size により全ポインタとサイズの有効性が保証済み。
     let result = unsafe {
         sys::I420Psnr(
             src_a.y.as_ptr(),
@@ -40,6 +50,8 @@ pub fn i420_psnr(
 /// I420 画像間の SSIM（構造的類似性指標）を計算する
 ///
 /// 返り値は 0.0 から 1.0 の範囲で、1.0 が完全に同一。
+/// width または height が 17 未満では `Err` を返す（U/V プレーンの幅または高さが 8 以下に
+/// なり、SSIM のサンプル数が 0 で NaN が発生するため）。
 pub fn i420_ssim(
     src_a: &I420Image<'_>,
     src_b: &I420Image<'_>,
@@ -48,6 +60,21 @@ pub fn i420_ssim(
     src_a.validate(size, "I420Ssim")?;
     src_b.validate(size, "I420Ssim")?;
 
+    // libyuv の I420Ssim は Y プレーンを元サイズ、U/V プレーンを
+    // `(width + 1) >> 1` × `(height + 1) >> 1` に縮小して CalcFrameSsim に渡す
+    // (compare.cc)。Y プレーンが 9x9 以上でも width <= 16 または height <= 16 では
+    // U/V プレーンの幅または高さが 8 以下になり NaN が発生するため、17x17 未満は
+    // Err にする。この前提はバンドル版 libyuv の実装に依存しており、libyuv 更新時に
+    // 見直すべき箇所である (NaN の扱いが変更される可能性がある)。
+    if size.width <= 16 || size.height <= 16 {
+        return Err(Error::with_reason(
+            -1,
+            "I420Ssim",
+            "image must be at least 17x17 for SSIM calculation (U/V planes are downsampled)",
+        ));
+    }
+
+    // SAFETY: require_c_int と checked_buf_size により全ポインタとサイズの有効性が保証済み。
     let result = unsafe {
         sys::I420Ssim(
             src_a.y.as_ptr(),
@@ -73,7 +100,7 @@ pub fn i420_ssim(
 /// 単一プレーンの PSNR（ピーク信号対雑音比）を計算する
 ///
 /// ARGB 等のパックドフォーマットやグレースケール画像の品質比較に使用する。
-/// 返り値は dB 単位の PSNR 値。同一画像の場合は `f64::INFINITY` を返す。
+/// 返り値は dB 単位の PSNR 値。同一画像の場合は `kMaxPsnr` (128.0) を返す。
 pub fn calc_frame_psnr(
     src_a: &[u8],
     src_a_stride: usize,
@@ -84,6 +111,16 @@ pub fn calc_frame_psnr(
     // c_int 範囲チェック
     require_c_int(size.width, "CalcFramePsnr", "width exceeds c_int range")?;
     require_c_int(size.height, "CalcFramePsnr", "height exceeds c_int range")?;
+
+    // ゼロサイズ入力は意味のない値（kMaxPsnr）が正常値として返るためエラーにする
+    if size.width == 0 || size.height == 0 {
+        return Err(Error::with_reason(
+            -1,
+            "CalcFramePsnr",
+            "width and height must be greater than 0",
+        ));
+    }
+
     require_c_int(
         src_a_stride,
         "CalcFramePsnr",
@@ -139,6 +176,7 @@ pub fn calc_frame_psnr(
         ));
     }
 
+    // SAFETY: require_c_int と checked_buf_size により全ポインタとサイズの有効性が保証済み。
     let result = unsafe {
         sys::CalcFramePsnr(
             src_a.as_ptr(),
@@ -167,6 +205,17 @@ pub fn calc_frame_ssim(
     // c_int 範囲チェック
     require_c_int(size.width, "CalcFrameSsim", "width exceeds c_int range")?;
     require_c_int(size.height, "CalcFrameSsim", "height exceeds c_int range")?;
+
+    // libyuv の CalcFrameSsim は 8x8 ブロックを走査する (compare.cc)。
+    // width <= 8 または height <= 8 では samples == 0 となり除算ゼロ (NaN) が発生する。
+    if size.width <= 8 || size.height <= 8 {
+        return Err(Error::with_reason(
+            -1,
+            "CalcFrameSsim",
+            "image must be at least 9x9 for SSIM calculation",
+        ));
+    }
+
     require_c_int(
         src_a_stride,
         "CalcFrameSsim",
@@ -222,6 +271,7 @@ pub fn calc_frame_ssim(
         ));
     }
 
+    // SAFETY: require_c_int と checked_buf_size により全ポインタとサイズの有効性が保証済み。
     let result = unsafe {
         sys::CalcFrameSsim(
             src_a.as_ptr(),
@@ -260,6 +310,7 @@ pub fn compute_sum_square_error(src_a: &[u8], src_b: &[u8], count: usize) -> Res
     }
 
     let result =
+        // SAFETY: require_c_int と checked_buf_size により全ポインタとサイズの有効性が保証済み。
         unsafe { sys::ComputeSumSquareError(src_a.as_ptr(), src_b.as_ptr(), count as c_int) };
 
     Ok(result)
@@ -339,6 +390,7 @@ pub fn compute_sum_square_error_plane(
         ));
     }
 
+    // SAFETY: require_c_int と checked_buf_size により全ポインタとサイズの有効性が保証済み。
     let result = unsafe {
         sys::ComputeSumSquareErrorPlane(
             src_a.as_ptr(),
@@ -354,8 +406,19 @@ pub fn compute_sum_square_error_plane(
 }
 
 /// 二乗誤差の合計から PSNR 値を計算する
-pub fn sum_square_error_to_psnr(sse: u64, count: u64) -> f64 {
-    unsafe { sys::SumSquareErrorToPsnr(sse, count) }
+///
+/// `count` が 0 の場合はエラーを返す。
+/// `sse` が 0 かつ `count` が 0 より大きい場合は `kMaxPsnr` (128.0) を返す（C の挙動の踏襲）。
+pub fn sum_square_error_to_psnr(sse: u64, count: u64) -> Result<f64, Error> {
+    if count == 0 {
+        return Err(Error::with_reason(
+            -1,
+            "SumSquareErrorToPsnr",
+            "count must be greater than 0",
+        ));
+    }
+    // SAFETY: SumSquareErrorToPsnr は純粋な数値計算でありポインタ操作を伴わない。
+    Ok(unsafe { sys::SumSquareErrorToPsnr(sse, count) })
 }
 
 /// ハミング距離を計算する
@@ -363,11 +426,15 @@ pub fn compute_hamming_distance(src_a: &[u8], src_b: &[u8]) -> Result<u64, Error
     let count = src_a.len().min(src_b.len());
     require_c_int(count, "ComputeHammingDistance", "count exceeds c_int range")?;
     let result =
+        // SAFETY: require_c_int と checked_buf_size により全ポインタとサイズの有効性が保証済み。
         unsafe { sys::ComputeHammingDistance(src_a.as_ptr(), src_b.as_ptr(), count as c_int) };
     Ok(result)
 }
 
 /// DJB2 ハッシュを計算する
-pub fn hash_djb2(src: &[u8], seed: u32) -> u32 {
-    unsafe { sys::HashDjb2(src.as_ptr(), src.len() as u64, seed) }
+///
+/// 空スライスの場合は `seed` をそのまま返す（C の挙動の踏襲）。
+pub fn hash_djb2(src: &[u8], seed: u32) -> Result<u32, Error> {
+    // SAFETY: libyuv の HashDjb2 は src.as_ptr() から src.len() バイトまでしか読み込まず、純粋な数値計算であり未定義動作を起こさない。
+    Ok(unsafe { sys::HashDjb2(src.as_ptr(), src.len() as u64, seed) })
 }

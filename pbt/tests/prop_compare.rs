@@ -18,7 +18,7 @@ proptest! {
             v: &v, v_stride: width / 2,
         };
 
-        let psnr = i420_psnr(&src, &src, size).unwrap();
+        let psnr = i420_psnr(&src, &src, size).expect("同一 I420 画像の PSNR 計算が成功すること");
         prop_assert!(psnr >= 100.0, "PSNR should be very high for identical images, got {}", psnr);
     }
 
@@ -36,7 +36,7 @@ proptest! {
             v: &v, v_stride: width / 2,
         };
 
-        let ssim = i420_ssim(&src, &src, size).unwrap();
+        let ssim = i420_ssim(&src, &src, size).expect("同一 I420 画像の SSIM 計算が成功すること");
         prop_assert!(!ssim.is_nan(), "SSIM should not be NaN, got {}", ssim);
         prop_assert!((ssim - 1.0).abs() < 1e-6, "SSIM should be 1.0 for identical images, got {}", ssim);
     }
@@ -48,7 +48,7 @@ proptest! {
             .prop_flat_map(|(w, h)| (Just((w, h)), arb_plane(w, h)))
     ) {
         let size = ImageSize::new(width, height);
-        let sse = compute_sum_square_error_plane(&plane, width, &plane, width, size).unwrap();
+        let sse = compute_sum_square_error_plane(&plane, width, &plane, width, size).expect("同一プレーンの SSE 計算が成功すること");
         prop_assert_eq!(sse, 0);
     }
 }

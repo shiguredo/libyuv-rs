@@ -1,5 +1,4 @@
 //! 回転関数
-#![allow(clippy::too_many_arguments)]
 
 use std::ffi::c_int;
 
@@ -32,6 +31,7 @@ pub fn i420_rotate(
     }
     dst.validate(dst_size, "I420Rotate")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::I420Rotate(
             src.y.as_ptr(),
@@ -77,6 +77,7 @@ pub fn argb_rotate(
     }
     dst.validate(dst_size, "ARGBRotate")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::ARGBRotate(
             src.data.as_ptr(),
@@ -172,6 +173,7 @@ pub fn rotate_plane(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::RotatePlane(
             src.as_ptr(),
@@ -213,6 +215,7 @@ pub fn i010_rotate(
     }
     dst.validate(dst_size, "I010Rotate")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::I010Rotate(
             src.y.as_ptr(),
@@ -258,6 +261,7 @@ pub fn i210_rotate(
     }
     dst.validate(dst_size, "I210Rotate")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::I210Rotate(
             src.y.as_ptr(),
@@ -303,6 +307,7 @@ pub fn i410_rotate(
     }
     dst.validate(dst_size, "I410Rotate")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::I410Rotate(
             src.y.as_ptr(),
@@ -334,6 +339,15 @@ pub fn i410_rotate(
 ///
 /// `pixel_stride_uv` は UV ピクセルストライド（1: planar、2: interleaved）。
 /// 90 度 / 270 度回転の場合、出力画像の幅と高さは入力と逆になる。
+///
+/// `pixel_stride_uv == 2` のとき、`u` / `v` は同一バッファの連続領域（インターリーブ）で
+/// なければならない（libyuv が `src_v - src_u` のポインタ減算を行うため。別スライスは
+/// C 標準上は未定義動作になる。一般的な実装では整数減算に落ちるため実害はない）。
+/// `u` / `v` のストライドは `2 * ceil(width / 2)` 以上である必要がある。検証はバッファ長に
+/// `len() >= stride * ceil(height / 2)` を要求するため、共有バッファの末尾に 1 バイトの
+/// パディングを確保すること（NV12 では v 側、NV21 では u 側のバッファ長が要求を満たす）。
+/// `pixel_stride_uv == 2` で `u` / `v` のストライドが不一致の場合、フォールバックは
+/// 0 度回転のみ有効で、90 / 270 度回転は libyuv がサポートしないため Err になる。
 pub fn android420_to_i420_rotate(
     src: &Android420Image<'_>,
     src_size: ImageSize,
@@ -353,15 +367,43 @@ pub fn android420_to_i420_rotate(
     }
     dst.validate(dst_size, "Android420ToI420Rotate")?;
 
-    // pixel_stride_uv は 1 (planar) または 2 (interleaved) のみ有効
-    if pixel_stride_uv != 1 && pixel_stride_uv != 2 {
-        return Err(Error::with_reason(
-            -1,
-            "Android420ToI420Rotate",
-            "pixel_stride_uv must be 1 or 2",
-        ));
+    // pixel_stride_uv == 2 では libyuv は U/V をインターリーブデータとして 1 行
+    // 2 * halfwidth バイト読み進める（高速パス SplitRotateUV とフォールバックの
+    // SplitPixels の読み出し規則。rotate.cc の Android420ToI420Rotate）。
+    // そのためストライドをインターリーブ前提で検証する。バッファ長は src.validate が
+    // u_stride * ceil(height / 2) を同一式で検査済みのため、ここでは検証しない
+    match pixel_stride_uv {
+        1 => {}
+        2 => {
+            let uv_stride = src_size.width.div_ceil(2).checked_mul(2).ok_or_else(|| {
+                Error::with_reason(-1, "Android420ToI420Rotate", "UV minimum stride overflow")
+            })?;
+            if src.u_stride < uv_stride {
+                return Err(Error::with_reason(
+                    -1,
+                    "Android420ToI420Rotate",
+                    "U stride smaller than interleaved chroma width",
+                ));
+            }
+            if src.v_stride < uv_stride {
+                return Err(Error::with_reason(
+                    -1,
+                    "Android420ToI420Rotate",
+                    "V stride smaller than interleaved chroma width",
+                ));
+            }
+        }
+        _ => {
+            return Err(Error::with_reason(
+                -1,
+                "Android420ToI420Rotate",
+                "pixel_stride_uv must be 1 or 2",
+            ));
+        }
     }
 
+    // SAFETY: src / dst は .validate() と上記のインライン検証で検査可能な前提を検査済み。
+    // 同一バッファ前提（pixel_stride_uv == 2）は docstring の契約に依存する。
     let result = unsafe {
         sys::Android420ToI420Rotate(
             src.y.as_ptr(),
@@ -407,6 +449,7 @@ pub fn nv12_to_i420_rotate(
     }
     dst.validate(dst_size, "NV12ToI420Rotate")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::NV12ToI420Rotate(
             src.y.as_ptr(),
@@ -454,6 +497,7 @@ pub fn i422_rotate(
     }
     dst.validate(dst_size, "I422Rotate")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::I422Rotate(
             src.y.as_ptr(),
@@ -499,6 +543,7 @@ pub fn i444_rotate(
     }
     dst.validate(dst_size, "I444Rotate")?;
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::I444Rotate(
             src.y.as_ptr(),
@@ -614,6 +659,7 @@ pub fn rotate_plane_16(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::RotatePlane_16(
             src.as_ptr(),
@@ -707,6 +753,7 @@ pub fn rotate_plane_90(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::RotatePlane90(
             src.as_ptr(),
@@ -796,6 +843,7 @@ pub fn rotate_plane_180(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::RotatePlane180(
             src.as_ptr(),
@@ -888,6 +936,7 @@ pub fn rotate_plane_270(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::RotatePlane270(
             src.as_ptr(),
@@ -1022,6 +1071,7 @@ pub fn split_rotate_uv(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
         sys::SplitRotateUV(
             src_uv.as_ptr(),
@@ -1148,6 +1198,7 @@ pub fn split_rotate_uv_90(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::SplitRotateUV90(
             src.as_ptr(),
@@ -1271,6 +1322,7 @@ pub fn split_rotate_uv_180(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::SplitRotateUV180(
             src.as_ptr(),
@@ -1396,6 +1448,7 @@ pub fn split_rotate_uv_270(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::SplitRotateUV270(
             src.as_ptr(),
@@ -1525,6 +1578,7 @@ pub fn split_transpose_uv(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::SplitTransposeUV(
             src.as_ptr(),
@@ -1619,6 +1673,7 @@ pub fn transpose_plane(
         ));
     }
 
+    // SAFETY: .validate() が全前提条件を検査済み。
     unsafe {
         sys::TransposePlane(
             src.as_ptr(),

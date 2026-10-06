@@ -1,34 +1,47 @@
 [package]
 name = "shiguredo_libyuv"
-version = "2026.1.0"
+version = "2026.2.0-canary.7"
 edition = "2024"
-rust-version = "1.88"
-authors = ["Shiguredo Inc."]
-license = "Apache-2.0"
+rust-version = "1.93"
 description = "Rust bindings for Google's libyuv image conversion and processing library"
+readme = "README.md"
 homepage = "https://github.com/shiguredo/libyuv-rs"
 repository = "https://github.com/shiguredo/libyuv-rs"
-readme = "README.md"
+license = "Apache-2.0"
 build = "build.rs"
-include = ["/src/**", "/build.rs", "/README.md", "/LICENSE"]
-
-[features]
-source-build = []
-
-[dependencies]
-
-[build-dependencies]
-bindgen = "0.72"
-shiguredo_cmake = "4.3"
-shiguredo_toml = "2026.1"
+include = [
+    "/LICENSE",
+    "/README.md",
+    "/THIRD_PARTY_LICENSES",
+    "/build.rs",
+    "/src/**",
+]
 
 # 以降は外部ライブラリビルド用のメタデータ
 # (この内容は build.rs の中からのみ参照される)
 #
 # なお libyuv にはタグが存在しないので、コミットハッシュで参照している
-[package.metadata.external-dependencies]
-libyuv = { git = "https://chromium.googlesource.com/libyuv/libyuv", version = "1170363ce55fec2a256ce383479d8a6a3edadffe" }
+[package.metadata.external-dependencies.libyuv]
+git = "https://chromium.googlesource.com/libyuv/libyuv"
+version = "eb8eda9c7973704d1103a535059224df7a6063b5"
+
+# libjpeg-turbo はタグが存在するのでタグで固定する
+[package.metadata.external-dependencies.libjpeg-turbo]
+git = "https://github.com/libjpeg-turbo/libjpeg-turbo"
+version = "3.1.90"
 
 [workspace]
 members = ["pbt"]
 exclude = ["fuzz"]
+
+[dependencies]
+
+[build-dependencies]
+bindgen = "0.72"
+# cmake クレートのコンパイラ判定に Android NDK の C / C++ コンパイラを指定する
+cc = "1.4"
+shiguredo_cmake = "4.3"
+shiguredo_toml = "2026.2"
+
+[features]
+source-build = []
