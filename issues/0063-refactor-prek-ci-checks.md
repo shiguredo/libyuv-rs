@@ -2,7 +2,7 @@
 
 - Priority: Medium
 - Created: 2026-08-04
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-10-06
 - Model: DeepSeek V4 Flash
 - Branch: feature/refactor-prek-ci-checks
 - Polished: {YYYY-MM-DD}
@@ -41,6 +41,22 @@ Medium。
 
 ## 解決方法
 
-1. `prek.toml` を修正する（stage 指定・tombi フック・default_install_hook_types）
-2. `.github/workflows/ci.yml` の clippy に `--all-targets` を追加する
-3. `prek validate-config` と `prek run --all-files` で確認する
+1. `prek.toml` を shiguredo-rust 規約と兄弟リポジトリの標準に合わせて書き換えた
+   - `fail_fast` / `default_stages` / `default_install_hook_types = ["pre-commit", "pre-push"]` / `exclude` (`target/**` / `fuzz/target/**`) を設定した
+   - builtin フックを 3 個から 16 個に拡充した（BOM 除去 / YAML / JSON / マージコンフリクト / 大文字小文字衝突 / Windows 予約名 / 大容量ファイル / 秘密鍵 / 改行コード / シンボリックリンク / shebang）
+   - tombi の lint / format フックを追加した（`rev = "v1.7.2"`、`Cargo.lock` は対象外）
+   - markdownlint-cli2 フックを追加した（`rev = "v0.23.3"`、リポジトリ既存の `.markdownlint.jsonc` を使用）
+   - `cargo-test` に `stages = ["pre-push"]` を指定して pre-push 限定にした
+2. `.github/workflows/ci.yml` の clippy を `cargo clippy --workspace --all-targets --features source-build -- -D warnings` に変更し、フックと検査範囲を揃えた
+3. 追加した tombi フックで差分が出ないよう、`Cargo.toml` / `fuzz/Cargo.toml` を tombi で整形した
+4. 追加した markdownlint-cli2 フックの既存違反 419 件（59 ファイル）を解消した
+   - 自動修正（テーブル・空行・コードフェンス言語・番号リスト）と、300 文字超の行 62 件の句読点折り返しを行った
+   - 自動修正が日本語文中の `*` / `_`（`width * 2` や `_12 / _16`）を行頭空白コードスパンと同様に壊すため、`.markdownlint.jsonc` に MD037 / MD038 と MD029 の無効化（理由コメント付き）と `line_length` を 300 に変更する設定を加えた
+5. `prek update` で tombi-pre-commit / markdownlint-cli2 の rev を最新に揃えた（両方とも既に最新だった）
+6. 検証結果
+   - `prek validate-config` が成功した
+   - `prek run --all-files` が全フック成功した
+   - `prek install --prepare-hooks` で pre-commit / pre-push フックをインストールした
+   - `cargo clippy --workspace --all-targets --all-features -- -D warnings` が成功した
+   - `cargo test --workspace --features source-build` が成功した
+   - `npx markdownlint-cli2@0.23.3` が全 83 ファイルで 0 issues になった
