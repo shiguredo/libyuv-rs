@@ -21,7 +21,7 @@ Medium。誤った関数呼び出しが発生した場合、12 ビットデー�
 `src/scale.rs` には以下の 4 組の `_12` / `_16` ペアが存在する:
 
 | _12 関数 | _16 関数 | Rust 入力型 | libyuv C 関数 |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | `i420_scale_12` (L130) | `i420_scale_16` (L166) | `I012Image` / `I012ImageMut` | `I420Scale_12` / `I420Scale_16` |
 | `i422_scale_12` (L202) | `i422_scale_16` (L238) | `I212Image` / `I212ImageMut` | `I422Scale_12` / `I422Scale_16` |
 | `i444_scale_12` (L274) | `i444_scale_16` (L310) | `I412Image` / `I412ImageMut` | `I444Scale_12` / `I444Scale_16` |

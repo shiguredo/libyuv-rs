@@ -54,7 +54,7 @@ __asm__ volatile("vdpphps %%xmm0, %%xmm0, %%xmm0" : : : "xmm0");
 認識されない。CI で使う GitHub Actions ランナーの binutils バージョンは:
 
 | ランナー | binutils | vdpphps 対応 |
-|---|---|---|
+| --- | --- | --- |
 | `ubuntu-22.04` | 2.38 | 不可 |
 | `ubuntu-24.04` | 2.42 | 不可 |
 | `ubuntu-22.04-arm` / `ubuntu-24.04-arm` | (関係なし) | x86_64 コードパス自体が無効化されるため無関係 |

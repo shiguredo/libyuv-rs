@@ -21,7 +21,7 @@ High。Rust の unsafe コードガイドラインで強く推奨されており
 全 unsafe ブロックに SAFETY コメントが存在しない。ファイル別内訳:
 
 | ファイル | unsafe ブロック数 |
-|---|---|
+| --- | --- |
 | `src/convert/` (10 サブモジュール) | 243 |
 | `src/planar.rs` | 67 |
 | `src/rotate.rs` | 20 |

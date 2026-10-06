@@ -21,7 +21,9 @@ High。
 
 ## 現状
 
-libyuv の `Android420ToARGBMatrix`（`convert_argb.cc`）と `Android420ToI420Rotate`（`rotate.cc`、commit `d23308a2a7442be8e559b1b471862fd7588d6a57` 時点）は `pixel_stride_uv == 2` のとき、U/V をインターリーブデータとして 1 行 `2 * halfwidth` バイト読み進める（奇数幅では width + 1 バイト。高速パス `NV12/NV21ToARGBMatrix` の行関数と `SplitRotateUV` が該当）。また C 側は `src_v - src_u`（`vu_off`）のポインタ減算を行い、`vu_off` が ±1 かつ `src_stride_u == src_stride_v` のときだけ高速パスに入る。フォールバックは `WeavePixels` / `SplitPixels` による `pixel_stride_uv` 刻みの読み出しになる（`Android420ToI420Rotate` のフォールバックは `rotation == 0` のときのみ。それ以外の回転では C 側が `-1` を返す）。
+libyuv の `Android420ToARGBMatrix`（`convert_argb.cc`）と `Android420ToI420Rotate`（`rotate.cc`、commit `d23308a2a7442be8e559b1b471862fd7588d6a57` 時点）は `pixel_stride_uv == 2` のとき、U/V をインターリーブデータとして 1 行 `2 * halfwidth` バイト読み進める（奇数幅では width + 1 バイト。
+高速パス `NV12/NV21ToARGBMatrix` の行関数と `SplitRotateUV` が該当）。また C 側は `src_v - src_u`（`vu_off`）のポインタ減算を行い、`vu_off` が ±1 かつ `src_stride_u == src_stride_v` のときだけ高速パスに入る。フォールバックは `WeavePixels` / `SplitPixels` による `pixel_stride_uv`
+刻みの読み出しになる（`Android420ToI420Rotate` のフォールバックは `rotation == 0` のときのみ。それ以外の回転では C 側が `-1` を返す）。
 
 一方 Rust 側の検証（`src/lib.rs` の `validate_yuv_src_inner`）は `u_stride >= ceil(width / 2)` と `u.len() >= u_stride * ceil(height / 2)` を要求するだけなので:
 
@@ -34,7 +36,8 @@ libyuv の `Android420ToARGBMatrix`（`convert_argb.cc`）と `Android420ToI420R
 - `pixel_stride_uv` の値検証（1 または 2 以外は `Err`）を 4 関数すべてに追加する（hardware.rs の 3 関数に追加、rotate.rs は既存の検証を維持。値が 1 / 2 に限定されるため `require_c_int(pixel_stride_uv)` は不要）
 - `pixel_stride_uv == 2` のときは U/V の実効行幅を `2 * ceil(width / 2)` バイトとして検証する（`u_stride >= width.div_ceil(2) * 2`、`u.len() >= u_stride * ceil(height / 2)` 相当。`validate_nv_src_inner` のインターリーブ最小幅と同じ式）
 - 検証の実装場所は 4 関数の関数内（`require_c_int` / `checked_buf_size` パターン）とする。`validate_yuv_src_inner` は全 YUV 画像型共通のため変更しない（共通ヘルパー化が必要なら将来のヘルパー整理の課題とする）
-- docstring に「`pixel_stride_uv == 2` のとき、u / v は同一バッファの連続領域（インターリーブ）でなければならない。別スライスを渡すと C 側のポインタ減算（`src_v - src_u`）が未定義動作になる」前提を明記する（C 側は `pixel_stride_uv` の値によらず減算式を評価するため、`pixel_stride_uv == 1` のプラナーでも別スライスは形式上 UB になる。ただし結果は使用されないため実害はない旨を併記する）。また、検証は安全側に `len() >= stride * ceil(height / 2)` を要求するため、同一バッファの連続領域（u は先頭から、v は 1 バイトずらして末尾まで）で渡す場合、v 側のバッファ長が要求を満たすよう末尾にパディングを確保することも明記する
+- docstring に「`pixel_stride_uv == 2` のとき、u / v は同一バッファの連続領域（インターリーブ）でなければならない。別スライスを渡すと C 側のポインタ減算（`src_v - src_u`）が未定義動作になる」前提を明記する（C 側は `pixel_stride_uv` の値によらず減算式を評価するため、`pixel_stride_uv == 1` のプラナーでも別スライスは形式上 UB になる。ただし結果は使用されないため実害はない旨を併記する）。
+  また、検証は安全側に `len() >= stride * ceil(height / 2)` を要求するため、同一バッファの連続領域（u は先頭から、v は 1 バイトずらして末尾まで）で渡す場合、v 側のバッファ長が要求を満たすよう末尾にパディングを確保することも明記する
 
 ## 完了条件
 

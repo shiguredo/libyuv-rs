@@ -21,7 +21,9 @@ High。
 
 ## 現状
 
-libyuv の `DetilePlane`（`planar_functions.cc`、commit `d23308a2a7442be8e559b1b471862fd7588d6a57` 時点）は行ごとに src を 16 バイト進め、`tile_height` 行ごとに `src_y - src_tile_stride + src_stride_y * tile_height`（`src_tile_stride = 16 * tile_height`）で次のタイル行へジャンプする。1 行の読み出しはタイル列ごとに `src_tile_stride` 間隔のチャンク列であり、1 タイル行の読み出しは幅を 16 の倍数に切り上げた値（padded width）分のタイル配置スパンに及ぶ。実アクセスの最大オフセットの上界は `(div_ceil(height, tile_height) - 1) * stride * tile_height + (tile_height - 1) * 16 + (div_ceil(width, 16) - 1) * 16 * tile_height + 端数` となり、線形サイズ（`stride * height`）より大きくなりうる（この式は最終タイル段がフルタイル高を持つ仮定の上界であり、実際の最大読み出しはこれ以下。下記の例では 784 バイト）。
+libyuv の `DetilePlane`（`planar_functions.cc`、commit `d23308a2a7442be8e559b1b471862fd7588d6a57` 時点）は行ごとに src を 16 バイト進め、`tile_height` 行ごとに `src_y - src_tile_stride + src_stride_y * tile_height`（`src_tile_stride = 16 * tile_height`）で次のタイル行へジャンプする。
+1 行の読み出しはタイル列ごとに `src_tile_stride` 間隔のチャンク列であり、1 タイル行の読み出しは幅を 16 の倍数に切り上げた値（padded width）分のタイル配置スパンに及ぶ。
+実アクセスの最大オフセットの上界は `(div_ceil(height, tile_height) - 1) * stride * tile_height + (tile_height - 1) * 16 + (div_ceil(width, 16) - 1) * 16 * tile_height + 端数` となり、線形サイズ（`stride * height`）より大きくなりうる（この式は最終タイル段がフルタイル高を持つ仮定の上界であり、実際の最大読み出しはこれ以下。下記の例では 784 バイト）。
 
 対象と問題:
 
@@ -33,7 +35,9 @@ libyuv の `DetilePlane`（`planar_functions.cc`、commit `d23308a2a7442be8e559b
 
 ## 設計方針
 
-`detile_split_uv_plane` の式（round16 stride チェック + `src_stride * div_ceil(height, tile_height) * tile_height`）に統一する。`detile_split_uv_plane` の式が安全なのは `src_stride >= round_up(width, 16)` チェック（`src_min_stride = size.width.div_ceil(16) * 16`、hardware.rs の `detile_split_uv_plane`）を併設しているためであり、3 関数にも同じ stride 下限チェックを追加する。この式は全タイル段を一括で要求する安全側の過大要求であり、0046 の MM21 / MT2T 式（最終タイル段のみ幅丸めベースで計算）より過大になるが、同一ファイル内の既存実装（`detile_split_uv_plane`）との統一を優先する。サイズ計算は `detile_split_uv_plane` と同じく `checked_mul` によるオーバーフロー安全な演算とする。
+`detile_split_uv_plane` の式（round16 stride チェック + `src_stride * div_ceil(height, tile_height) * tile_height`）に統一する。
+`detile_split_uv_plane` の式が安全なのは `src_stride >= round_up(width, 16)` チェック（`src_min_stride = size.width.div_ceil(16) * 16`、hardware.rs の `detile_split_uv_plane`）を併設しているためであり、3 関数にも同じ stride 下限チェックを追加する。この式は全タイル段を一括で要求する安全側の過大要求であり、0046 の MM21 / MT2T 式（最終タイル段のみ幅丸めベースで計算）より過大になるが、
+同一ファイル内の既存実装（`detile_split_uv_plane`）との統一を優先する。サイズ計算は `detile_split_uv_plane` と同じく `checked_mul` によるオーバーフロー安全な演算とする。
 
 - `detile_plane` / `detile_plane_16`: `src_stride >= width.div_ceil(16) * 16` チェックを追加し、ソースサイズを `src_stride * div_ceil(height, tile_height) * tile_height` で検証する（`detile_plane_16` は u16 要素数単位で同様）
 - `detile_to_yuy2`: `tile_height` の 2 累乗検証と `require_c_int` を追加し、ソース（Y / UV）もタイル配置サイズで検証する。検証は関数内で `src.y` / `src.uv` スライス長を個別に検証する（`Nv12Image::validate` は NV12 全関数共通のため変更しない）。`tile_height` は 2 以上かつ 2 累乗であること（`tile_height >= 2`。tile_height=1 は 2 累乗だが UV タイル高 `tile_height / 2` が 0 になり検証をすり抜けるため不許可）

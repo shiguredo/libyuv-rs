@@ -40,7 +40,8 @@ rotate 固有の `dst_size` 不一致エラーパス（`RotationMode::output_siz
 ## 完了条件
 
 - 17 関数に正常系・エラーパスのテストが存在すること（テスト配置先は `tests/test_rotate.rs`。対象関数の選定一覧を実装時に issue に追記して確定すること。エラーパスはバッファ不足・stride 不足・`dst_size` 不一致を対象とし、`require_c_int` のみで実用上テスト不能の c_int 超過は含めない。テストファイルはヘッダの「正常系のプロパティ検証は PBT でカバーする」を ground truth テスト追加に合わせて更新すること）
-- mode 付き関数（`i010_rotate` / `i210_rotate` / `i410_rotate` / `android420_to_i420_rotate` / `nv12_to_i420_rotate` / `i422_rotate` / `i444_rotate` / `rotate_plane_16` / `split_rotate_uv`）に `RotationMode` 全モード（None / 90 / 180 / 270）の ground truth テストが存在すること（既存テストのある `i420_rotate` / `argb_rotate` / `rotate_plane` の全モード ground truth も含む）
+- mode 付き関数（`i010_rotate` / `i210_rotate` / `i410_rotate` / `android420_to_i420_rotate` / `nv12_to_i420_rotate` / `i422_rotate` / `i444_rotate` / `rotate_plane_16` / `split_rotate_uv`）に `RotationMode` 全モード（None / 90 / 180 / 270）の ground truth テストが存在すること（既存テストのある `i420_rotate` /
+  `argb_rotate` / `rotate_plane` の全モード ground truth も含む）
 - rotate の `dst_size` 不一致エラーパスがテストされていること（mode 付き関数）
 - 全テストが `cargo test --workspace --features source-build` で成功すること
 - `cargo fmt --all --check` と `cargo clippy --workspace --features source-build -- -D warnings` が成功すること

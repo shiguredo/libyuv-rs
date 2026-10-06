@@ -7,6 +7,7 @@ YuvConstants を利用したマトリックスベースの色空間変換関数�
 ## 対象関数
 
 ### マトリックス付き変換
+
 - I420ToARGBMatrix
 - I420ToARGBMatrixFilter
 - I420ToRGB24Matrix
@@ -63,6 +64,7 @@ YuvConstants を利用したマトリックスベースの色空間変換関数�
 - UYVYToARGBMatrix
 
 ### 逆方向マトリックス付き変換
+
 - ARGBToI420Matrix
 - ARGBToI422Matrix
 - ARGBToI444Matrix
@@ -95,6 +97,7 @@ pub enum ColorSpace {
 ```
 
 理由:
+
 - ユーザーが C の定数名を知る必要がなくなる
 - カスタムマトリックスは libyuv 自体がサポートしていない (内部構造がプラットフォーム依存) ので不要
 - 6 つの固定値しかないため enum が最適

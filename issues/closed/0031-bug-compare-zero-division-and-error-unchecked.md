@@ -35,6 +35,7 @@ pub fn sum_square_error_to_psnr(sse: u64, count: u64) -> f64 {
 ```
 
 `count` に対する検証が一切ない。C 実装 (`compare.cc:271-285`) の挙動:
+
 - `sse > 0 && count == 0`: `mse = 0.0 / sse = 0.0` → `10.0 * log10(255.0 * 255.0 * 0.0)` = `10.0 * log10(0.0)` = **-inf**
 - `sse == 0`: `kMaxPsnr` (128.0, `compare.h:53`) を返す（除算回避）
 

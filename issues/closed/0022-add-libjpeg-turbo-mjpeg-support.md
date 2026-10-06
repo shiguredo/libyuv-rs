@@ -54,7 +54,7 @@ version = "e1dbfa7be7b7e54922020051dc77781e92739700"
 複数の外部ライブラリを扱えるよう、現状 libyuv 専用になっている定数群とヘルパーを汎用化する。
 
 | 既存 (build.rs の行) | 変更内容 |
-|---|---|
+| --- | --- |
 | `const LIB_NAME` / `LINK_NAME` / `SYMBOL_PREFIX` (L11-L25) | 削除。`LibraryConfig` 構造体に置き換える |
 | `git_clone_external_lib(build_dir)` (L672) | `git_clone_external_lib(build_dir, lib: &LibraryConfig)` |
 | `get_git_url_and_version()` (L700) | `get_git_url_and_version(lib_name: &str)` |
@@ -132,7 +132,8 @@ SIMD は **NASM 必須**:
 
 1. libjpeg-turbo を cmake install して `OUT_DIR/libjpeg-turbo-install/lib/libjpeg.a` (Windows: `lib/jpeg-static.lib`) を生成する
 2. install 出力の `OUT_DIR/libjpeg-turbo-install/lib/libjpeg.a` (Windows: `jpeg-static.lib`) は **そのまま残す** (libyuv ビルドの `find_package(JPEG)` で参照させるため)。同時に `OUT_DIR/lib/libshiguredo_jpeg.a` (Windows: `OUT_DIR/lib/shiguredo_jpeg.lib`) にコピーする (こちらが最終的にリンクに使う実体、ステップ 4 でシンボル書き換える対象)
-3. libyuv を cmake configure & build する。`shiguredo_cmake::Config` で `BUILD_SHARED_LIBS=OFF`、`CMAKE_PREFIX_PATH` に `OUT_DIR/libjpeg-turbo-install` を渡し、`find_package(JPEG)` を成功させて `add_definitions(-DHAVE_JPEG)` で MJPG\* 系のコンパイルを有効化する。libyuv の cmake はリネーム前の `OUT_DIR/libjpeg-turbo-install/lib/libjpeg.a` をリンク対象として認識するが、最終 Rust リンクではこれは使われない (libyuv.a 側の未定義参照はステップ 6 で `shiguredo_jpeg_*` に書き換えられる)
+3. libyuv を cmake configure & build する。`shiguredo_cmake::Config` で `BUILD_SHARED_LIBS=OFF`、`CMAKE_PREFIX_PATH` に `OUT_DIR/libjpeg-turbo-install` を渡し、`find_package(JPEG)` を成功させて `add_definitions(-DHAVE_JPEG)` で MJPG\* 系のコンパイルを有効化する。
+   libyuv の cmake はリネーム前の `OUT_DIR/libjpeg-turbo-install/lib/libjpeg.a` をリンク対象として認識するが、最終 Rust リンクではこれは使われない (libyuv.a 側の未定義参照はステップ 6 で `shiguredo_jpeg_*` に書き換えられる)
 4. `OUT_DIR/lib/libshiguredo_jpeg.a` の定義シンボルを `llvm-nm --defined-only --extern-only` で収集し、`shiguredo_jpeg_` プレフィックス付きリネームマップ (`OUT_DIR/symbol_rename_map_jpeg.txt`) を生成。`llvm-objcopy --redefine-syms` で `libshiguredo_jpeg.a` を書き換える
 5. libyuv の install 出力 `libyuv.a` (Windows: `yuv.lib`) を `OUT_DIR/lib/libshiguredo_yuv.a` (Windows: `OUT_DIR/lib/shiguredo_yuv.lib`) にコピーする
 6. `libshiguredo_yuv.a` に **ステップ 4 のリネームマップを `--redefine-syms` で適用** する。`--redefine-syms` は未定義参照シンボルも書き換えるため、`libyuv.a` 内の `jpeg_*` への未定義参照 / グローバル関数ポインタ参照 (`jpeg_resync_to_restart` 等) が `shiguredo_jpeg_*` に書き換わる
@@ -142,12 +143,15 @@ SIMD は **NASM 必須**:
 
 #### build.rs 各関数への展開
 
-- `main()`: 既存 `should_use_prebuilt()` 分岐の後、新規ヘルパー `build_libjpeg_turbo(&out_dir) -> LibjpegTurboBuildResult` と既存 `build_from_source(&out_dir, &output_bindings_path, &libjpeg_turbo_result)` を順に呼ぶ。`LibjpegTurboBuildResult` には `install_prefix: PathBuf` (libyuv ビルドで `CMAKE_PREFIX_PATH` に渡す) と `rename_map_path: PathBuf` (libyuv の未定義参照書き換えに使う `symbol_rename_map_jpeg.txt`) の 2 つを格納する。`build_libjpeg_turbo` がステップ 1〜2、4 を担当し、`build_from_source` がステップ 3, 5〜7 を担当する
+- `main()`: 既存 `should_use_prebuilt()` 分岐の後、新規ヘルパー `build_libjpeg_turbo(&out_dir) -> LibjpegTurboBuildResult` と既存 `build_from_source(&out_dir, &output_bindings_path, &libjpeg_turbo_result)` を順に呼ぶ。
+  `LibjpegTurboBuildResult` には `install_prefix: PathBuf` (libyuv ビルドで `CMAKE_PREFIX_PATH` に渡す) と `rename_map_path: PathBuf` (libyuv の未定義参照書き換えに使う `symbol_rename_map_jpeg.txt`) の 2 つを格納する。`build_libjpeg_turbo` がステップ 1〜2、4 を担当し、`build_from_source` がステップ 3, 5〜7 を担当する
 - `main()` のリンク出力 (現状 L86 の 1 行) を以下の 2 行に差し替える。`download_prebuilt()` 経路でも同じ 2 行を出す (どちらの経路でも `OUT_DIR/lib/` に `libshiguredo_yuv.a` と `libshiguredo_jpeg.a` が揃う前提):
-  ```
+
+  ```text
   cargo::rustc-link-lib=static=shiguredo_yuv
   cargo::rustc-link-lib=static=shiguredo_jpeg
   ```
+
 - bindgen 呼び出し (現状 `build_from_source()` L294) はステップ 7 の後に置く。`rename_defined_symbols` の戻り値 (`SymbolLinkNameCallbacks`) を `parse_callbacks` に渡す
 
 #### マップファイルの相互汚染防止
@@ -173,6 +177,7 @@ SIMD は **NASM 必須**:
 **CI への組み込み位置** (Windows runner でも動かすため `shell: bash` を明示し、`rustc -vV` の出力で `\r` が混入する点を `tr -d '\r'` で除去する):
 
 - `ci.yml` の `test` ジョブ: `cargo test --workspace --features source-build` の直後に下記ステップを追加する。`find -maxdepth 0` が複数候補をヒットしたら fail させる (`set -euo pipefail` でガード):
+
   ```yaml
   - name: Verify symbol rewrite
     shell: bash
@@ -184,6 +189,7 @@ SIMD は **NASM 必須**:
       bash scripts/verify_symbol_rewrite.sh "$OUT_DIR"
       bash scripts/verify_libyuv_source.sh "$OUT_DIR"
   ```
+
 - `release.yml` の `build-prebuilt` ジョブ: `Find OUT_DIR` ステップ (既存) の直後に「`bash scripts/verify_symbol_rewrite.sh "${{ steps.find_out_dir.outputs.OUT_DIR }}"`」を `shell: bash` 明示で追加する。同時に既存 `Find OUT_DIR` ステップにも `wc -l` ガードと `set -euo pipefail` を追加する
 
 **検証失敗時の対応**: assert のいずれかが失敗したら実装作業を停止し、ユーザーに「どの assert がどのプラットフォームで失敗したか」を報告する。本 issue 内ではフォールバック実装 (libjpeg-turbo ビルド時のマクロ注入による自己整合書き換えなど) を行わず、別 issue (`feature/fix-symbol-rewrite-<platform>`) として切り出して対処する。
@@ -194,7 +200,7 @@ bindgen は引き続き `libyuv.h` のみを入力する。MJPG\* 関数の宣�
 
 リンク設定 (build.rs メイン関数で出力):
 
-```
+```text
 cargo::rustc-link-search=native=<OUT_DIR>/lib/
 cargo::rustc-link-lib=static=shiguredo_yuv
 cargo::rustc-link-lib=static=shiguredo_jpeg
@@ -204,7 +210,7 @@ libyuv (依存する側) を先、libjpeg (依存される側) を後に書く�
 
 ### prebuilt アーカイブの構造
 
-```
+```text
 lib/
   libshiguredo_yuv.a      (Windows: shiguredo_yuv.lib)
   libshiguredo_jpeg.a     (Windows: shiguredo_jpeg.lib)
@@ -249,7 +255,8 @@ pub fn mjpeg_to_argb(src: &[u8], dst: &mut ArgbImageMut<'_>, size: ImageSize) ->
 - `size.width == 0 || size.height == 0` → `Err`
 - `dst.validate(size, "<関数名>")?` で dst バッファサイズ検証
 
-libyuv の C 関数 (例: `MJPGToI420`) は `src_width / src_height / dst_width / dst_height` を取るが、本 API ではすべてに `size.width` / `size.height` を 4 つとも同値で渡してスケーリングを無効化する。dst プレーンのストライドは既存 API と同じく `dst.y_stride` / `dst.u_stride` / `dst.v_stride` (NV12 / NV21 は `dst.y_stride` / `dst.uv_stride`、ARGB は `dst.stride`) を `c_int` キャストして渡す。
+libyuv の C 関数 (例: `MJPGToI420`) は `src_width / src_height / dst_width / dst_height` を取るが、本 API ではすべてに `size.width` / `size.height` を 4 つとも同値で渡してスケーリングを無効化する。
+dst プレーンのストライドは既存 API と同じく `dst.y_stride` / `dst.u_stride` / `dst.v_stride` (NV12 / NV21 は `dst.y_stride` / `dst.uv_stride`、ARGB は `dst.stride`) を `c_int` キャストして渡す。
 
 ### Docs.rs ダミー bindings
 
@@ -304,7 +311,8 @@ Linux arm64 は GAS の NEON SIMD のため NASM 不要 (上記スクリプト�
 4. 将来 libjpeg-turbo の commit を bump する際は `THIRD_PARTY_LICENSES` も同時に更新する。これを CI で強制するため `scripts/verify_license_hash.sh` を本 issue で新設する。仕様:
    - shebang / set: `#!/usr/bin/env bash` + `set -euo pipefail`
    - 呼び出し: `bash scripts/verify_license_hash.sh`
-   - 動作: `Cargo.toml` から libjpeg-turbo セクションの `version` を抽出する。`Cargo.toml` 内には複数の `version` キーがあるため `awk` でセクション境界を判定する (例: `awk '/^\[package\.metadata\.external-dependencies\.libjpeg-turbo\]/,/^\[/ {if ($1 == "version") print $3}' Cargo.toml | tr -d '"'`)。`THIRD_PARTY_LICENSES` 冒頭の `# libjpeg-turbo (commit <hash>)` から `sed -n '1s/.*(commit \([0-9a-f]*\)).*/\1/p' THIRD_PARTY_LICENSES` で hash を取り、両者を比較する。不一致なら exit 1
+   - 動作: `Cargo.toml` から libjpeg-turbo セクションの `version` を抽出する。`Cargo.toml` 内には複数の `version` キーがあるため `awk` でセクション境界を判定する (例: `awk '/^\[package\.metadata\.external-dependencies\.libjpeg-turbo\]/,/^\[/ {if ($1 == "version") print $3}' Cargo.toml | tr -d '"'`)。
+     `THIRD_PARTY_LICENSES` 冒頭の `# libjpeg-turbo (commit <hash>)` から `sed -n '1s/.*(commit \([0-9a-f]*\)).*/\1/p' THIRD_PARTY_LICENSES` で hash を取り、両者を比較する。不一致なら exit 1
    - CI 組み込み: `ci.yml` の `test` ジョブで `cargo fmt --all --check` の直前に `shell: bash` 明示で実行ステップを追加する
 5. `Cargo.toml` の `include` に `/THIRD_PARTY_LICENSES` を追加する (`/src/test_data/` は `/src/**` でカバーされるため別途追加不要)
 
@@ -373,7 +381,7 @@ fuzz ターゲット戦略:
 
 `shiguredo-changelog` 規約 (種別並び CHANGE → ADD → UPDATE → FIX) に従い、既存 `[UPDATE] libyuv のハッシュを ... に更新する` の **上** に挿入する (既存エントリは触らない):
 
-```
+```text
 - [CHANGE] build.rs を複数の外部ライブラリに対応できるよう汎用化する
   - LIB_NAME / LINK_NAME / SYMBOL_PREFIX 定数を LibraryConfig 構造体に置き換える
   - git_clone_external_lib / get_git_url_and_version / rewrite_symbols / find_static_library を汎用化する
@@ -395,7 +403,7 @@ fuzz ターゲット戦略:
 
 `### misc` セクション:
 
-```
+```text
 - [ADD] MJPEG fuzz ターゲットを追加する
   - @voluntas
 - [UPDATE] CI / release ワークフローに NASM のインストールを追加する
@@ -421,13 +429,15 @@ fuzz ターゲット戦略:
 
 ## 解決方法
 
-`build.rs` を `LibraryConfig` 構造体ベースの汎用化リファクタに切り替えたうえで、libjpeg-turbo 3.1.90 (commit `e1dbfa7be7b7e54922020051dc77781e92739700`) を `build.rs` から自動ビルドし、シンボル書き換えと bindgen 連携を 2 ライブラリ対応にした。MJPEG 系 5 関数 (`mjpeg_size`, `mjpeg_to_i420`, `mjpeg_to_nv12`, `mjpeg_to_nv21`, `mjpeg_to_argb`) を `src/convert.rs` に追加し、`tests/test_convert.rs` の命名規則に従って `tests/test_mjpeg.rs` で 15 件の単体テスト (正常系 5 + 異常系 10) を追加した。
+`build.rs` を `LibraryConfig` 構造体ベースの汎用化リファクタに切り替えたうえで、libjpeg-turbo 3.1.90 (commit `e1dbfa7be7b7e54922020051dc77781e92739700`) を `build.rs` から自動ビルドし、シンボル書き換えと bindgen 連携を 2 ライブラリ対応にした。
+MJPEG 系 5 関数 (`mjpeg_size`, `mjpeg_to_i420`, `mjpeg_to_nv12`, `mjpeg_to_nv21`, `mjpeg_to_argb`) を `src/convert.rs` に追加し、`tests/test_convert.rs` の命名規則に従って `tests/test_mjpeg.rs` で 15 件の単体テスト (正常系 5 + 異常系 10) を追加した。
 
 主な変更ファイル:
 
 - `Cargo.toml`: libjpeg-turbo の external-dependencies と `include` に `THIRD_PARTY_LICENSES` を追加
 - `THIRD_PARTY_LICENSES`: libjpeg-turbo の LICENSE.md 全文を `# libjpeg-turbo (commit ...)` ヘッダ付きで同梱
-- `build.rs`: `LIB_NAME`/`LINK_NAME`/`SYMBOL_PREFIX` 定数を削除し `LibraryConfig` 構造体に置き換え。`rewrite_symbols` を `rename_defined_symbols` (戻り値 `RenameResult` に `map_file_path` 同梱) と `rewrite_archive_symbols` の組み合わせに分割。`build_libjpeg_turbo` を新設し、libyuv 側で `CMAKE_PREFIX_PATH` を渡して `find_package(JPEG)` を成功させる。DOCS_RS 分岐に MJPG\* 関数のダミー FFI シグネチャを追加
+- `build.rs`: `LIB_NAME`/`LINK_NAME`/`SYMBOL_PREFIX` 定数を削除し `LibraryConfig` 構造体に置き換え。`rewrite_symbols` を `rename_defined_symbols` (戻り値 `RenameResult` に `map_file_path` 同梱) と `rewrite_archive_symbols` の組み合わせに分割。
+  `build_libjpeg_turbo` を新設し、libyuv 側で `CMAKE_PREFIX_PATH` を渡して `find_package(JPEG)` を成功させる。DOCS_RS 分岐に MJPG\* 関数のダミー FFI シグネチャを追加
 - `src/convert.rs`: MJPEG API 5 関数と共通入力検証 `validate_mjpeg_input` を追加 (スケーリングは `let w = size.width as c_int; let h = size.height as c_int;` で受けて `(w, h, w, h)` で渡し、無効化していることをコード上で明示)
 - `src/test_data/`: ImageMagick で生成した 4:2:0 / 4:2:2 / 4:4:4 の固定 JPEG 3 枚と再生成手順の README.md を追加 (CI から再生成しない)
 - `tests/test_mjpeg.rs`: 単体テスト 15 件。正常系では Y プレーン非ゼロ・ARGB アルファチャンネル 0xFF を検証。異常系では空入力 / SOI 破壊 / EOI 欠落 / サイズ不一致 / バッファ不足 / 幅・高さの `c_int` オーバーフローを検査

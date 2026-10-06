@@ -17,7 +17,8 @@
 High。
 
 - 範囲外の `depth`（例: `1 << depth` は 31 以上で int 表現不能の UB、`depth - 10` は 10 未満で負シフト UB）で libyuv のシフトが C 標準上 UB になる。`ConvertToMSBPlane_16` / `ConvertToLSBPlane_16` はシフト式（`int scale = 1 << ...`）が早期 return より先に評価されるため、ゼロサイズ入力でも範囲外 `depth` なら UB を誘発する
-- libyuv 側の `assert`（関数ごとに `depth >= 1` / `depth >= 8` / `depth >= 10` など）は C 版 row 関数（`MergeAR64Row_C` / `MergeXR30Row_C` / `MergeARGB16To8Row_C` / `MergeUVRow_16_C` / `SplitUVRow_16_C`）と `MergeUVPlane_16` 本体に存在するが、他の plane 関数と SIMD 版 row 関数には存在しない。さらに Release（NDEBUG）ビルドでは assert 自体がコンパイル時に除去され、`ConvertToMSBPlane_16` / `ConvertToLSBPlane_16` は assert を一切持たない
+- libyuv 側の `assert`（関数ごとに `depth >= 1` / `depth >= 8` / `depth >= 10` など）は C 版 row 関数（`MergeAR64Row_C` / `MergeXR30Row_C` / `MergeARGB16To8Row_C` / `MergeUVRow_16_C` / `SplitUVRow_16_C`）と `MergeUVPlane_16` 本体に存在するが、他の plane 関数と SIMD 版 row 関数には存在しない。
+  さらに Release（NDEBUG）ビルドでは assert 自体がコンパイル時に除去され、`ConvertToMSBPlane_16` / `ConvertToLSBPlane_16` は assert を一切持たない
 
 ## 現状
 
@@ -49,9 +50,12 @@ C 側の assert は `build.rs` の CMake Release プロファイル（NDEBUG）�
 - `merge_uv_plane_16` / `split_uv_plane_16` / `merge_argb16_to_8_plane`: 8..=16
 - `merge_ar64_plane`: 1..=16（C 側契約（assert）と一致。8..=16 に制限すると C で動作する depth 1..=7 を拒否する機能退行になるため、C 契約に合わせる）
 - `merge_xr30_plane`: 10..=16（C 側契約（assert）と一致。8..=16 だと depth=8, 9 の負シフト UB が残るため必須）
-- `convert_to_lsb_plane_16` / `convert_to_msb_plane_16`: 8..=16（C 側に assert がなく契約が明示されていないため、crate の 16bit 変換関数の下限 8 に合わせた crate 仕様として採用。シフト単体では MSB が -14..=16、LSB が 0..=30 で安全だが、depth 8 未満は 16bit 変換の実用範囲外として許可しない。なお 8..=16 内でも row 関数の乗算（LSB depth=16 のとき scale=65536 となり、`src_y[x] * scale` が int 範囲を超えうる）は libyuv 側の現行実装として C 標準上 UB のまま残るが、本 issue のスコープ外とする）
+- `convert_to_lsb_plane_16` / `convert_to_msb_plane_16`: 8..=16（C 側に assert がなく契約が明示されていないため、crate の 16bit 変換関数の下限 8 に合わせた crate 仕様として採用。シフト単体では MSB が -14..=16、LSB が 0..=30 で安全だが、depth 8 未満は 16bit 変換の実用範囲外として許可しない。
+  なお 8..=16 内でも row 関数の乗算（LSB depth=16 のとき scale=65536 となり、`src_y[x] * scale` が int 範囲を超えうる）は libyuv 側の現行実装として C 標準上 UB のまま残るが、本 issue のスコープ外とする）
 
-検証は各関数の先頭で、既存の `require_c_int` 検証と同じ並びに追加する（エラーの `function` 引数は各 C 関数名、例: `"MergeXR30Plane"`）。`depth` の型は `i32` のまま実行時検証とする（C ABI が `c_int` のため）。ゼロサイズ入力（width == 0 / height == 0）は C 実装の早期 return により現状 no-op（`Ok`）だが（convert 系は範囲外 depth ならシフト UB が先に起きうる）、ゼロサイズ時は他の検証（`require_c_int` / stride / バッファ）が必ず通過するため、depth 検証を既存検証と同じ並びに置けばゼロサイズ + 範囲外 depth は `Err` になる。この挙動（ゼロサイズでも範囲外 depth は `Err`）を本 issue の仕様として確定する（ゼロサイズ入力自体を Err に統一するのは 0064 のスコープ）。
+検証は各関数の先頭で、既存の `require_c_int` 検証と同じ並びに追加する（エラーの `function` 引数は各 C 関数名、例: `"MergeXR30Plane"`）。`depth` の型は `i32` のまま実行時検証とする（C ABI が `c_int` のため）。
+ゼロサイズ入力（width == 0 / height == 0）は C 実装の早期 return により現状 no-op（`Ok`）だが（convert 系は範囲外 depth ならシフト UB が先に起きうる）、ゼロサイズ時は他の検証（`require_c_int` / stride / バッファ）が必ず通過するため、depth 検証を既存検証と同じ並びに置けばゼロサイズ + 範囲外 depth は `Err` になる。
+この挙動（ゼロサイズでも範囲外 depth は `Err`）を本 issue の仕様として確定する（ゼロサイズ入力自体を Err に統一するのは 0064 のスコープ）。
 
 ## 完了条件
 

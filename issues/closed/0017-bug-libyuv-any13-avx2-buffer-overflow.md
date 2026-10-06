@@ -32,6 +32,7 @@ cargo test -p pbt --test prop_planar -- roundtrip_split_merge_rgb
 `SplitRGBRow_Any_AVX2` は `ANY13(SplitRGBRow_Any_AVX2, SplitRGBRow_AVX2, 3, 31)` で生成される。
 
 MASK=31 のとき:
+
 1. `memcpy(vin, ..., r * 3)` — r は最大 31、31 * 3 = 93 バイトを 48 バイトバッファに書き込み → **オーバーフロー**
 2. `SplitRGBRow_AVX2(vin, ...)` — 96 バイト読み込みだが vin は 48 バイト → **オーバーフロー**
 3. `vout + 32` に 32 バイト書き込みだが残り 16 バイト → **オーバーフロー**
@@ -45,12 +46,12 @@ MASK=31 のとき:
 
 ## CI ログ
 
-```
+```text
 test nv12_mirror_twice ... ok
 *** buffer overflow detected ***: terminated
 ```
 
-https://github.com/shiguredo/libyuv-rs/actions/runs/22860116385/job/66311383646
+<https://github.com/shiguredo/libyuv-rs/actions/runs/22860116385/job/66311383646>
 
 ## 影響範囲
 
@@ -62,6 +63,7 @@ https://github.com/shiguredo/libyuv-rs/actions/runs/22860116385/job/66311383646
 `patches/fix-any13-avx2-buffer-overflow.patch` を作成し、build.rs で libyuv ビルド前に自動適用するようにした。
 
 パッチの内容:
+
 - `vin` のサイズを `(MASK + 1) * BPP` に拡大 (AVX2 では 96 バイト)
 - `vout` を 3 つの個別バッファ `vr`, `vg`, `vb` に分離し、出力プレーンの重複書き込みを防止
 
