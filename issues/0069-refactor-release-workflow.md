@@ -2,7 +2,7 @@
 
 - Priority: Medium
 - Created: 2026-08-04
-- Completed: {YYYY-MM-DD}
+- Completed: 2026-10-06
 - Model: DeepSeek V4 Flash
 - Branch: feature/refactor-release-workflow
 - Polished: {YYYY-MM-DD}
@@ -40,6 +40,12 @@ Medium。
 
 ## 解決方法
 
-1. release.yml の `github-release` ジョブに `permissions: contents: write` を追加する
-2. `publish` ジョブに `cargo publish --dry-run` ステップを追加する
-3. slack-notify の参照を固定する（可能であれば）
+- `release.yml` の `github-release` ジョブに `permissions: contents: write` を追加した
+- `github-release` ジョブに `Verify tag matches Cargo.toml version` ステップを追加し、`gh release create` の前にタグ名と `Cargo.toml` の `[package]` version を照合するようにした（`[package]` セクションに限定するため sed の範囲抽出を使う。`package.metadata.external-dependencies.*` の version を誤読しない）
+- `publish` ジョブに `cargo publish --dry-run` ステップを追加し、成功した場合のみ本番の `cargo publish` を実行するようにした
+- slack-notify の参照は `shiguredo/github-actions` が自社リポジトリの action であり、`@main` 参照が意図的な追従運用のため変更していない（`update-actions` スキルでも `shiguredo/github-actions` の内部 action は書き換え対象外とされている）
+
+検証:
+
+- `actionlint` で新規の指摘がないことを確認した（既存の SC2086 と未知の runner ラベル警告のみ）
+- タグと `Cargo.toml` の version 照合ロジックをローカルで実行し、一致時に通過し不一致時に失敗することを確認した
