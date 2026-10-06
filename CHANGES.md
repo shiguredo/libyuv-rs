@@ -44,8 +44,9 @@
   - @voluntas
 - [ADD] iOS 実機 / シミュレーターおよび Android (arm64-v8a / x86_64) 向けのビルド、CI、prebuilt 対応を追加する
   - @voluntas
-- [UPDATE] `libyuv` のハッシュを `d23308a2a7442be8e559b1b471862fd7588d6a57` に更新する
-  - <https://chromium.googlesource.com/libyuv/libyuv/+/d23308a2a7442be8e559b1b471862fd7588d6a57>
+- [UPDATE] `libyuv` のハッシュを `eb8eda9c7973704d1103a535059224df7a6063b5` に更新する
+  - <https://chromium.googlesource.com/libyuv/libyuv/+/eb8eda9c7973704d1103a535059224df7a6063b5>
+  - libyuv 側で `NV21ToNV12` が `NV12ToNV21` のエイリアスになったため、`nv21_to_nv12` の呼び出し先を `NV12ToNV21` に変更する
   - @voluntas
 - [UPDATE] scale.rs の _12/_16 関数のドキュメントを改善し 12bit/16bit データの意味的差異を明確化する
   - @voluntas
