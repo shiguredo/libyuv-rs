@@ -89,7 +89,7 @@ check_unresolved() {
   nm_output=$("$LLVM_NM" -u --format=just-symbols "$lib")
 
   # マップは "旧名 新名" を空白 1 個区切りで 1 行に記述する。現行の libjpeg-turbo
-  # 3.1.90 では数百行規模で、write_objcopy_rename_map が lines.join("\n") で書き出すため
+  # 3.2.0 では数百行規模で、write_objcopy_rename_map が lines.join("\n") で書き出すため
   # **末尾に改行が無い**。`while read` で読むと最終行を落とすため、行単位処理は使わず
   # sed / sort / comm で全行を一行パイプラインで扱う。旧名は C 識別子なので空白を含まない。
   #

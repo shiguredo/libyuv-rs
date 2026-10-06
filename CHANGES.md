@@ -33,7 +33,7 @@
   - libyuv に MM21 / MT2T を出力する変換が存在しないため、使う手段のない公開型を削除する
   - @voluntas
 - [ADD] libjpeg-turbo をビルド依存として組み込む
-  - libjpeg-turbo 3.1.90 (tag `3.1.90`, commit `e1dbfa7be7b7e54922020051dc77781e92739700`) を build.rs から自動ビルドする
+  - libjpeg-turbo 3.2.0 (tag `3.2.0`, commit `c85e6b905bf237038faa936dab160ebfc5da0344`) を build.rs から自動ビルドする
   - 静的ライブラリのシンボルに `shiguredo_jpeg_` プレフィックスを付与する
   - @voluntas
 - [ADD] MJPEG 変換関数を追加する

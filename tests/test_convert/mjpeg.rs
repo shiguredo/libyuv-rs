@@ -4,7 +4,7 @@
 //! 既知 JPEG のデコード結果を ground truth として固定して正常系を検証する。
 //! エラーパス (バッファ不足・stride 不足・c_int 超過) も検証する。
 //!
-//! ground truth は libjpeg-turbo 3.1.90 (build.rs で固定) のデコード結果であり、
+//! ground truth は libjpeg-turbo 3.2.0 (build.rs で固定) のデコード結果であり、
 //! libyuv の MJPG デコードは既定の整数 IDCT を使うため SIMD / 非 SIMD で同一出力になる。
 //! テストデータは `src/test_data/mjpeg_8x8_yuv420.jpg` (8x8, 4:2:0, gradient:red-blue) を使う。
 
@@ -14,7 +14,7 @@ use shiguredo_libyuv::{I420ImageMut, ImageSize, mjpeg_to_i420};
 
 // テスト対象の JPEG ファイル (バイト列ごと埋め込む)
 const JPEG_8X8_YUV420: &[u8] = include_bytes!("../../src/test_data/mjpeg_8x8_yuv420.jpg");
-// 8x8 4:2:0 のデコード結果 (libjpeg-turbo 3.1.90 の実測値)
+// 8x8 4:2:0 のデコード結果 (libjpeg-turbo 3.2.0 の実測値)
 // Y: 8x8 (64 要素)。上から下へ行ごとに 8 要素ずつ
 const EXPECTED_Y: [u8; 64] = [
     76, 76, 76, 76, 76, 76, 76, 76, //

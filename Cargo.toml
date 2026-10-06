@@ -28,7 +28,7 @@ version = "eb8eda9c7973704d1103a535059224df7a6063b5"
 # libjpeg-turbo はタグが存在するのでタグで固定する
 [package.metadata.external-dependencies.libjpeg-turbo]
 git = "https://github.com/libjpeg-turbo/libjpeg-turbo"
-version = "3.1.90"
+version = "3.2.0"
 
 [workspace]
 members = ["pbt"]
