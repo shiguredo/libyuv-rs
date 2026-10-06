@@ -109,6 +109,9 @@
 
 ### misc
 
+- [UPDATE] `canary.py` を正式リリース (canary 版から正式版への引き下げ) に対応させる
+  - `--release` フラグ、`CHANGES.md` のリリース日更新、ブランチ・作業ツリー検証を追加する
+  - @voluntas
 - [CHANGE] convert.rs をサブモジュールに分割する
   - @voluntas
 - [ADD] MJPEG fuzz ターゲットを追加する

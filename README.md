@@ -199,6 +199,46 @@ DOCS_RS=1 cargo doc --no-deps
 | `ANDROID_NDK_HOME` | Android ソースビルドで使用する NDK のディレクトリ |
 | `ANDROID_PLATFORM` | Android ソースビルドの最小 API level (未指定時は `21`) |
 
+## リリース手順
+
+### canary リリース
+
+1. `canary.py` でバージョンをインクリメントし、コミット・タグ・プッシュを実行する
+
+```bash
+python3 canary.py
+```
+
+- バージョンは `2026.2.0-canary.6` → `2026.2.0-canary.7` のように更新される
+- タグのプッシュにより、GitHub Actions の `release.yml` が GitHub Release の作成、全プラットフォームの prebuilt ビルド、crates.io への公開まで自動実行する
+- タグのプッシュは `develop` または `release/` ブランチからのみ実行できる
+
+### 正式リリース
+
+1. `release/YYYY.M.P` ブランチを `develop` から作成する
+
+```bash
+git checkout -b release/2026.2.0 develop
+```
+
+2. `canary.py --release` で canary バージョンを正式リリース版に変換する
+
+```bash
+python3 canary.py --release
+```
+
+- バージョンは `2026.2.0-canary.6` → `2026.2.0` のように変換される
+- `CHANGES.md` の `## develop` の下に `## 2026.2.0` とリリース日が追加される
+- コミット・タグ・プッシュまで自動で実行される
+
+3. プッシュ後、GitHub Actions の `release.yml` が以下を自動実行する
+
+- GitHub Release の作成
+- 全 12 ターゲット (デスクトップ 8 + iOS / Android 4) の prebuilt バイナリのビルドとアップロード
+- crates.io への公開
+
+4. リリース後、`release/` ブランチを `develop` にマージする
+
 ## 使い方
 
 ### フォーマット変換
