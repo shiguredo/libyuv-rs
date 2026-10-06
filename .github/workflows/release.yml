@@ -1,5 +1,11 @@
 name: Release
 
+# 任意のタグ push で発火する。タグ push は canary.py の verify_release_branch が
+# develop / release/* ブランチ上に限定する。
+# canary タグ (例: 2026.2.0-canary.7) では prerelease として GitHub Release を作成したうえで
+# crates.io にも canary 版を公開する。正式タグ (例: 2026.2.0) では通常の Release として公開する。
+# タグ名は Cargo.toml の [package] version と一致している必要がある
+# (build.rs が CARGO_PKG_VERSION をタグ名として prebuilt の URL を組み立てるため)。
 on:
   push:
     tags:
@@ -13,6 +19,8 @@ jobs:
     name: "Create GitHub Release"
     timeout-minutes: 20
     runs-on: ubuntu-slim
+    permissions:
+      contents: write
     outputs:
       version: ${{ steps.get_version.outputs.VERSION }}
     steps:
@@ -22,6 +30,26 @@ jobs:
       - name: Get the version
         id: get_version
         run: echo "VERSION=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_OUTPUT
+
+      - name: Verify tag matches Cargo.toml version
+        env:
+          VERSION: ${{ steps.get_version.outputs.VERSION }}
+        run: |
+          # Cargo.toml の [package] セクションの version を読み取る。
+          # package.metadata.external-dependencies.libyuv にも version があるため、
+          # 1 段目の sed で [package] から次の [ セクションまでを範囲として抽出する。
+          CARGO_VERSION=$(
+            sed -n '/^\[package\]/,/^\[/p' Cargo.toml |
+              sed -n 's/^version *= *"\(.*\)"/\1/p'
+          )
+          if [ -z "$CARGO_VERSION" ]; then
+            echo "Failed to read version from Cargo.toml [package] section" >&2
+            exit 1
+          fi
+          if [ "$VERSION" != "$CARGO_VERSION" ]; then
+            echo "Tag version ($VERSION) does not match Cargo.toml version ($CARGO_VERSION)" >&2
+            exit 1
+          fi
 
       - name: Create Release
         env:
@@ -189,7 +217,17 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: rust-lang/crates-io-auth-action@bbd81622f20ce9e2dd9622e3218b975523e45bbe # v1.0.4
         id: auth
-      - run: cargo publish
+
+      # 本番 publish の前にパッケージ内容を検証する。
+      # include リストの欠落や README / LICENSE 不足による失敗を事前に検出し、
+      # 「GitHub Release は作成済みだが crates.io 未公開」の状態を防ぐ。
+      - name: Verify package contents with cargo publish --dry-run
+        run: cargo publish --dry-run
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+
+      - name: Publish to crates.io
+        run: cargo publish
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
 

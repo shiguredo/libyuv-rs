@@ -109,6 +109,10 @@
 
 ### misc
 
+- [UPDATE] `release.yml` にタグと `Cargo.toml` の version の整合検証と `cargo publish --dry-run` を追加する
+  - `build.rs` は `CARGO_PKG_VERSION` をタグ名として prebuilt の URL を組み立てるため、不一致は利用者のビルドを 404 で壊す
+  - `github-release` ジョブに `permissions: contents: write` を明示する
+  - @voluntas
 - [UPDATE] `canary.py` を正式リリース (canary 版から正式版への引き下げ) に対応させる
   - `--release` フラグ、`CHANGES.md` のリリース日更新、ブランチ・作業ツリー検証を追加する
   - @voluntas
