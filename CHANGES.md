@@ -11,6 +11,10 @@
 
 ## develop
 
+## 2026.2.0
+
+**リリース日**: 2026-10-06
+
 - [CHANGE] MSRV (rust-version) を 1.93 に上げる
   - rust-toolchain.toml の channel も rust-version と同じ 1.93 に揃える
   - @voluntas
@@ -48,7 +52,7 @@
   - <https://chromium.googlesource.com/libyuv/libyuv/+/eb8eda9c7973704d1103a535059224df7a6063b5>
   - libyuv 側で `NV21ToNV12` が `NV12ToNV21` のエイリアスになったため、`nv21_to_nv12` の呼び出し先を `NV12ToNV21` に変更する
   - @voluntas
-- [UPDATE] scale.rs の _12/_16 関数のドキュメントを改善し 12bit/16bit データの意味的差異を明確化する
+- [UPDATE] scale.rs の `_12/_16` 関数のドキュメントを改善し 12bit/16bit データの意味的差異を明確化する
   - @voluntas
 - [FIX] calc_frame_psnr と i420_psnr がゼロサイズ入力で意味のない値を返す問題を修正する
   - @voluntas

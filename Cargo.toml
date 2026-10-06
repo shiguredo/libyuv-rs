@@ -1,6 +1,6 @@
 [package]
 name = "shiguredo_libyuv"
-version = "2026.2.0-canary.8"
+version = "2026.2.0"
 edition = "2024"
 rust-version = "1.93"
 description = "Rust bindings for Google's libyuv image conversion and processing library"
@@ -37,10 +37,10 @@ exclude = ["fuzz"]
 [dependencies]
 
 [build-dependencies]
-bindgen = "0.72"
+bindgen = "0.73"
 # cmake クレートのコンパイラ判定に Android NDK の C / C++ コンパイラを指定する
-cc = "1.4"
-shiguredo_cmake = "4.3"
+cc = "1.6"
+shiguredo_cmake = "4.4"
 shiguredo_toml = "2026.2"
 
 [features]
