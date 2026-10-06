@@ -4114,7 +4114,7 @@ pub fn convert_to_lsb_plane_16(
 
     // depth == 16 では sys::ConvertToLSBPlane_16 を呼ばない。
     //
-    // libyuv commit d23308a2a7442be8e559b1b471862fd7588d6a57 時点の ConvertToLSBPlane_16
+    // libyuv commit eb8eda9c7973704d1103a535059224df7a6063b5 時点の ConvertToLSBPlane_16
     // は `int scale = 1 << depth` を計算し、その scale を 16bit レーンへ放送する SIMD 行
     // 関数（DivideRow_16_AVX2 / DivideRow_16_NEON / DivideRow_16_SVE2）または C の
     // DivideRow_16_C へディスパッチする。depth == 16 では scale = 65536 = 0x00010000 の

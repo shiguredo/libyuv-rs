@@ -367,9 +367,11 @@ pub fn nv21_to_nv12(
     src.validate(size, "NV21ToNV12")?;
     dst.validate(size, "NV21ToNV12")?;
 
+    // libyuv 側では NV21ToNV12 が NV12ToNV21 のエイリアスマクロとして定義され、
+    // 実シンボルは NV12ToNV21 のみになった。UV 入れ替えの意味は同じなのでこちらを呼ぶ。
     // SAFETY: .validate() が全前提条件を検査済み。
     let result = unsafe {
-        sys::NV21ToNV12(
+        sys::NV12ToNV21(
             src.y.as_ptr(),
             src.y_stride as c_int,
             src.uv.as_ptr(),
